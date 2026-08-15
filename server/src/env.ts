@@ -89,6 +89,20 @@ export const envSchema = z.object({
    * production guard in `loadEnv`.
    */
   MAIL_FROM: z.string().min(1).default('Trips <no-reply@mail.myze.ca>'),
+
+  /**
+   * Web Push (PLAN.md §7). Optional: without a key pair the app still sends
+   * reminders by email, which is the default channel anyway, so a missing VAPID
+   * config degrades a feature rather than breaking the app. Generate a pair
+   * with `npx web-push generate-vapid-keys`.
+   */
+  VAPID_PUBLIC_KEY: z.string().min(1).optional(),
+  VAPID_PRIVATE_KEY: z.string().min(1).optional(),
+  /** Contact URI the push service can reach you at, per the VAPID spec. */
+  VAPID_SUBJECT: z.string().min(1).default('mailto:no-reply@mail.myze.ca'),
+
+  /** How often the reminder sweep runs. Lower in tests. */
+  SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -119,6 +133,16 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
         `MAIL_FROM is set to a provider test address (${parsed.data.MAIL_FROM}). It only delivers to the provider account's own address, so invitations would silently reach nobody. Use an address on a domain you have verified.`,
       );
     }
+  }
+
+  // Half a VAPID pair is a configuration mistake that would fail only at the
+  // moment someone tried to subscribe.
+  const hasPublic = parsed.data.VAPID_PUBLIC_KEY !== undefined;
+  const hasPrivate = parsed.data.VAPID_PRIVATE_KEY !== undefined;
+  if (hasPublic !== hasPrivate) {
+    throw new Error(
+      'VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY must be set together, or both left unset.',
+    );
   }
 
   return parsed.data;

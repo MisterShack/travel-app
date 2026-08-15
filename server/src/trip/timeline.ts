@@ -215,6 +215,46 @@ export async function getTimeline(db: Db, tripId: string): Promise<TimelineItem[
   );
 }
 
+/**
+ * What a reminder for this entity should say and when it should fire.
+ *
+ * Built from the **stored** row rather than the submitted input, so it always
+ * reflects what was actually saved — including the derived instant.
+ */
+export function reminderSubjectFor(kind: EntityKind, row: Record<string, unknown>) {
+  if (kind === 'flight') {
+    return {
+      tripId: String(row['tripId']),
+      relatedType: 'flight' as const,
+      relatedId: String(row['id']),
+      startAt: String(row['departureAt']),
+      timezone: String(row['departureTimezone']),
+      title: `${String(row['airline'])} ${String(row['flightNumber'])}`,
+      detail: `${String(row['departureAirport'])} → ${String(row['arrivalAirport'])}`,
+    };
+  }
+  if (kind === 'lodging') {
+    return {
+      tripId: String(row['tripId']),
+      relatedType: 'lodging' as const,
+      relatedId: String(row['id']),
+      startAt: String(row['checkInAt']),
+      timezone: String(row['checkInTimezone']),
+      title: String(row['name']),
+      detail: row['address'] ? String(row['address']) : '',
+    };
+  }
+  return {
+    tripId: String(row['tripId']),
+    relatedType: 'activity' as const,
+    relatedId: String(row['id']),
+    startAt: String(row['startAt']),
+    timezone: String(row['startTimezone']),
+    title: String(row['name']),
+    detail: row['location'] ? String(row['location']) : '',
+  };
+}
+
 const TABLES = { flight: flights, lodging, activity: activities } as const;
 export type EntityKind = keyof typeof TABLES;
 

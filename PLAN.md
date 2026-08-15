@@ -472,8 +472,10 @@ verified Resend domain.
   list + timeline view + add/edit forms, **and the offline read cache** (§8). Manual entry only.
 - **Phase 4 — Booking import:** Resend inbound domain setup, signature-verified webhook, parser
   (heuristics + LLM fallback), trip-matching, review-and-apply UI.
-- **Phase 5 — Notifications:** reminder generation + fan-out + the in-process sweep, email
-  reminders via the existing `Mailer`, then VAPID/web push and the iOS install onboarding.
+- **Phase 5 — Notifications: done 2026-08-15.** Reminder generation and fan-out, the in-process
+  sweep with claim-before-send and a staleness cutoff, email reminders via the existing `Mailer`,
+  VAPID web push with a custom service worker, and the iOS install prompt. Verified end to end
+  against a running server: a due reminder is delivered once and not re-sent.
 
 **Deferred / explicitly out of scope for v1** (from §12): expense/budget tracking, document or
 photo attachments, offline *writes* (§8), AI-generated restaurant/attraction recommendations
@@ -507,6 +509,12 @@ From the 2026-08-15 scoping conversation, plus three settled during the plan rev
 
 ## 13. Open questions
 
+**Settled in Phase 5:** default reminder lead times are flights 3h, check-in 2h, activities 1h
+(`DEFAULT_LEAD_MINUTES`), chosen as the warning each type actually needs to be useful. Per-event
+overrides are deferred — sensible defaults matter more than a setting nobody opens. Reminders are
+not created for an event whose lead time has already passed: you just entered it, so notifying
+immediately would be noise.
+
 Resolved into the document above and no longer open: the trip-matching UX (§6.6), the LLM-failure
 rule (§6.7), the trip-level date anchor (§3 — `homeTimezone`, and those fields are for sort and
 bucketing only), and Litestream's status (§11 Phase 1 makes it a gated deliverable with a restore
@@ -519,9 +527,6 @@ Still genuinely open:
   share one name (only a CNAME conflicts with other record types, which is why the *app's* domain
   had to be separate — §6.1), so `mail.myze.ca` should be able to do both. Confirm against the
   actual Resend account before Phase 4 rather than discovering it at DNS time.
-- **Default reminder timing.** How long before a flight / check-in / activity should a reminder
-  fire by default, and is it the same per event type? Needs a decision before Phase 5, not before
-  Phase 3. Straw man: flights 3h, check-in 2h, activities 1h, each user-overridable.
 - **LLM spend cap.** §6.4's per-user import cap and §6.7's failure path bound the damage, but no
   number is chosen for either. On the paid tier the exposure is money rather than a quota, so set
   a billing alert as well as a per-user cap when Phase 4 lands.

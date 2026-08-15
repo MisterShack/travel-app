@@ -26,12 +26,18 @@ import {
 } from './membership';
 import { acceptInvite, createInvite, describeInvite, listInvites, revokeInvite } from './invites';
 import {
+  deleteAutoReminders,
+  generateReminders,
+  regenerateReminders,
+} from '../notify/reminders';
+import {
   createActivity,
   createFlight,
   createLodging,
   deleteEntity,
   getEntity,
   getTimeline,
+  reminderSubjectFor,
   timeAnomalies,
   tripIdOf,
   updateActivity,
@@ -290,7 +296,12 @@ export function createTripRoutes(deps: TripDeps) {
     const body = flightInputSchema.safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json(badRequest('Check the flight details.', body.error.issues), 400);
 
-    const id = await createFlight(db, tripId, body.data, now());
+    const at = now();
+    const id = await createFlight(db, tripId, body.data, at);
+    // Reminders fan out from the stored row, so they reflect the derived
+    // instant rather than whatever the client submitted (PLAN.md §7).
+    const stored = await getEntity(db, 'flight', id);
+    if (stored) await generateReminders(db, reminderSubjectFor('flight', stored), at);
     return c.json({ ok: true, id, ...warn(timeAnomalies({ departure: body.data.departure, arrival: body.data.arrival })) }, 201);
   });
 
@@ -301,7 +312,12 @@ export function createTripRoutes(deps: TripDeps) {
     const body = lodgingInputSchema.safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json(badRequest('Check the lodging details.', body.error.issues), 400);
 
-    const id = await createLodging(db, tripId, body.data, now());
+    const at = now();
+    const id = await createLodging(db, tripId, body.data, at);
+    // Reminders fan out from the stored row, so they reflect the derived
+    // instant rather than whatever the client submitted (PLAN.md §7).
+    const stored = await getEntity(db, 'lodging', id);
+    if (stored) await generateReminders(db, reminderSubjectFor('lodging', stored), at);
     return c.json({ ok: true, id, ...warn(timeAnomalies({ checkIn: body.data.checkIn, checkOut: body.data.checkOut })) }, 201);
   });
 
@@ -312,9 +328,20 @@ export function createTripRoutes(deps: TripDeps) {
     const body = activityInputSchema.safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json(badRequest('Check the activity details.', body.error.issues), 400);
 
-    const id = await createActivity(db, tripId, body.data, now());
+    const at = now();
+    const id = await createActivity(db, tripId, body.data, at);
+    // Reminders fan out from the stored row, so they reflect the derived
+    // instant rather than whatever the client submitted (PLAN.md §7).
+    const stored = await getEntity(db, 'activity', id);
+    if (stored) await generateReminders(db, reminderSubjectFor('activity', stored), at);
     return c.json({ ok: true, id, ...warn(timeAnomalies({ start: body.data.start, end: body.data.end })) }, 201);
   });
+
+  /** Re-derives an entity's reminders after an edit, from the stored row. */
+  const regenerateFor = async (kind: EntityKind, id: string, at: Date) => {
+    const stored = await getEntity(db, kind, id);
+    if (stored) await regenerateReminders(db, reminderSubjectFor(kind, stored), at);
+  };
 
   /**
    * The entity routes are flat (`/flights/:id`), so authorisation resolves
@@ -354,18 +381,21 @@ export function createTripRoutes(deps: TripDeps) {
           const body = flightInputSchema.safeParse(raw);
           if (!body.success) return c.json(badRequest('Check the flight details.', body.error.issues), 400);
           await updateFlight(db, found.id, body.data, at);
+          await regenerateFor('flight', found.id, at);
           return c.json({ ok: true, ...warn(timeAnomalies({ departure: body.data.departure, arrival: body.data.arrival })) });
         }
         case 'lodging': {
           const body = lodgingInputSchema.safeParse(raw);
           if (!body.success) return c.json(badRequest('Check the lodging details.', body.error.issues), 400);
           await updateLodging(db, found.id, body.data, at);
+          await regenerateFor('lodging', found.id, at);
           return c.json({ ok: true, ...warn(timeAnomalies({ checkIn: body.data.checkIn, checkOut: body.data.checkOut })) });
         }
         case 'activity': {
           const body = activityInputSchema.safeParse(raw);
           if (!body.success) return c.json(badRequest('Check the activity details.', body.error.issues), 400);
           await updateActivity(db, found.id, body.data, at);
+          await regenerateFor('activity', found.id, at);
           return c.json({ ok: true, ...warn(timeAnomalies({ start: body.data.start, end: body.data.end })) });
         }
       }
@@ -374,6 +404,9 @@ export function createTripRoutes(deps: TripDeps) {
     app.delete(path, auth, async (c) => {
       const found = await authorise(c);
       if ('error' in found) return found.error;
+      // Pending reminders go with it, or the app pings you about a cancelled
+      // flight. Already-sent ones survive as a record (PLAN.md §7).
+      await deleteAutoReminders(db, kind, found.id);
       await deleteEntity(db, kind, found.id, found.tripId);
       return c.json({ ok: true });
     });

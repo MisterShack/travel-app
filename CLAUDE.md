@@ -59,7 +59,14 @@ certificate, `/health` answering JSON, the client served at `/`, SPA deep links 
 `/api/*` returning JSON rather than being shadowed by the static fallback. Registration and email
 verification work against real Resend delivery.
 
-Phases 0, 1, 2 and 3 are done — the MVP is shipped. 84 tests, typecheck and lint clean.
+Phases 0, 1, 2, 3 and 5 are done. 101 tests, typecheck and lint clean.
+
+**Phase 5 (notifications) shipped 2026-08-15**: reminders fan out one row per member per channel,
+the in-process sweep claims each row before sending (so an overlapping tick cannot double-send)
+and drops anything more than 2h late rather than delivering a misleading "departs in 3 hours"
+after the plane has gone. Email is the default channel; web push is an opt-in upgrade, because
+iOS only exposes PushManager to a PWA launched from the Home Screen. Default lead times: flights
+3h, check-in 2h, activities 1h.
 
 Two things that are true and worth keeping in view:
 
@@ -74,8 +81,9 @@ Two things that are true and worth keeping in view:
 - **Registration is open.** The app is publicly reachable, so anyone with the URL can create an
   account and consume the Resend quota. There is no invite gate.
 
-Outstanding: **Phase 4** (booking import — needs the Resend inbound domain, and note §13's open
-question about the verified-domain allowance) and **Phase 5** (notifications — needs VAPID keys).
+Outstanding: **Phase 4** (booking import — needs the Resend inbound domain, a Gemini key, and
+note §13's open question about the verified-domain allowance). Web push needs `VAPID_*` set in
+Railway to work in production; without it reminders still go by email.
 
 Findings from building that contradict a straight port from budget-app, all encoded:
 

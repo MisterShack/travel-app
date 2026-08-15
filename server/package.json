@@ -17,9 +17,11 @@
     "@libsql/client": "^0.17.0",
     "@node-rs/argon2": "^2.0.0",
     "@travel/shared": "*",
+    "@types/web-push": "^3.6.4",
     "drizzle-orm": "^0.45.0",
     "hono": "^4.6.0",
     "tsx": "^4.19.0",
+    "web-push": "^3.6.7",
     "zod": "^4.0.0"
   },
   "devDependencies": {

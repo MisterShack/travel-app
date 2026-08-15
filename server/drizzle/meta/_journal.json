@@ -15,6 +15,13 @@
       "when": 1786813138386,
       "tag": "0001_bouncy_kulan_gath",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786833086601,
+      "tag": "0002_gorgeous_abomination",
+      "breakpoints": true
     }
   ]
 }

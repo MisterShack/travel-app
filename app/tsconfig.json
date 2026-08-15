@@ -5,6 +5,7 @@
     "jsx": "react-jsx",
     "useDefineForClassFields": true,
     "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],

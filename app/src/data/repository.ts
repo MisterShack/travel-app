@@ -47,7 +47,13 @@ export function loadTrips(userId: string): Promise<Loaded<TripSummary[]>> {
 
 export type TripDetail = {
   trip: TripSummary & { role: 'owner' | 'member' };
-  members: { userId: string; email: string; role: string; joinedAt: string }[];
+  members: {
+    userId: string;
+    email: string;
+    role: string;
+    remindersEnabled: string;
+    joinedAt: string;
+  }[];
 };
 
 export function loadTrip(tripId: string, userId: string): Promise<Loaded<TripDetail>> {

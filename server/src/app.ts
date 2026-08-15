@@ -6,6 +6,7 @@ import type { Mailer } from './mail/mailer';
 import { originGuard } from './middleware/originGuard';
 import { createAuthRoutes } from './auth/routes';
 import { createInviteRoutes, createTripRoutes } from './trip/routes';
+import { createNotifyRoutes } from './notify/routes';
 
 export const SERVER_VERSION = '0.0.0';
 
@@ -62,6 +63,7 @@ export function buildApp({ db, env, mailer, now }: AppDeps) {
   app.route('/api/auth', createAuthRoutes({ db, mailer, env, now }));
   app.route('/api', createTripRoutes({ db, mailer, env, now }));
   app.route('/api', createInviteRoutes({ db, mailer, env, now }));
+  app.route('/api', createNotifyRoutes({ db, env, now }));
 
   // Static file serving is registered *after* the API routes so it can never
   // shadow them, and only when STATIC_DIR is set — which is how one process

@@ -251,3 +251,84 @@ export const activities = sqliteTable(
 export type FlightRow = typeof flights.$inferSelect;
 export type LodgingRow = typeof lodging.$inferSelect;
 export type ActivityRow = typeof activities.$inferSelect;
+
+/* -------------------------------------------------------------------------- */
+/* Notifications                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A browser's push endpoint. One row per browser, not per user — the same
+ * person on a phone and a laptop has two.
+ */
+export const pushSubscriptions = sqliteTable(
+  'push_subscriptions',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Unique: re-subscribing must update this row, not add a second one. */
+    endpoint: text('endpoint').notNull().unique(),
+    p256dh: text('p256dh').notNull(),
+    auth: text('auth').notNull(),
+    createdAt: text('created_at').notNull(),
+    lastSeenAt: text('last_seen_at').notNull(),
+  },
+  (table) => [index('push_subscriptions_user_idx').on(table.userId)],
+);
+
+/**
+ * One reminder per **recipient per channel** (PLAN.md §7).
+ *
+ * A trip has several members, so a reminder without a recipient cannot be
+ * delivered or recorded, and a single `sentAt` cannot represent "sent to two of
+ * four members". Fanning out at creation time makes each delivery its own row
+ * with its own outcome.
+ */
+export const reminders = sqliteTable(
+  'reminders',
+  {
+    id: text('id').primaryKey(),
+    tripId: text('trip_id')
+      .notNull()
+      .references(() => trips.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    channel: text('channel', { enum: ['push', 'email'] }).notNull(),
+
+    /**
+     * Polymorphic pointer, so it cannot carry a foreign key. `auto` rows are
+     * regenerated when the event is edited and deleted with it; the sweep also
+     * skips any whose target has gone (PLAN.md §7).
+     */
+    relatedType: text('related_type', { enum: ['flight', 'lodging', 'activity'] }).notNull(),
+    relatedId: text('related_id').notNull(),
+    origin: text('origin', { enum: ['auto', 'custom'] }).notNull(),
+
+    /** What the notification says. Rendered at creation, so a later edit to the
+     *  event cannot make an already-sent reminder retroactively wrong. */
+    title: text('title').notNull(),
+    body: text('body').notNull(),
+
+    remindAt: text('remind_at').notNull(),
+    /**
+     * Claimed before sending, so an overlapping sweep tick cannot select the
+     * same row twice. Select-send-stamp duplicates every notification whose
+     * send outlasts one tick.
+     */
+    claimedAt: text('claimed_at'),
+    sentAt: text('sent_at'),
+    failedAt: text('failed_at'),
+    error: text('error'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    index('reminders_due_idx').on(table.remindAt, table.claimedAt),
+    index('reminders_related_idx').on(table.relatedType, table.relatedId),
+    index('reminders_user_idx').on(table.userId),
+  ],
+);
+
+export type ReminderRow = typeof reminders.$inferSelect;
+export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;

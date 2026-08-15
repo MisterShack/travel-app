@@ -88,6 +88,9 @@ agree. Change one, change the other.
 | `TRUST_PROXY` | `true` | Railway terminates TLS in front of the app; without this the rate limiter (Phase 2) keys every request to one bucket |
 | `RESEND_API_KEY` | `re_…` | **Required.** The server refuses to boot in production without it |
 | `MAIL_FROM` | `Trips <no-reply@mail.myze.ca>` | Must be a domain verified in Resend |
+| `VAPID_PUBLIC_KEY` | see below | Optional. Without a pair, reminders go by email only |
+| `VAPID_PRIVATE_KEY` | see below | Must be set together with the public key, or boot fails |
+| `VAPID_SUBJECT` | `mailto:no-reply@mail.myze.ca` | Contact URI for the push service |
 | `LITESTREAM_*` | see §5 | Four variables; without them there is no backup |
 
 Set by the Dockerfile, override only deliberately: `DATABASE_URL`, `STATIC_DIR`, `PORT`,
@@ -101,6 +104,11 @@ Dockerfile's `ENV PORT=8080`, and a mismatch shows up only as a healthcheck that
 > mean mail setup is a prerequisite of deploying at all, not a Phase 2 task. An earlier version of
 > this runbook said otherwise and cost one failed deploy.
 >
+Web push is optional by design: email is the default reminder channel (PLAN.md §7), so a missing
+VAPID pair degrades a feature rather than breaking the app. Generate a pair with
+`npx web-push generate-vapid-keys`. Setting only one half fails at boot rather than at the moment
+someone tries to subscribe.
+
 > `MAIL_FROM` must be an address on a domain verified with Resend. The provider's `@resend.dev`
 > test sender accepts the send and delivers only to the account owner, so every invitation would
 > silently reach nobody; `env.ts` refuses to start on one.

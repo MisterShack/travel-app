@@ -6,6 +6,7 @@ import { useAuth } from '@/auth/useAuth';
 import { ErrorText, Field, StaleBanner } from '@/components/Bits';
 import { loadTimeline, loadTrip, loadTrips, type Loaded } from '@/data/repository';
 import { Timeline } from '@/features/timeline/Timeline';
+import { NotificationSettings } from '@/features/notify/NotificationSettings';
 import { TimezoneField } from '@/features/timeline/AirportField';
 
 const guessZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -222,6 +223,14 @@ export function TripDetailPage() {
       </div>
 
       <Timeline items={timeline.data} homeTimezone={trip.homeTimezone} />
+
+      <h2>Notifications</h2>
+      <NotificationSettings
+        tripId={tripId}
+        enabled={
+          detail.data.members.find((m) => m.userId === user?.id)?.remindersEnabled !== 'false'
+        }
+      />
 
       <h2>People</h2>
       {detail.data.members.map((m) => (

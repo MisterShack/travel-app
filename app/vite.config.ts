@@ -9,6 +9,11 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      // injectManifest, not generateSW: a generated worker cannot carry the
+      // push and notificationclick handlers, which is the point of having one.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       registerType: 'autoUpdate',
       manifest: {
         name: 'Trips',
