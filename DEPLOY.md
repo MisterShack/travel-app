@@ -35,7 +35,9 @@ You need three things. The first two are quick; the third is the one people skip
 
 1. **A GitHub repo.** Railway deploys from it and auto-builds on push.
 2. **A Railway account** with this repo connected.
-3. **An S3-compatible bucket** for Litestream, plus an access key and secret.
+3. **A Resend API key**, and a domain verified in that Resend account. The server will not start
+   in production without the key — see §3.
+4. **An S3-compatible bucket** for Litestream, plus an access key and secret.
    **Cloudflare R2** and **Backblaze B2** both have free tiers far beyond what a family's trips
    use. Both want a payment method on the account, so if that is the blocker, come back to it —
    but come back, and read §5 before deciding it can wait.
@@ -83,16 +85,24 @@ agree. Change one, change the other.
 | `PUBLIC_URL` | `https://<your-domain>` | Used to build links in email |
 | `APP_ORIGIN` | `https://<your-domain>` | Cross-origin allow-list. **Needs the scheme** — a bare host is rejected at boot, because `new URL('example.com')` parses as scheme `example.com:` and would match no real Origin header |
 | `TRUST_PROXY` | `true` | Railway terminates TLS in front of the app; without this the rate limiter (Phase 2) keys every request to one bucket |
+| `RESEND_API_KEY` | `re_…` | **Required.** The server refuses to boot in production without it |
+| `MAIL_FROM` | `Trips <no-reply@mail.myze.ca>` | Must be a domain verified in Resend |
 | `LITESTREAM_*` | see §5 | Four variables; without them there is no backup |
 
 Set by the Dockerfile, override only deliberately: `DATABASE_URL`, `STATIC_DIR`, `PORT`,
-`NODE_ENV`.
+`NODE_ENV`. **Do not add a `PORT` variable here** — a dashboard variable overrides the
+Dockerfile's `ENV PORT=8080`, and a mismatch shows up only as a healthcheck that never passes.
 
-Mail (`RESEND_API_KEY`, `MAIL_FROM`) arrives in Phase 2 with the mailer. `MAIL_FROM` must be an
-address on a domain verified with Resend — the provider's `@resend.dev` test sender accepts the
-send and delivers only to the account owner, so every invitation would silently reach nobody.
-budget-app's `env.ts` refuses to boot in production if it sees one; port that guard with the
-mailer.
+> **`RESEND_API_KEY` is required for the very first production deploy**, not a later addition.
+> `env.ts` throws on boot without it, so the container exits before it can answer `/health` and
+> Railway reports a **healthcheck failure** with no other clue. That is the guard working — an app
+> that boots happily and silently delivers no verification or invite email is worse — but it does
+> mean mail setup is a prerequisite of deploying at all, not a Phase 2 task. An earlier version of
+> this runbook said otherwise and cost one failed deploy.
+>
+> `MAIL_FROM` must be an address on a domain verified with Resend. The provider's `@resend.dev`
+> test sender accepts the send and delivers only to the account owner, so every invitation would
+> silently reach nobody; `env.ts` refuses to start on one.
 
 ---
 
