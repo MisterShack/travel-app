@@ -4,9 +4,20 @@
   "version": "0.0.0",
   "type": "module",
   "description": "Zod schemas and validation shared verbatim by the client and the server.",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts",
+    "./airports": "./src/airports.ts"
+  },
   "types": "./src/index.ts",
-  "scripts": { "typecheck": "tsc --noEmit" },
-  "dependencies": { "zod": "^4.0.0" },
-  "devDependencies": { "typescript": "^5.9.3" }
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
 }

@@ -5,7 +5,7 @@
     // browser client and the Node server alike, so anything platform-specific
     // leaking in here would break one of them (PLAN.md §2).
     "lib": ["ES2022"],
-    "types": []
+    "types": ["vitest/globals"]
   },
-  "include": ["src"]
+  "include": ["src", "vitest.config.ts"]
 }

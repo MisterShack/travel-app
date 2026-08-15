@@ -136,3 +136,118 @@ export const tripMembers = sqliteTable(
     index('trip_members_user_idx').on(table.userId),
   ],
 );
+
+/* -------------------------------------------------------------------------- */
+/* Timeline entities                                                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Every event time is three columns: the local wall-clock string, the IANA zone
+ * it is expressed in, and the derived UTC instant (PLAN.md §4).
+ *
+ * Local+zone is the source of truth — it is what the ticket says, and DST rules
+ * change between booking and travel. The `*_at` instant is a derived index,
+ * recomputed whenever the local time or the zone changes, and it is what the
+ * merged timeline sorts on. A flight departing in one zone and landing in
+ * another cannot be ordered any other way.
+ *
+ * Three tables rather than one polymorphic `events` table, because each type
+ * has meaningfully different required fields and a shared table would make most
+ * of them nullable.
+ */
+
+export const flights = sqliteTable(
+  'flights',
+  {
+    id: text('id').primaryKey(),
+    tripId: text('trip_id')
+      .notNull()
+      .references(() => trips.id, { onDelete: 'cascade' }),
+    airline: text('airline').notNull(),
+    flightNumber: text('flight_number').notNull(),
+    confirmationCode: text('confirmation_code'),
+
+    departureAirport: text('departure_airport').notNull(),
+    departureLocal: text('departure_local').notNull(),
+    departureTimezone: text('departure_timezone').notNull(),
+    departureAt: text('departure_at').notNull(),
+
+    arrivalAirport: text('arrival_airport').notNull(),
+    arrivalLocal: text('arrival_local').notNull(),
+    arrivalTimezone: text('arrival_timezone').notNull(),
+    arrivalAt: text('arrival_at').notNull(),
+
+    seat: text('seat'),
+    notes: text('notes'),
+    source: text('source', { enum: ['manual', 'import'] })
+      .notNull()
+      .default('manual'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [index('flights_trip_idx').on(table.tripId, table.departureAt)],
+);
+
+export const lodging = sqliteTable(
+  'lodging',
+  {
+    id: text('id').primaryKey(),
+    tripId: text('trip_id')
+      .notNull()
+      .references(() => trips.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    address: text('address'),
+
+    checkInLocal: text('check_in_local').notNull(),
+    checkInTimezone: text('check_in_timezone').notNull(),
+    checkInAt: text('check_in_at').notNull(),
+
+    checkOutLocal: text('check_out_local').notNull(),
+    checkOutTimezone: text('check_out_timezone').notNull(),
+    checkOutAt: text('check_out_at').notNull(),
+
+    confirmationCode: text('confirmation_code'),
+    notes: text('notes'),
+    source: text('source', { enum: ['manual', 'import'] })
+      .notNull()
+      .default('manual'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [index('lodging_trip_idx').on(table.tripId, table.checkInAt)],
+);
+
+export const activities = sqliteTable(
+  'activities',
+  {
+    id: text('id').primaryKey(),
+    tripId: text('trip_id')
+      .notNull()
+      .references(() => trips.id, { onDelete: 'cascade' }),
+    kind: text('kind', { enum: ['restaurant', 'attraction', 'transport', 'other'] }).notNull(),
+    name: text('name').notNull(),
+    location: text('location'),
+
+    startLocal: text('start_local').notNull(),
+    startTimezone: text('start_timezone').notNull(),
+    startAt: text('start_at').notNull(),
+
+    /** Optional: plenty of activities have a start and no meaningful end. */
+    endLocal: text('end_local'),
+    endTimezone: text('end_timezone'),
+    endAt: text('end_at'),
+
+    confirmationCode: text('confirmation_code'),
+    notes: text('notes'),
+    source: text('source', { enum: ['manual', 'import'] })
+      .notNull()
+      .default('manual'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [index('activities_trip_idx').on(table.tripId, table.startAt)],
+);
+
+export type FlightRow = typeof flights.$inferSelect;
+export type LodgingRow = typeof lodging.$inferSelect;
+export type ActivityRow = typeof activities.$inferSelect;

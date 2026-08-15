@@ -1,0 +1,96 @@
+import { z } from 'zod';
+import { localDateTimeSchema, timeZoneSchema } from './common';
+
+/**
+ * Timeline entities (PLAN.md §3).
+ *
+ * Every event time is submitted as a **local wall-clock time plus an IANA
+ * zone**. The UTC instant is derived server-side and never accepted from the
+ * client — it is a computed index, and letting a client supply it would be
+ * exactly the "server trusts the client" failure §4 forbids.
+ */
+
+export const eventTimeSchema = z.object({
+  local: localDateTimeSchema,
+  timezone: timeZoneSchema,
+});
+export type EventTime = z.infer<typeof eventTimeSchema>;
+
+export const timelineKinds = ['flight', 'lodging', 'activity'] as const;
+export const timelineKindSchema = z.enum(timelineKinds);
+export type TimelineKind = z.infer<typeof timelineKindSchema>;
+
+const iataSchema = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .regex(/^[A-Z]{3}$/, 'Airport codes are three letters, e.g. LHR');
+
+export const flightInputSchema = z
+  .object({
+    airline: z.string().trim().min(1).max(80),
+    flightNumber: z.string().trim().min(1).max(10),
+    confirmationCode: z.string().trim().max(40).optional(),
+    departureAirport: iataSchema,
+    departure: eventTimeSchema,
+    arrivalAirport: iataSchema,
+    arrival: eventTimeSchema,
+    seat: z.string().trim().max(10).optional(),
+    notes: z.string().trim().max(2000).optional(),
+  })
+  // Checked on the instants server-side too; this catches the obvious case
+  // early and gives the form a field to point at.
+  .refine((f) => f.departure.local <= f.arrival.local || f.departure.timezone !== f.arrival.timezone, {
+    message: 'Arrival is before departure',
+    path: ['arrival'],
+  });
+export type FlightInput = z.infer<typeof flightInputSchema>;
+
+export const lodgingInputSchema = z.object({
+  name: z.string().trim().min(1).max(160),
+  address: z.string().trim().max(300).optional(),
+  checkIn: eventTimeSchema,
+  checkOut: eventTimeSchema,
+  confirmationCode: z.string().trim().max(40).optional(),
+  notes: z.string().trim().max(2000).optional(),
+});
+export type LodgingInput = z.infer<typeof lodgingInputSchema>;
+
+export const activityKinds = ['restaurant', 'attraction', 'transport', 'other'] as const;
+export const activityKindSchema = z.enum(activityKinds);
+
+export const activityInputSchema = z.object({
+  kind: activityKindSchema,
+  name: z.string().trim().min(1).max(160),
+  location: z.string().trim().max(300).optional(),
+  start: eventTimeSchema,
+  end: eventTimeSchema.optional(),
+  confirmationCode: z.string().trim().max(40).optional(),
+  notes: z.string().trim().max(2000).optional(),
+});
+export type ActivityInput = z.infer<typeof activityInputSchema>;
+
+/**
+ * One row of the merged timeline. The three entity types have meaningfully
+ * different fields, so they are separate tables (PLAN.md §3) — this is the
+ * shape they are flattened into for display, ordered by `startAt`.
+ */
+export const timelineItemSchema = z.object({
+  kind: timelineKindSchema,
+  id: z.string(),
+  tripId: z.string(),
+  title: z.string(),
+  subtitle: z.string().nullable(),
+  /** UTC instant — what the timeline sorts on. */
+  startAt: z.string(),
+  startLocal: localDateTimeSchema,
+  startTimezone: timeZoneSchema,
+  /** Present for flights (arrival), lodging (check-out) and timed activities. */
+  endAt: z.string().nullable(),
+  endLocal: localDateTimeSchema.nullable(),
+  endTimezone: timeZoneSchema.nullable(),
+  confirmationCode: z.string().nullable(),
+  notes: z.string().nullable(),
+  source: z.enum(['manual', 'import']),
+});
+export type TimelineItem = z.infer<typeof timelineItemSchema>;

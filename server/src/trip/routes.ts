@@ -1,6 +1,13 @@
 import { eq } from 'drizzle-orm';
-import { Hono } from 'hono';
-import { inviteInputSchema, tripInputSchema, tripPatchSchema } from '@travel/shared';
+import { Hono, type Context } from 'hono';
+import {
+  activityInputSchema,
+  flightInputSchema,
+  inviteInputSchema,
+  lodgingInputSchema,
+  tripInputSchema,
+  tripPatchSchema,
+} from '@travel/shared';
 import type { Db } from '../db/client';
 import { trips } from '../db/schema';
 import type { Env } from '../env';
@@ -18,6 +25,19 @@ import {
   roleIn,
 } from './membership';
 import { acceptInvite, createInvite, describeInvite, listInvites, revokeInvite } from './invites';
+import {
+  createActivity,
+  createFlight,
+  createLodging,
+  deleteEntity,
+  getTimeline,
+  timeAnomalies,
+  tripIdOf,
+  updateActivity,
+  updateFlight,
+  updateLodging,
+  type EntityKind,
+} from './timeline';
 
 export type TripDeps = {
   db: Db;
@@ -28,6 +48,11 @@ export type TripDeps = {
 
 function badRequest(message: string, issues?: unknown) {
   return { error: 'invalid_request' as const, message, ...(issues ? { issues } : {}) };
+}
+
+/** Attaches DST warnings to a response only when there are any. */
+function warn(warnings: string[]) {
+  return warnings.length > 0 ? { warnings } : {};
 }
 
 /**
@@ -243,6 +268,113 @@ export function createTripRoutes(deps: TripDeps) {
     if (!revoked) return c.json({ error: 'not_found' }, 404);
     return c.json({ ok: true });
   });
+
+  /* -- timeline ---------------------------------------------------------- */
+
+  app.get('/trips/:id/timeline', auth, async (c) => {
+    const tripId = c.req.param('id');
+    if (!(await roleIn(db, tripId, c.get('user').id))) return c.json({ error: 'not_found' }, 404);
+    return c.json({ items: await getTimeline(db, tripId) });
+  });
+
+  /**
+   * Creating and editing timeline entities is open to any **member**, not just
+   * owners: this is a family trip planner, and requiring an owner to enter every
+   * hotel would make sharing pointless (PLAN.md §5).
+   */
+  app.post('/trips/:id/flights', auth, async (c) => {
+    const tripId = c.req.param('id');
+    if (!(await roleIn(db, tripId, c.get('user').id))) return c.json({ error: 'not_found' }, 404);
+
+    const body = flightInputSchema.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json(badRequest('Check the flight details.', body.error.issues), 400);
+
+    const id = await createFlight(db, tripId, body.data, now());
+    return c.json({ ok: true, id, ...warn(timeAnomalies({ departure: body.data.departure, arrival: body.data.arrival })) }, 201);
+  });
+
+  app.post('/trips/:id/lodging', auth, async (c) => {
+    const tripId = c.req.param('id');
+    if (!(await roleIn(db, tripId, c.get('user').id))) return c.json({ error: 'not_found' }, 404);
+
+    const body = lodgingInputSchema.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json(badRequest('Check the lodging details.', body.error.issues), 400);
+
+    const id = await createLodging(db, tripId, body.data, now());
+    return c.json({ ok: true, id, ...warn(timeAnomalies({ checkIn: body.data.checkIn, checkOut: body.data.checkOut })) }, 201);
+  });
+
+  app.post('/trips/:id/activities', auth, async (c) => {
+    const tripId = c.req.param('id');
+    if (!(await roleIn(db, tripId, c.get('user').id))) return c.json({ error: 'not_found' }, 404);
+
+    const body = activityInputSchema.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json(badRequest('Check the activity details.', body.error.issues), 400);
+
+    const id = await createActivity(db, tripId, body.data, now());
+    return c.json({ ok: true, id, ...warn(timeAnomalies({ start: body.data.start, end: body.data.end })) }, 201);
+  });
+
+  /**
+   * The entity routes are flat (`/flights/:id`), so authorisation resolves
+   * entity → trip → role. An id in the URL is a claim, never an authorisation.
+   *
+   * The three kinds share this shape but not their schemas, so the parse and
+   * the update are dispatched together in one switch — that keeps each branch
+   * fully typed rather than casting a union through the update functions.
+   */
+  const entityRoute = (path: string, kind: EntityKind) => {
+    /** Resolves the id and the caller's access, or the response to send back. */
+    const authorise = async (c: Context<{ Variables: AuthedVars }>) => {
+      const id = c.req.param('id');
+      if (id === undefined) return { error: c.json({ error: 'not_found' }, 404) };
+      const tripId = await tripIdOf(db, kind, id);
+      if (!tripId || !(await roleIn(db, tripId, c.get('user').id))) {
+        return { error: c.json({ error: 'not_found' }, 404) };
+      }
+      return { id, tripId };
+    };
+
+    app.patch(path, auth, async (c) => {
+      const found = await authorise(c);
+      if ('error' in found) return found.error;
+
+      const at = now();
+      const raw = await c.req.json().catch(() => null);
+
+      switch (kind) {
+        case 'flight': {
+          const body = flightInputSchema.safeParse(raw);
+          if (!body.success) return c.json(badRequest('Check the flight details.', body.error.issues), 400);
+          await updateFlight(db, found.id, body.data, at);
+          return c.json({ ok: true, ...warn(timeAnomalies({ departure: body.data.departure, arrival: body.data.arrival })) });
+        }
+        case 'lodging': {
+          const body = lodgingInputSchema.safeParse(raw);
+          if (!body.success) return c.json(badRequest('Check the lodging details.', body.error.issues), 400);
+          await updateLodging(db, found.id, body.data, at);
+          return c.json({ ok: true, ...warn(timeAnomalies({ checkIn: body.data.checkIn, checkOut: body.data.checkOut })) });
+        }
+        case 'activity': {
+          const body = activityInputSchema.safeParse(raw);
+          if (!body.success) return c.json(badRequest('Check the activity details.', body.error.issues), 400);
+          await updateActivity(db, found.id, body.data, at);
+          return c.json({ ok: true, ...warn(timeAnomalies({ start: body.data.start, end: body.data.end })) });
+        }
+      }
+    });
+
+    app.delete(path, auth, async (c) => {
+      const found = await authorise(c);
+      if ('error' in found) return found.error;
+      await deleteEntity(db, kind, found.id, found.tripId);
+      return c.json({ ok: true });
+    });
+  };
+
+  entityRoute('/flights/:id', 'flight');
+  entityRoute('/lodging/:id', 'lodging');
+  entityRoute('/activities/:id', 'activity');
 
   return app;
 }
