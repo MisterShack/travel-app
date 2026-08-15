@@ -31,7 +31,8 @@ not complete until §6's restore drill has actually been run.
 
 ## 0. Before the first deploy
 
-You need three things. The first two are quick; the third is the one people skip.
+You need four things. The first two are quick; the third stops the deploy dead if missing, and
+the fourth is the one people skip.
 
 1. **A GitHub repo.** Railway deploys from it and auto-builds on push.
 2. **A Railway account** with this repo connected.
