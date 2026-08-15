@@ -441,9 +441,11 @@ verified Resend domain.
   configured **and a restore drill actually run**, Resend domain verified and `MAIL_FROM` set.
   Nothing real is stored yet, which is the point — this is the cheapest moment to get the
   infrastructure wrong.
-  **Deferred 2026-08-15** (needs dashboards David cannot reach while away); Phase 2 proceeds
-  locally. The rule that made the ordering matter still binds: **nothing real is stored in a
-  deployed instance until Phase 1 is finished.** Phase 3 cannot go live before it.
+  **Deferred 2026-08-15** (needs dashboards David cannot reach while away); Phases 2–3 proceed
+  locally. David has also decided backups are not needed yet for either app, so the restore drill
+  no longer gates local work — it gates the moment this holds data worth keeping. Building and
+  running locally is unaffected either way, since a local SQLite file is not what Litestream is
+  for.
 - **Phase 2 — Auth & trips core:** port auth + membership + invites + middleware, Drizzle schema
   and migrations, `trips`/`tripMembers` CRUD, full invite flow, libSQL client setup.
 - **Phase 3 — Timeline core (the MVP, and the point this goes live):** `flights`/`lodging`/
