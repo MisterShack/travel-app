@@ -1,0 +1,29 @@
+# Continuous replication of the trips database to object storage.
+#
+# Credentials come from the environment as deployment secrets, so this file
+# holds none and is safe to commit:
+#   LITESTREAM_BUCKET              e.g. travel-backups
+#   LITESTREAM_ENDPOINT            e.g. https://fly.storage.tigris.dev
+#   LITESTREAM_ACCESS_KEY_ID       read by Litestream itself
+#   LITESTREAM_SECRET_ACCESS_KEY   read by Litestream itself
+#
+# Explicit fields rather than a single s3:// URL, because any S3-compatible
+# store that is not AWS needs its endpoint stated separately. Keeping this file
+# host-neutral is what made switching hosts a config change for budget-app
+# rather than a rewrite.
+
+dbs:
+  - path: /data/travel.db
+    replicas:
+      - type: s3
+        bucket: ${LITESTREAM_BUCKET}
+        path: travel
+        endpoint: ${LITESTREAM_ENDPOINT}
+        region: auto
+        # Enough history to undo an accidental wipe noticed a few weeks later.
+        retention: 720h
+        snapshot-interval: 24h
+        # Verify the replica against the local database periodically. A backup
+        # nobody checks is worth nothing on the day it is needed, and this is
+        # the only thing that notices silent replication failure.
+        validation-interval: 12h

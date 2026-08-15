@@ -2,5 +2,24 @@
   "name": "@travel/server",
   "private": true,
   "version": "0.0.0",
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env.local --import tsx --watch src/index.ts",
+    "start": "node --env-file-if-exists=.env.local --import tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.0.0",
+    "@travel/shared": "*",
+    "hono": "^4.6.0",
+    "tsx": "^4.19.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
 }

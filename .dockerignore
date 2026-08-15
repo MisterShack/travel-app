@@ -1,0 +1,33 @@
+# The build context. Two things matter here, and only one of them is speed.
+#
+# `node_modules` is the correctness one: the Dockerfile runs `npm ci` to install
+# the *Linux* native binaries (see DEPLOY.md §6) and then `COPY . .`. Without
+# this file that COPY drops the host's macOS binaries on top of them, and the
+# image either fails to build or ships @rolldown/binding-darwin-arm64 to a
+# Linux container.
+node_modules
+**/node_modules
+**/dist
+**/coverage
+.git
+.github
+*.log
+.vite
+.eslintcache
+
+# The SQLite file and its sidecars. The database belongs on the mounted volume
+# at /data, never baked into an image layer.
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+server/data
+
+# Env files at every level, not just the root — `.env` alone would not match
+# `server/.env.local`, which will hold the Resend API key. They must never reach
+# the image: secrets come from Railway at runtime, and a stray `app/.env` would
+# otherwise be baked into the client bundle at build time.
+**/.env
+**/.env.*
+!**/.env.example
+**/*.local

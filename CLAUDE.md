@@ -5,7 +5,7 @@ with reminders. **PLAN.md** is the spec — read it before implementing anything
 built against yet; if you're about to start Phase 0, confirm PLAN.md has been through
 `.claude/skills/plan-review` first (§ of PLAN.md's header note).
 
-## Layout (npm workspaces, once Phase 0 lands)
+## Layout (npm workspaces)
 
 | Path | What |
 |---|---|
@@ -17,18 +17,26 @@ built against yet; if you're about to start Phase 0, confirm PLAN.md has been th
 
 See PLAN.md §4 for the full list and rationale. In short:
 
-- **Every event time is a UTC instant + an IANA timezone name.** Never store or compare bare local
-  datetimes — a flight departs in one zone and lands in another.
+- **Every event time is local wall-clock + an IANA timezone name + a derived UTC instant.** All
+  three. Local+zone is the source of truth (it is what the ticket says, and DST rules change);
+  the UTC instant is a derived index for sorting and comparison, recomputed when either changes.
+  Never store a local datetime alone — a flight departs in one zone and lands in another.
 - **A trip is the shared unit** (this app's equivalent of budget-app's ledger): owner/member roles,
-  single-use hashed invite tokens bound to an email, redemption checked against the *verified*
-  email of the redeeming account.
+  at least one owner enforced in the membership module, single-use hashed invite tokens bound to
+  an email, redemption checked against the *verified* email of the redeeming account.
 - **The server never trusts the client** — every write is re-validated against `shared/` schemas.
-- **No document/attachment storage.** Booking import extracts fields and discards the source
-  email; only a summary row survives.
+- **No document or attachment is persisted _by this app_.** Booking import extracts fields in
+  memory; the review screen fetches the source from Resend on demand. Resend retains its own copy
+  — the rule is about our storage, and saying so honestly is part of the rule.
 - **Single Railway instance, file-based DB** — the reminder sweep and any other periodic work runs
-  in-process, there is nowhere else for a scheduler to live.
+  in-process, there is nowhere else for a scheduler to live. But it claims rows before sending and
+  drops stale work; budget-app's boot-time `purgeExpired` is the same *location*, not the same
+  reliability bar.
 - **A booking import is never silently applied** — it always lands as `needs_review` (or unmatched
-  `pending`) until a human confirms it.
+  `pending`) until a human confirms it. It is also untrusted input: the inbound address is
+  reachable by anyone and `From:` is forgeable.
+- **The trip timeline is readable without connectivity.** A read-through IndexedDB cache ships
+  with the MVP. Offline *writes* are explicitly out of scope.
 
 ## Relationship to budget-app
 
@@ -46,5 +54,40 @@ re-discovering them the hard way.
 
 ## Status
 
-**Planning stage.** PLAN.md is written; nothing has been implemented yet. Next step is an
-adversarial review of PLAN.md (see its header note), then Phase 0.
+**Phase 0 complete and verified** (2026-08-15). `typecheck`, `lint`, `test` (9) and `vite build`
+all pass on Node 24.19.0 / npm 11.17.0, and the `linux/amd64` image builds and serves `/health`
+plus the client. Local Docker is **Colima**, not Docker Desktop (no admin needed) — DEPLOY.md §7.
+
+Two things Phase 0 found that contradict a straight port from budget-app, both now encoded:
+
+- **`STATIC_DIR` must be absolute.** Hono's `serveStatic` resolves its root against the process
+  cwd, so a relative value works from the repo root and 404s the entire client under
+  `npm run start --workspace @travel/server`. `env.ts` refuses a relative value at boot.
+- **`.dockerignore` is load-bearing.** The Dockerfile runs `npm ci` (Linux binaries) then
+  `COPY . .`; without it the host's macOS `node_modules` lands on top of them. The scaffold
+  originally lacked one — budget-app has it.
+- **The native-binary pin is Rolldown, not Rollup.** Vite 8 replaced Rollup with Rolldown, so
+  budget-app's `@rollup/rollup-linux-x64-gnu` pins a package this tree does not contain. The
+  lockfile trap itself is still live on npm 11.17 — measured, not assumed: removing
+  `optionalDependencies` drops the lockfile's Linux entries from 22 to zero. See DEPLOY.md §6.
+
+PLAN.md was reviewed adversarially by Opus on 2026-08-15 and the findings are resolved into the
+document — do not re-litigate them from the old shape. Three changed the plan structurally:
+
+- The client needs an **offline read cache** (§8); a PWA shell alone shows an empty timeline on a
+  plane, which is the moment the app matters most.
+- **Deployment moved to Phase 1**, ahead of auth — real data must never sit on a Railway volume
+  before Litestream and a rehearsed restore exist, and invite redemption needs verified email,
+  which needs a verified Resend domain anyway.
+- **Reminders carry a recipient** (one row per user per channel). A trip has several members; a
+  single `sentAt` cannot represent "sent to two of four".
+
+`DEPLOY.md` is the deployment runbook, written ahead of Phase 1 so the infrastructure decisions
+are made before there is data to lose.
+
+## Quality workflow
+
+A phase is done when `npm run typecheck`, `npm run lint` and `npm test` all pass from the repo
+root, and the phase's own acceptance criterion in PLAN.md §11 is met. Commit once per phase with
+a clear message. Phase 1 additionally is **not** done until a Litestream restore has actually been
+rehearsed — configured is not the same as working (DEPLOY.md §4).

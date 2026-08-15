@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // No DOM and no ambient test globals: this package is consumed by the
+    // browser client and the Node server alike, so anything platform-specific
+    // leaking in here would break one of them (PLAN.md §2).
+    "lib": ["ES2022"],
+    "types": []
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["node", "vitest/globals"],
+    "baseUrl": ".",
+    "paths": { "@travel/shared": ["../shared/src/index.ts"] }
+  },
+  "include": ["src", "test", "vitest.config.ts"]
+}
