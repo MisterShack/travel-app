@@ -66,6 +66,11 @@ Two things that are true and worth keeping in view:
 - **There are no backups.** `LITESTREAM_BUCKET` is unset by David's decision (2026-08-15), so the
   Railway volume is the only copy of every account and trip, and the restore drill in DEPLOY.md §6
   has never been run. Deliberate, but it makes the volume a single point of failure.
+  **And a custom Railway Start Command currently overrides the image's `ENTRYPOINT`**, so
+  `entrypoint.sh` — and therefore Litestream — never runs. Harmless while no bucket is set;
+  actively dangerous the moment one is, because everything would look configured and nothing would
+  replicate. Clearing it crashed the deploy once, cause unknown. See the boxed warning in
+  DEPLOY.md §5 before turning backups on.
 - **Registration is open.** The app is publicly reachable, so anyone with the URL can create an
   account and consume the Resend quota. There is no invite gate.
 

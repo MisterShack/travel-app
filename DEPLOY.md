@@ -153,6 +153,30 @@ server under `litestream replicate -exec`. With `LITESTREAM_BUCKET` unset it pri
 `WARNING: LITESTREAM_BUCKET is not set` and starts anyway. **Read the logs on the first deploy
 and confirm you are not seeing that line.**
 
+> ### ⚠ A custom Start Command silently disables replication
+>
+> As deployed on 2026-08-15 the Railway service has a **custom Start Command**
+> (`npm run start --workspace @travel/server`, running from `/app/server`) which overrides the
+> image's `ENTRYPOINT`. The app runs correctly that way — but `entrypoint.sh` never executes, so
+> **Litestream never starts**.
+>
+> Today that costs nothing, because no bucket is configured. The moment `LITESTREAM_BUCKET` is
+> set it becomes the worst kind of failure: the variables are present, the dashboard looks
+> configured, the app is healthy, and **nothing is being replicated**. You would stop worrying
+> about backups precisely when you had none.
+>
+> **Before enabling backups, clear the Start Command** so the image's `ENTRYPOINT` runs, and
+> confirm from the deploy logs that the `WARNING: LITESTREAM_BUCKET is not set` line appears
+> *before* you set the bucket — that line is proof the entrypoint is executing. Once the bucket is
+> set, prove it again with `litestream snapshots` (§6); an empty result means replication is not
+> running no matter what the variables say.
+>
+> Clearing it was attempted on 2026-08-15 and the deploy crashed, so it was rolled back and the
+> custom command left in place. **The cause is not yet known.** The entrypoint itself is not at
+> fault: the same command shape (`node --import tsx server/src/index.ts` from `/app`) starts and
+> serves `/health` correctly both natively and in the image, and the entrypoint's own WARNING line
+> printed before the failure. Capture the crash logs when retrying rather than guessing.
+
 ---
 
 ## 6. Verify the backup — the Phase 1 gate
