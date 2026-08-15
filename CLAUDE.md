@@ -82,6 +82,15 @@ Findings from building that contradict a straight port from budget-app, all enco
 ## Quality workflow
 
 A phase is done when `npm run typecheck`, `npm run lint` and `npm test` all pass from the repo
-root, and the phase's own acceptance criterion in PLAN.md §11 is met. Commit once per phase with
+root, and the phase's own acceptance criterion in PLAN.md §11 is met.
+
+| Trigger | Run |
+|---|---|
+| Any UI change, and before showing the app to anyone | `accessibility-reviewer` agent |
+| Wanting to see the app rather than its test output | `node app/e2e/drive.mjs` (see its header) |
+
+Both exist because the unit suites were green and the app was still wrong: a browser drive found
+six defects in one pass, including new events defaulting to the browser's timezone instead of the
+trip's. Tests prove the code does what it says; they cannot tell you the app is wrong. Commit once per phase with
 a clear message. Phase 1 additionally is **not** done until a Litestream restore has actually been
 rehearsed — configured is not the same as working (DEPLOY.md §4).
