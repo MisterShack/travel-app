@@ -5,11 +5,6 @@ import { z } from 'zod';
  * Configuration is parsed once, at startup, and fails loudly. A server that
  * boots with a missing secret and only misbehaves later is far worse than one
  * that refuses to start.
- *
- * Phase 0 covers what the scaffold actually uses. Mail (`RESEND_API_KEY`,
- * `MAIL_FROM`) arrives with the mailer in Phase 2, along with budget-app's
- * production guard against the `@resend.dev` test sender — that guard belongs
- * with the code that sends, not ahead of it.
  */
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -83,6 +78,17 @@ export const envSchema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((v) => v === 'true'),
+
+  SESSION_COOKIE_NAME: z.string().min(1).default('travel_session'),
+  SESSION_TTL_DAYS: z.coerce.number().int().positive().max(365).default(30),
+
+  /** Absent in dev/test: mail is logged to the console instead of sent. */
+  RESEND_API_KEY: z.string().min(1).optional(),
+  /**
+   * Must be an address on a domain verified with the provider — see the
+   * production guard in `loadEnv`.
+   */
+  MAIL_FROM: z.string().min(1).default('Trips <no-reply@mail.myze.ca>'),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -95,5 +101,25 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
       .join('\n');
     throw new Error(`Invalid environment configuration:\n${details}`);
   }
+  if (parsed.data.NODE_ENV === 'production') {
+    if (parsed.data.RESEND_API_KEY === undefined) {
+      // Verification and invite links would silently go nowhere. Invite
+      // redemption requires a *verified* email (PLAN.md §5), so without mail
+      // nobody can join a trip and nobody can finish signing up.
+      throw new Error(
+        'RESEND_API_KEY is required in production: without it, verification, invite and password-reset email cannot be delivered.',
+      );
+    }
+
+    // The provider's shared test sender accepts the send and delivers only to
+    // the account owner. Everyone else gets nothing, with no error anywhere —
+    // so this refuses to start rather than quietly locking out every invitee.
+    if (/@resend\.dev\b/i.test(parsed.data.MAIL_FROM)) {
+      throw new Error(
+        `MAIL_FROM is set to a provider test address (${parsed.data.MAIL_FROM}). It only delivers to the provider account's own address, so invitations would silently reach nobody. Use an address on a domain you have verified.`,
+      );
+    }
+  }
+
   return parsed.data;
 }

@@ -1,12 +1,15 @@
-import { describe, expect, it } from 'vitest';
-import { buildApp } from '../src/app';
+import { afterEach, describe, expect, it } from 'vitest';
+import { createHarness } from './helpers';
 import { loadEnv } from '../src/env';
 
-const env = loadEnv({ NODE_ENV: 'test' } as NodeJS.ProcessEnv);
+let cleanup: (() => void) | undefined;
+afterEach(() => cleanup?.());
 
 describe('GET /health', () => {
-  it('answers 200 with a status body', async () => {
-    const res = await buildApp({ env }).request('/health');
+  it('answers 200 with a status body when the database opens', async () => {
+    const h = await createHarness();
+    cleanup = h.cleanup;
+    const res = await h.app.request('/health');
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ status: 'ok' });
   });
@@ -47,5 +50,27 @@ describe('STATIC_DIR', () => {
 
   it('stays undefined when unset, so development does not serve stale assets', () => {
     expect(loadEnv({} as NodeJS.ProcessEnv).STATIC_DIR).toBeUndefined();
+  });
+});
+
+describe('production guards', () => {
+  const base = {
+    NODE_ENV: 'production',
+    APP_ORIGIN: 'https://trips.myze.ca',
+    PUBLIC_URL: 'https://trips.myze.ca',
+  };
+
+  it('refuses to start without a mail key', () => {
+    // Invite redemption requires a *verified* email (PLAN.md §5), so without
+    // mail nobody can join a trip and nobody can finish signing up.
+    expect(() => loadEnv(base as NodeJS.ProcessEnv)).toThrow(/RESEND_API_KEY is required/);
+  });
+
+  it("refuses the provider's test sender", () => {
+    // It accepts the send and delivers only to the account owner, so every
+    // invitation would silently reach nobody.
+    expect(() =>
+      loadEnv({ ...base, RESEND_API_KEY: 'x', MAIL_FROM: 'Trips <a@resend.dev>' } as NodeJS.ProcessEnv),
+    ).toThrow(/provider test address/);
   });
 });
