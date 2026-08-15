@@ -5,6 +5,7 @@ import { buildApp } from '../src/app';
 import { createDb, migrateDb, type Db } from '../src/db/client';
 import { loadEnv, type Env } from '../src/env';
 import { MemoryMailer } from '../src/mail/mailer';
+import { MemoryInboundClient, type ReceivedEmail } from '../src/import/resendInbound';
 
 /**
  * A throwaway database on disk, not `:memory:`.
@@ -25,7 +26,10 @@ export type Harness = {
   cleanup: () => void;
 };
 
-export async function createHarness(overrides: Partial<NodeJS.ProcessEnv> = {}): Promise<Harness> {
+export async function createHarness(
+  overrides: Partial<NodeJS.ProcessEnv> = {},
+  messages: Record<string, ReceivedEmail> = {},
+): Promise<Harness> {
   const dir = mkdtempSync(join(tmpdir(), 'travel-test-'));
   const env = loadEnv({
     NODE_ENV: 'test',
@@ -38,8 +42,9 @@ export async function createHarness(overrides: Partial<NodeJS.ProcessEnv> = {}):
   await migrateDb(db);
 
   const mailer = new MemoryMailer();
+  const inbound = new MemoryInboundClient(messages);
   let current = new Date('2026-08-15T12:00:00.000Z');
-  const app = buildApp({ db, env, mailer, now: () => current });
+  const app = buildApp({ db, env, mailer, inbound, now: () => current });
 
   return {
     db,

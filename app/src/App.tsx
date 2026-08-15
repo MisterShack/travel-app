@@ -10,6 +10,7 @@ import {
   VerifyPage,
 } from '@/features/auth/AuthPages';
 import { TripDetailPage, TripFormPage, TripListPage } from '@/features/trips/TripPages';
+import { ImportsPage } from '@/features/imports/ImportsPage';
 import { EventFormPage } from '@/features/timeline/EventForm';
 
 /**
@@ -59,9 +60,12 @@ export function App() {
         </h1>
         {offline && <span className="muted tiny">offline</span>}
         {user !== null && (
-          <button className="secondary" onClick={() => void signOut()}>
-            Sign out
-          </button>
+          <>
+            <Link to="/imports">Inbox</Link>
+            <button className="secondary" onClick={() => void signOut()}>
+              Sign out
+            </button>
+          </>
         )}
       </header>
 
@@ -79,6 +83,14 @@ export function App() {
             element={
               <RequireUser>
                 <TripListPage />
+              </RequireUser>
+            }
+          />
+          <Route
+            path="/imports"
+            element={
+              <RequireUser>
+                <ImportsPage />
               </RequireUser>
             }
           />

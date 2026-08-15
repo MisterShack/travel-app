@@ -1,5 +1,5 @@
 import { useEffect, useId, useState, type FormEvent } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError } from '@/api/client';
 import { ErrorText, Field, Warnings } from '@/components/Bits';
 import { AirportField, TimezoneField } from './AirportField';
@@ -79,6 +79,16 @@ export function EventFormPage() {
   const [warnings, setWarnings] = useState<string[]>([]);
   /** Set once the server has stored the row, so the UI stops offering "Add". */
   const [savedId, setSavedId] = useState<string | null>(null);
+  /**
+   * A draft handed over from the import review queue. It only ever *prefills*
+   * the form — the user still submits through the same validated route, which
+   * is what stops an import writing a row a human could not have typed
+   * (PLAN.md §4).
+   */
+  const handover = (useLocation().state ?? {}) as {
+    draft?: Record<string, unknown>;
+    importId?: string;
+  };
   const [busy, setBusy] = useState(false);
   const set = (patch: Partial<State>) => setF((prev) => ({ ...prev, ...patch }));
   const kindSelectId = useId();
@@ -88,6 +98,30 @@ export function EventFormPage() {
    * rather than passed through route state so a deep link into the form gets it
    * too.
    */
+  useEffect(() => {
+    const d = handover.draft;
+    if (!d) return;
+    const str = (k: string) => (typeof d[k] === 'string' ? (d[k] as string) : '');
+    setF((prev) => ({
+      ...prev,
+      airline: str('airline') || prev.airline,
+      flightNumber: str('flightNumber') || prev.flightNumber,
+      departureAirport: str('departureAirport') || prev.departureAirport,
+      departureLocal: str('departureLocal') || prev.departureLocal,
+      arrivalAirport: str('arrivalAirport') || prev.arrivalAirport,
+      arrivalLocal: str('arrivalLocal') || prev.arrivalLocal,
+      seat: str('seat') || prev.seat,
+      name: str('name') || prev.name,
+      address: str('address') || prev.address,
+      location: str('location') || prev.location,
+      startLocal: str('startLocal') || str('checkInLocal') || prev.startLocal,
+      endLocal: str('endLocal') || str('checkOutLocal') || prev.endLocal,
+      confirmationCode: str('confirmationCode') || prev.confirmationCode,
+    }));
+    // Handover happens once, on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (!isNew) return;
     void api
@@ -202,6 +236,9 @@ export function EventFormPage() {
           setBusy(false);
           return;
         }
+        // Only now is the import considered applied — after a human saved a
+        // real row from it.
+        if (handover.importId) await api.post(`/imports/${handover.importId}/apply`).catch(() => {});
         navigate(`/trips/${tripId}`, { replace: true });
       } catch (err) {
         setError(err instanceof ApiError ? err.message : 'Could not reach the server.');

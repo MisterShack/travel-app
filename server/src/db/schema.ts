@@ -332,3 +332,57 @@ export const reminders = sqliteTable(
 
 export type ReminderRow = typeof reminders.$inferSelect;
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
+
+/* -------------------------------------------------------------------------- */
+/* Booking import (Resend inbound, PLAN.md §6)                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One forwarded booking confirmation.
+ *
+ * **No part of the raw email is stored here** (PLAN.md §4). The row records
+ * that an import happened and what was extracted; the source is fetched from
+ * Resend on demand at review time, within their 30-day retention.
+ */
+export const bookingImports = sqliteTable(
+  'booking_imports',
+  {
+    id: text('id').primaryKey(),
+    /**
+     * Resolved from the sender at ingest. Without it an unmatched import
+     * belongs to nobody and there is no principled answer to who may read it —
+     * which on a multi-user app is a way to leak one person's itinerary to
+     * everyone.
+     */
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Null until the import is matched to a trip. */
+    tripId: text('trip_id').references(() => trips.id, { onDelete: 'cascade' }),
+
+    /** Unique: this is the idempotency key for the provider's webhook retries. */
+    resendMessageId: text('resend_message_id').notNull().unique(),
+    fromAddress: text('from_address').notNull(),
+    subject: text('subject').notNull(),
+    receivedAt: text('received_at').notNull(),
+
+    status: text('status', {
+      enum: ['pending', 'needs_review', 'applied', 'rejected', 'failed'],
+    }).notNull(),
+    extractedType: text('extracted_type', { enum: ['flight', 'lodging', 'activity'] }),
+    /** JSON of the parse result, shown on the review screen. Never the email. */
+    extractedFields: text('extracted_fields'),
+    /** How it was read, so a bad parser run can be told from a bad email. */
+    parsedBy: text('parsed_by', { enum: ['heuristic', 'llm', 'none'] }),
+    errorMessage: text('error_message'),
+
+    processedAt: text('processed_at'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    index('booking_imports_user_idx').on(table.userId, table.status),
+    index('booking_imports_trip_idx').on(table.tripId),
+  ],
+);
+
+export type BookingImportRow = typeof bookingImports.$inferSelect;

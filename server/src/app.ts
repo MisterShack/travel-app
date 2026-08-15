@@ -7,6 +7,8 @@ import { originGuard } from './middleware/originGuard';
 import { createAuthRoutes } from './auth/routes';
 import { createInviteRoutes, createTripRoutes } from './trip/routes';
 import { createNotifyRoutes } from './notify/routes';
+import { createImportRoutes } from './import/routes';
+import type { InboundClient } from './import/resendInbound';
 
 export const SERVER_VERSION = '0.0.0';
 
@@ -14,6 +16,8 @@ export type AppDeps = {
   db: Db;
   env: Env;
   mailer: Mailer;
+  /** Null when inbound import is not configured; the webhook then no-ops. */
+  inbound?: InboundClient | null;
   /** Injectable clock, so token expiry is testable without waiting an hour. */
   now?: () => Date;
 };
@@ -22,7 +26,7 @@ export type AppDeps = {
  * The API, built from its dependencies rather than importing them, so tests can
  * construct one against a throwaway database and a recording mailer.
  */
-export function buildApp({ db, env, mailer, now }: AppDeps) {
+export function buildApp({ db, env, mailer, inbound = null, now }: AppDeps) {
   const app = new Hono();
 
   /**
@@ -64,6 +68,7 @@ export function buildApp({ db, env, mailer, now }: AppDeps) {
   app.route('/api', createTripRoutes({ db, mailer, env, now }));
   app.route('/api', createInviteRoutes({ db, mailer, env, now }));
   app.route('/api', createNotifyRoutes({ db, env, now }));
+  app.route('/api', createImportRoutes({ db, env, inbound, now }));
 
   // Static file serving is registered *after* the API routes so it can never
   // shadow them, and only when STATIC_DIR is set — which is how one process

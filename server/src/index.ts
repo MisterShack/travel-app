@@ -4,6 +4,7 @@ import { purgeExpired } from './auth/sessions';
 import { createDb, migrateDb } from './db/client';
 import { loadEnv } from './env';
 import { createMailer } from './mail/mailer';
+import { ResendInboundClient } from './import/resendInbound';
 import { createPusher } from './notify/push';
 import { startSweep } from './notify/sweep';
 
@@ -24,7 +25,8 @@ if (swept.sessions + swept.tokens > 0) {
 }
 
 const mailer = createMailer({ resendApiKey: env.RESEND_API_KEY, from: env.MAIL_FROM });
-const app = buildApp({ db, env, mailer });
+const inbound = env.RESEND_API_KEY ? new ResendInboundClient(env.RESEND_API_KEY) : null;
+const app = buildApp({ db, env, mailer, inbound });
 
 /**
  * The reminder sweep. One instance and a file database means there is nowhere
@@ -53,5 +55,10 @@ serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   }
   if (pusher === null) {
     console.info('No VAPID keys set — reminders will be delivered by email only.');
+  }
+  if (env.RESEND_WEBHOOK_SECRET === undefined) {
+    console.info('No RESEND_WEBHOOK_SECRET set — the inbound import webhook will reject everything.');
+  } else if (env.GEMINI_API_KEY === undefined) {
+    console.info('No GEMINI_API_KEY set — booking import will use heuristics only.');
   }
 });

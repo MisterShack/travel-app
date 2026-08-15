@@ -103,6 +103,33 @@ export const envSchema = z.object({
 
   /** How often the reminder sweep runs. Lower in tests. */
   SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
+
+  /* --- Booking import (PLAN.md §6) --------------------------------------- */
+
+  /**
+   * Resend's webhook signing secret (`whsec_…`). **Without it the inbound
+   * route refuses every request**, rather than accepting unsigned ones: an
+   * unauthenticated endpoint that fetches attacker-chosen message ids and
+   * writes rows is not a degraded feature, it is a hole.
+   */
+  RESEND_WEBHOOK_SECRET: z.string().min(1).optional(),
+
+  /**
+   * The one address that means "import this".
+   *
+   * An MX record on the sending domain makes *every* address there deliver to
+   * Resend, including the `no-reply@` the app sends from — so a reply to a
+   * reminder would otherwise land in the import pipeline. Mail to anything else
+   * is discarded (PLAN.md §6.1).
+   */
+  INBOUND_ADDRESS: z.string().min(1).default('trips@mail.myze.ca'),
+
+  /** Paid tier, deliberately — see PLAN.md §6.7. Absent means heuristics only. */
+  GEMINI_API_KEY: z.string().min(1).optional(),
+  GEMINI_MODEL: z.string().min(1).default('gemini-2.5-flash-lite'),
+
+  /** Ceiling on imports per user per day; the inbound address is public. */
+  IMPORT_DAILY_CAP: z.coerce.number().int().positive().default(50),
 });
 
 export type Env = z.infer<typeof envSchema>;

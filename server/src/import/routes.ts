@@ -1,0 +1,258 @@
+import { randomUUID } from 'node:crypto';
+import { and, desc, eq, gte, isNull } from 'drizzle-orm';
+import { Hono } from 'hono';
+import { z } from 'zod';
+import type { Db } from '../db/client';
+import { bookingImports, tripMembers, trips, users } from '../db/schema';
+import type { Env } from '../env';
+import { rateLimit } from '../middleware/rateLimit';
+import { requireUser, type AuthedVars } from '../middleware/requireUser';
+import { roleIn } from '../trip/membership';
+import { addressOf, type InboundClient } from './resendInbound';
+import { parseBooking } from './parse';
+import { verifyWebhook } from './signature';
+
+export type ImportDeps = {
+  db: Db;
+  env: Env;
+  inbound: InboundClient | null;
+  now?: () => Date;
+};
+
+export function createImportRoutes(deps: ImportDeps) {
+  const { db, env, inbound } = deps;
+  const now = deps.now ?? (() => new Date());
+  const app = new Hono<{ Variables: AuthedVars }>();
+  const auth = requireUser(db, env, now);
+
+  /* -- inbound webhook --------------------------------------------------- */
+
+  /**
+   * Resend's inbound webhook (PLAN.md §6).
+   *
+   * Four gates, in order of how cheap they are to fail:
+   *   1. signature — the route is otherwise an unauthenticated endpoint that
+   *      fetches attacker-chosen messages and writes rows
+   *   2. recipient — an MX on the sending domain delivers *every* address here,
+   *      including replies to our own no-reply, which are not bookings
+   *   3. known sender — the address is public, so anyone can mail it
+   *   4. daily cap — bounds both row growth and LLM spend
+   */
+  app.post(
+    '/webhooks/resend-inbound',
+    rateLimit({ windowMs: 60 * 1000, max: 60, trustProxy: env.TRUST_PROXY }),
+    async (c) => {
+      // The raw body, byte for byte: re-serialising parsed JSON changes key
+      // order and whitespace, and the signature would never match.
+      const raw = await c.req.text();
+      const verified = verifyWebhook(
+        env.RESEND_WEBHOOK_SECRET,
+        {
+          id: c.req.header('svix-id'),
+          timestamp: c.req.header('svix-timestamp'),
+          signature: c.req.header('svix-signature'),
+        },
+        raw,
+        now(),
+      );
+      if (!verified.ok) {
+        // Deliberately terse: a probing client learns only that it failed.
+        return c.json({ error: 'unauthorised' }, 401);
+      }
+
+      let event: { type?: string; data?: { email_id?: string; id?: string } };
+      try {
+        event = JSON.parse(raw) as typeof event;
+      } catch {
+        return c.json({ error: 'invalid_request' }, 400);
+      }
+
+      const messageId = event.data?.email_id ?? event.data?.id;
+      if (!messageId) return c.json({ ok: true, ignored: 'no message id' });
+      if (!inbound) return c.json({ ok: true, ignored: 'inbound not configured' });
+
+      // Idempotency: the provider retries, and a retry must not import twice.
+      const seen = await db
+        .select({ id: bookingImports.id })
+        .from(bookingImports)
+        .where(eq(bookingImports.resendMessageId, messageId))
+        .limit(1);
+      if (seen[0]) return c.json({ ok: true, duplicate: true });
+
+      let message;
+      try {
+        message = await inbound.fetchMessage(messageId);
+      } catch (error) {
+        return c.json({ ok: false, error: (error as Error).message }, 502);
+      }
+
+      const wanted = env.INBOUND_ADDRESS.toLowerCase();
+      if (!message.to.map(addressOf).includes(wanted)) {
+        // A reply to a reminder is not a booking confirmation.
+        return c.json({ ok: true, ignored: 'not addressed to the import address' });
+      }
+
+      const from = addressOf(message.from);
+      const senderRows = await db.select().from(users).where(eq(users.email, from)).limit(1);
+      const sender = senderRows[0];
+      // `From` is trivially forged, so this is cost and noise control, not
+      // authentication — the human-review step is what contains the damage.
+      if (!sender || sender.emailVerifiedAt === null) {
+        return c.json({ ok: true, ignored: 'unknown sender' });
+      }
+
+      const since = new Date(now().getTime() - 24 * 60 * 60 * 1000).toISOString();
+      const today = await db
+        .select({ id: bookingImports.id })
+        .from(bookingImports)
+        .where(and(eq(bookingImports.userId, sender.id), gte(bookingImports.createdAt, since)));
+      if (today.length >= env.IMPORT_DAILY_CAP) {
+        return c.json({ ok: true, ignored: 'daily cap reached' });
+      }
+
+      const parsed = await parseBooking(message, {
+        apiKey: env.GEMINI_API_KEY,
+        model: env.GEMINI_MODEL,
+      });
+
+      /**
+       * Trip matching: pre-select only when there is exactly one candidate.
+       * Guessing between two upcoming trips would put a flight on the wrong
+       * one, and the review screen exists precisely to ask.
+       */
+      const today10 = now().toISOString().slice(0, 10);
+      const candidates = await db
+        .select({ tripId: trips.id })
+        .from(trips)
+        .innerJoin(tripMembers, eq(tripMembers.tripId, trips.id))
+        .where(and(eq(tripMembers.userId, sender.id), gte(trips.endDate, today10)));
+      const tripId = candidates.length === 1 ? candidates[0]!.tripId : null;
+
+      const at = now().toISOString();
+      await db.insert(bookingImports).values({
+        id: `imp_${randomUUID()}`,
+        userId: sender.id,
+        tripId,
+        resendMessageId: messageId,
+        fromAddress: from,
+        subject: message.subject,
+        receivedAt: message.createdAt,
+        // Never `applied`: a human confirms before anything reaches the
+        // timeline (PLAN.md §4).
+        status: parsed.ok ? 'needs_review' : 'failed',
+        extractedType: parsed.ok ? parsed.draft.type : null,
+        extractedFields: parsed.ok ? JSON.stringify(parsed.draft.fields) : null,
+        parsedBy: parsed.by,
+        errorMessage: parsed.ok ? null : parsed.reason,
+        processedAt: at,
+        createdAt: at,
+      });
+
+      return c.json({ ok: true });
+    },
+  );
+
+  /* -- review queue ------------------------------------------------------ */
+
+  /** The caller's imports. Scoped by `userId`, never by trip alone — an
+   *  unmatched import has no trip to be scoped by. */
+  app.get('/imports', auth, async (c) => {
+    const rows = await db
+      .select()
+      .from(bookingImports)
+      .where(eq(bookingImports.userId, c.get('user').id))
+      .orderBy(desc(bookingImports.createdAt));
+    return c.json({ imports: rows.filter((r) => r.status !== 'applied' && r.status !== 'rejected') });
+  });
+
+  app.get('/trips/:id/imports', auth, async (c) => {
+    const tripId = c.req.param('id');
+    if (!(await roleIn(db, tripId, c.get('user').id))) return c.json({ error: 'not_found' }, 404);
+    const rows = await db
+      .select()
+      .from(bookingImports)
+      .where(and(eq(bookingImports.tripId, tripId), isNull(bookingImports.processedAt)))
+      .orderBy(desc(bookingImports.createdAt));
+    return c.json({ imports: rows });
+  });
+
+  const ownImport = async (id: string, userId: string) => {
+    const rows = await db
+      .select()
+      .from(bookingImports)
+      .where(and(eq(bookingImports.id, id), eq(bookingImports.userId, userId)))
+      .limit(1);
+    return rows[0] ?? null;
+  };
+
+  /**
+   * The source, fetched from Resend on demand.
+   *
+   * This is what makes "no document storage" workable: the reviewer can check
+   * the extraction against the original without the app ever holding it
+   * (PLAN.md §4, §6.8). Resend keeps received mail for 30 days, so this can
+   * legitimately fail on an old import — which is reported, not hidden.
+   */
+  app.get('/imports/:id/source', auth, async (c) => {
+    const row = await ownImport(c.req.param('id'), c.get('user').id);
+    if (!row) return c.json({ error: 'not_found' }, 404);
+    if (!inbound) return c.json({ error: 'unavailable' }, 503);
+
+    try {
+      const message = await inbound.fetchMessage(row.resendMessageId);
+      return c.json({ subject: message.subject, from: message.from, text: message.text.slice(0, 20_000) });
+    } catch {
+      return c.json(
+        {
+          error: 'source_unavailable',
+          message: 'The original email is no longer available — the provider keeps it for 30 days.',
+        },
+        410,
+      );
+    }
+  });
+
+  app.post('/imports/:id/assign', auth, async (c) => {
+    const row = await ownImport(c.req.param('id'), c.get('user').id);
+    if (!row) return c.json({ error: 'not_found' }, 404);
+
+    const body = z.object({ tripId: z.string().min(1) }).safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ error: 'invalid_request' }, 400);
+    if (!(await roleIn(db, body.data.tripId, c.get('user').id))) {
+      return c.json({ error: 'not_found' }, 404);
+    }
+
+    await db
+      .update(bookingImports)
+      .set({ tripId: body.data.tripId })
+      .where(eq(bookingImports.id, row.id));
+    return c.json({ ok: true });
+  });
+
+  /**
+   * Marking an import applied. The entity itself is created through the normal
+   * validated create route, so an import can never write a row that a human
+   * could not have typed.
+   */
+  app.post('/imports/:id/apply', auth, async (c) => {
+    const row = await ownImport(c.req.param('id'), c.get('user').id);
+    if (!row) return c.json({ error: 'not_found' }, 404);
+    await db
+      .update(bookingImports)
+      .set({ status: 'applied', processedAt: now().toISOString() })
+      .where(eq(bookingImports.id, row.id));
+    return c.json({ ok: true });
+  });
+
+  app.post('/imports/:id/reject', auth, async (c) => {
+    const row = await ownImport(c.req.param('id'), c.get('user').id);
+    if (!row) return c.json({ error: 'not_found' }, 404);
+    await db
+      .update(bookingImports)
+      .set({ status: 'rejected', processedAt: now().toISOString() })
+      .where(eq(bookingImports.id, row.id));
+    return c.json({ ok: true });
+  });
+
+  return app;
+}

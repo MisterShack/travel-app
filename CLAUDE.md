@@ -59,7 +59,14 @@ certificate, `/health` answering JSON, the client served at `/`, SPA deep links 
 `/api/*` returning JSON rather than being shadowed by the static fallback. Registration and email
 verification work against real Resend delivery.
 
-Phases 0, 1, 2, 3 and 5 are done. 101 tests, typecheck and lint clean.
+**All phases (0–5) are done.** 118 tests, typecheck and lint clean.
+
+**Phase 4 (booking import) shipped 2026-08-15**: a Svix-signature-verified webhook (implemented
+directly rather than via an SDK, so it is testable without a network), then three more gates —
+recipient (an MX on the sending domain delivers replies to our own `no-reply` too), verified
+sender, and a per-user daily cap. Heuristics run first and claim a flight only on two independent
+signals; Gemini on the *paid* tier is the fallback. Everything lands as `needs_review` and is
+applied only after a human saves it through the normal validated create route.
 
 **Phase 5 (notifications) shipped 2026-08-15**: reminders fan out one row per member per channel,
 the in-process sweep claims each row before sending (so an overlapping tick cannot double-send)
@@ -81,9 +88,9 @@ Two things that are true and worth keeping in view:
 - **Registration is open.** The app is publicly reachable, so anyone with the URL can create an
   account and consume the Resend quota. There is no invite gate.
 
-Outstanding: **Phase 4** (booking import — needs the Resend inbound domain, a Gemini key, and
-note §13's open question about the verified-domain allowance). Web push needs `VAPID_*` set in
-Railway to work in production; without it reminders still go by email.
+Outstanding in production only, not in code: `RESEND_WEBHOOK_SECRET`, `GEMINI_API_KEY` and the
+inbound MX record (DEPLOY.md §11) for import; `VAPID_*` for push. Each degrades its own feature
+when absent and none breaks the app.
 
 Findings from building that contradict a straight port from budget-app, all encoded:
 
