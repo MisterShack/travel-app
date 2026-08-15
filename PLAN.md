@@ -250,9 +250,11 @@ Revisit only if maintaining two accounts becomes a real annoyance in practice â€
 
 ## 6. Booking import pipeline (Resend inbound)
 
-1. Namecheap: point a subdomain (e.g. `trips.<domain>`) at Resend's inbound MX per their setup
+1. Namecheap: point a subdomain (e.g. `inbox.<domain>`) at Resend's inbound MX per their setup
    docs, and verify the domain in Resend. The MX record must have the **lowest priority value** or
-   mail will not route to Resend. Keep this subdomain distinct from the outbound sending domain.
+   mail will not route to Resend. It must be a *different* label from the one the app is served
+   on: DNS forbids a CNAME coexisting with other record types, so the name carrying the app's
+   CNAME cannot also carry an MX. Keep it distinct from the outbound sending domain too.
 2. Resend receives mail sent to that address and POSTs a webhook event to
    `POST /webhooks/resend-inbound`. The payload is **metadata only** â€” no body, headers or
    attachments.
