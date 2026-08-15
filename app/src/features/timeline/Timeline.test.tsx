@@ -49,11 +49,46 @@ describe('Timeline', () => {
 
   it('badges a zone only when it differs from the trip home zone', () => {
     const { unmount } = draw([item({ startTimezone: 'Europe/Lisbon' })], 'Europe/Lisbon');
-    expect(screen.queryByText(/GMT|WEST|BST/)).toBeNull();
+    expect(screen.queryByText('Lisbon')).toBeNull();
     unmount();
 
     draw([item({ startTimezone: 'America/New_York' })], 'Europe/Lisbon');
-    expect(screen.getByText(/EDT|EST|GMT-/)).toBeInTheDocument();
+    expect(screen.getByText('New York')).toBeInTheDocument();
+  });
+
+  it('labels the badge with the city, not a UTC offset', () => {
+    // In September both Europe/London and Europe/Lisbon render as "GMT+1"
+    // through Intl's short name, so an offset badge gave two different zones an
+    // identical label and stopped carrying any information.
+    draw(
+      [
+        item({
+          id: 'f1',
+          kind: 'flight',
+          startTimezone: 'Europe/London',
+          endAt: '2026-09-10T12:00:00.000Z',
+          endTimezone: 'Europe/Lisbon',
+        }),
+      ],
+      'Europe/Lisbon',
+    );
+    expect(screen.getByText('London')).toBeInTheDocument();
+    // The arrival is in the trip's own zone, so it needs no badge at all.
+    expect(screen.queryByText('Lisbon')).toBeNull();
+  });
+
+  it('shows the date on an end that falls on another day', () => {
+    // "15:00 -> 11:00" reads as a six-hour hotel stay when it is eight nights.
+    draw([
+      item({
+        kind: 'lodging',
+        title: 'Hotel Bairro Alto',
+        startAt: '2026-09-10T14:00:00.000Z',
+        endAt: '2026-09-18T10:00:00.000Z',
+        endTimezone: 'Europe/Lisbon',
+      }),
+    ]);
+    expect(screen.getByText(/18 Sep|Sep 18/)).toBeInTheDocument();
   });
 
   it('groups events under the day of their own zone', () => {

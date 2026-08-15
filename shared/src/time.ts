@@ -145,6 +145,20 @@ export function zoneAbbreviation(instant: string, timeZone: string): string {
   return parts.find((p) => p.type === 'timeZoneName')?.value ?? timeZone;
 }
 
+/**
+ * A short human label for a zone: `Europe/London` → `London`.
+ *
+ * Preferred over `zoneAbbreviation` for the timeline badge. In September both
+ * Europe/London and Europe/Lisbon render as `GMT+1` through `Intl`'s short
+ * name, so two genuinely different zones get an identical badge and the badge
+ * stops carrying information — which is the whole reason it is there. The IANA
+ * city is always distinct and reads better besides.
+ */
+export function zoneLabel(timeZone: string): string {
+  const last = timeZone.split('/').at(-1) ?? timeZone;
+  return last.replace(/_/g, ' ');
+}
+
 /** Minutes between two instants; how a flight's duration is computed. */
 export function minutesBetween(from: string, to: string): number {
   return Math.round((Date.parse(to) - Date.parse(from)) / 60_000);

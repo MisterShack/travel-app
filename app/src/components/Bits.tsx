@@ -14,6 +14,17 @@ export function StaleBanner({ savedAt }: { savedAt?: string }) {
   return <p className="banner">Offline — showing the copy saved {when}.</p>;
 }
 
+/**
+ * A labelled control.
+ *
+ * The control is nested **inside** the `<label>` rather than sitting next to
+ * it. Implicit association needs no matching id, cannot drift out of sync, and
+ * is what makes the label announce with the field for a screen reader and focus
+ * it on click. The first version rendered the two as siblings with no `htmlFor`
+ * at all, which associated nothing — caught by a browser driver failing to find
+ * a field by its label, which is exactly how a screen-reader user would fail to
+ * find it too.
+ */
 export function Field({
   label,
   children,
@@ -24,11 +35,11 @@ export function Field({
   hint?: string;
 }) {
   return (
-    <div>
-      <label>{label}</label>
+    <label className="field">
+      <span className="field-label">{label}</span>
       {children}
-      {hint !== undefined && <p className="muted tiny">{hint}</p>}
-    </div>
+      {hint !== undefined && <span className="muted tiny">{hint}</span>}
+    </label>
   );
 }
 

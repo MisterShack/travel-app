@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import type { Airport } from '@travel/shared/airports';
 
 /**
@@ -52,8 +52,8 @@ export function AirportField({
   }, [code]);
 
   return (
-    <div>
-      <label>{label}</label>
+    <label className="field">
+      <span className="field-label">{label}</span>
       <input
         value={code}
         onChange={(e) => onChange(e.target.value.toUpperCase().slice(0, 3), timezone)}
@@ -64,13 +64,13 @@ export function AirportField({
         required
       />
       {resolved !== null ? (
-        <p className="muted tiny">
+        <span className="muted tiny">
           {resolved.name}, {resolved.city} — {resolved.timeZone}
-        </p>
+        </span>
       ) : code.length === 3 ? (
-        <p className="muted tiny">
+        <span className="muted tiny">
           Unknown code. Pick the timezone below so the departure time is stored correctly.
-        </p>
+        </span>
       ) : null}
       {suggestions.length > 0 && (
         <ul className="suggestions">
@@ -83,7 +83,7 @@ export function AirportField({
           ))}
         </ul>
       )}
-    </div>
+    </label>
   );
 }
 
@@ -100,12 +100,25 @@ export function TimezoneField({
   value: string;
   onChange: (tz: string) => void;
 }) {
+  const id = useId();
   const zones = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [];
+
+  /**
+   * Explicit `htmlFor`/`id` here rather than nesting the control in its label,
+   * which is what the plain text fields do.
+   *
+   * A `<select>` carries its options in its own subtree, so a wrapping label's
+   * text content becomes "Timezone" followed by all three hundred zone names —
+   * and that whole string is the field's accessible name. A screen reader would
+   * read the entire list before saying what the field is for.
+   */
   return (
-    <div>
-      <label>{label}</label>
+    <div className="field">
+      <label className="field-label" htmlFor={id}>
+        {label}
+      </label>
       {zones.length > 0 ? (
-        <select value={value} onChange={(e) => onChange(e.target.value)}>
+        <select id={id} value={value} onChange={(e) => onChange(e.target.value)}>
           {!zones.includes(value) && <option value={value}>{value}</option>}
           {zones.map((z) => (
             <option key={z} value={z}>
@@ -114,7 +127,12 @@ export function TimezoneField({
           ))}
         </select>
       ) : (
-        <input value={value} onChange={(e) => onChange(e.target.value)} placeholder="Europe/London" />
+        <input
+          id={id}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Europe/London"
+        />
       )}
     </div>
   );

@@ -10,6 +10,21 @@ import { TimezoneField } from '@/features/timeline/AirportField';
 
 const guessZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
+/**
+ * A date range, rendered in the reader's locale. Noon UTC avoids the classic
+ * off-by-one where parsing a bare date as midnight UTC shows the previous day
+ * to anyone west of Greenwich.
+ */
+function formatRange(startDate: string, endDate: string): string {
+  const fmt = (d: string, withYear: boolean) =>
+    new Date(`${d}T12:00:00Z`).toLocaleDateString(undefined, {
+      day: 'numeric',
+      month: 'short',
+      ...(withYear ? { year: 'numeric' } : {}),
+    });
+  return `${fmt(startDate, false)} – ${fmt(endDate, true)}`;
+}
+
 export function TripListPage() {
   const { user } = useAuth();
   const [state, setState] = useState<Loaded<TripSummary[]> | null>(null);
@@ -52,14 +67,7 @@ export function TripListPage() {
 }
 
 function TripCard({ trip }: { trip: TripSummary }) {
-  const range = `${new Date(`${trip.startDate}T12:00:00Z`).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-  })} – ${new Date(`${trip.endDate}T12:00:00Z`).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })}`;
+  const range = formatRange(trip.startDate, trip.endDate);
 
   return (
     <Link className="card link" to={`/trips/${trip.id}`}>
@@ -196,7 +204,7 @@ export function TripDetailPage() {
           <h2 style={{ marginTop: 0 }}>{trip.name}</h2>
           <p className="muted" style={{ marginTop: -4 }}>
             {trip.destination !== null && trip.destination !== '' ? `${trip.destination} · ` : ''}
-            {trip.startDate} – {trip.endDate}
+            {formatRange(trip.startDate, trip.endDate)}
           </p>
         </div>
       </div>

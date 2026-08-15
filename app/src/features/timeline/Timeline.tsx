@@ -1,4 +1,4 @@
-import { instantToLocal, zoneAbbreviation, type TimelineItem } from '@travel/shared';
+import { instantToLocal, zoneLabel, type TimelineItem } from '@travel/shared';
 import { Link } from 'react-router-dom';
 
 const ICON: Record<TimelineItem['kind'], string> = {
@@ -17,10 +17,6 @@ const ICON: Record<TimelineItem['kind'], string> = {
  */
 function dayOf(item: TimelineItem): string {
   return instantToLocal(item.startAt, item.startTimezone).slice(0, 10);
-}
-
-function timeOf(instant: string, zone: string): string {
-  return instantToLocal(instant, zone).slice(11);
 }
 
 export function Timeline({ items, homeTimezone }: { items: TimelineItem[]; homeTimezone: string }) {
@@ -55,30 +51,49 @@ export function Timeline({ items, homeTimezone }: { items: TimelineItem[]; homeT
 }
 
 function Event({ item, homeTimezone }: { item: TimelineItem; homeTimezone: string }) {
-  const start = timeOf(item.startAt, item.startTimezone);
-  const end = item.endAt && item.endTimezone ? timeOf(item.endAt, item.endTimezone) : null;
+  const startLocal = instantToLocal(item.startAt, item.startTimezone);
+  const endLocal =
+    item.endAt !== null && item.endTimezone !== null ? instantToLocal(item.endAt, item.endTimezone) : null;
 
-  // The zone badge appears only when it differs from the trip's home zone —
-  // labelling every row would be noise on a trip that never leaves one zone.
+  const start = startLocal.slice(11);
+  const end = endLocal?.slice(11) ?? null;
+
+  /**
+   * A badge appears only when the zone differs from the **trip's** home zone.
+   * Both ends are compared against the same reference: comparing the end
+   * against the start instead labelled a Lisbon arrival on a Lisbon trip just
+   * because it departed from London, which is noise.
+   */
   const showStartZone = item.startTimezone !== homeTimezone;
-  const showEndZone = item.endTimezone !== null && item.endTimezone !== item.startTimezone;
+  const showEndZone = item.endTimezone !== null && item.endTimezone !== homeTimezone;
+
+  /**
+   * An end on a different calendar day needs its date shown. A hotel rendered
+   * as "15:00 → 11:00" reads as a six-hour stay when it is eight nights, and an
+   * overnight flight has the same problem.
+   */
+  const endOnAnotherDay = endLocal !== null && endLocal.slice(0, 10) !== startLocal.slice(0, 10);
+  const endDate =
+    endOnAnotherDay && endLocal !== null
+      ? new Date(`${endLocal.slice(0, 10)}T12:00:00Z`).toLocaleDateString(undefined, {
+          day: 'numeric',
+          month: 'short',
+        })
+      : null;
 
   return (
     <Link className="card link" to={`/trips/${item.tripId}/${item.kind}/${item.id}`}>
       <div className="event">
         <div className="when">
-          <div className="time">
-            {start}
-            {showStartZone && <span className="zone">{zoneAbbreviation(item.startAt, item.startTimezone)}</span>}
-          </div>
+          <div className="time">{start}</div>
+          {showStartZone && <div className="zone">{zoneLabel(item.startTimezone)}</div>}
           {end !== null && (
             <div className="muted tiny mono">
               → {end}
-              {showEndZone && item.endTimezone !== null && (
-                <span className="zone">{zoneAbbreviation(item.endAt!, item.endTimezone)}</span>
-              )}
+              {endDate !== null && <span className="endday"> {endDate}</span>}
             </div>
           )}
+          {end !== null && showEndZone && <div className="zone">{zoneLabel(item.endTimezone!)}</div>}
         </div>
         <div className="body">
           <div className="title">

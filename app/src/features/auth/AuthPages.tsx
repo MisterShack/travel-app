@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '@/api/client';
 import { useAuth } from '@/auth/useAuth';
@@ -122,23 +122,49 @@ export function VerifyPage() {
   const navigate = useNavigate();
   const [state, setState] = useState<'working' | 'failed'>('working');
   const token = params.get('token') ?? '';
+  /**
+   * A verification token is single-use, so the request must fire **once** per
+   * mount — not once per effect invocation.
+   *
+   * React StrictMode double-invokes effects in development, which redeemed the
+   * token on the first run and then showed "no longer valid" from the second.
+   * A `cancelled` flag does not help: it suppresses the state update, not the
+   * request that already went out. The same hazard exists outside StrictMode
+   * wherever this component remounts.
+   */
+  const started = useRef(false);
 
   useEffect(() => {
-    let cancelled = false;
+    if (started.current) return;
+    started.current = true;
+
     void (async () => {
       try {
         await api.post('/auth/verify', { token });
-        if (cancelled) return;
         // Verifying signs you in, so pick the session up before navigating.
         await refresh();
         navigate('/', { replace: true });
       } catch {
-        if (!cancelled) setState('failed');
+        /**
+         * A failed redemption is not necessarily a dead link. Mail scanners
+         * prefetch URLs and people click twice, both of which spend the token
+         * on a request whose response nobody saw. If the session it created is
+         * live, this succeeded — say so rather than sending a verified user to
+         * an error page.
+         */
+        try {
+          const { user } = await api.get<{ user: { emailVerifiedAt: string | null } }>('/auth/me');
+          if (user.emailVerifiedAt !== null) {
+            await refresh();
+            navigate('/', { replace: true });
+            return;
+          }
+        } catch {
+          /* not signed in either — genuinely invalid */
+        }
+        setState('failed');
       }
     })();
-    return () => {
-      cancelled = true;
-    };
   }, [token, refresh, navigate]);
 
   if (state === 'working') return <p className="muted">Verifying…</p>;

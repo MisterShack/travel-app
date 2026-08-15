@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useId, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError } from '@/api/client';
 import { ErrorText, Field, Warnings } from '@/components/Bits';
@@ -15,6 +15,13 @@ import { AirportField, TimezoneField } from './AirportField';
 
 type Kind = 'flight' | 'lodging' | 'activity';
 const PATHS: Record<Kind, string> = { flight: 'flights', lodging: 'lodging', activity: 'activities' };
+/**
+ * Fallback only. A new event defaults to the **trip's** home zone, not the
+ * browser's — planning a Lisbon trip from a laptop in Chicago otherwise records
+ * every restaurant in America/Chicago, producing a plausible-looking timeline
+ * whose stored instants are six hours wrong. This is precisely the failure
+ * PLAN.md §4 exists to prevent, and it is invisible until you travel.
+ */
 const guessZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
 type State = {
@@ -74,6 +81,32 @@ export function EventFormPage() {
   const [savedId, setSavedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const set = (patch: Partial<State>) => setF((prev) => ({ ...prev, ...patch }));
+  const kindSelectId = useId();
+
+  /**
+   * The trip's home zone, used as the default for a new event's times. Fetched
+   * rather than passed through route state so a deep link into the form gets it
+   * too.
+   */
+  useEffect(() => {
+    if (!isNew) return;
+    void api
+      .get<{ trip: { homeTimezone: string } }>(`/trips/${tripId}`)
+      .then(({ trip }) =>
+        setF((prev) => ({
+          ...prev,
+          // Only fill zones the user has not already changed.
+          departureTimezone: prev.departureTimezone === guessZone() ? trip.homeTimezone : prev.departureTimezone,
+          arrivalTimezone: prev.arrivalTimezone === guessZone() ? trip.homeTimezone : prev.arrivalTimezone,
+          startTimezone: prev.startTimezone === guessZone() ? trip.homeTimezone : prev.startTimezone,
+          endTimezone: prev.endTimezone === guessZone() ? trip.homeTimezone : prev.endTimezone,
+        })),
+      )
+      .catch(() => {
+        /* falls back to the browser zone, which the form still shows and the
+           user can correct */
+      });
+  }, [tripId, isNew]);
 
   useEffect(() => {
     if (isNew) return;
@@ -267,14 +300,23 @@ export function EventFormPage() {
 
       {kind === 'activity' && (
         <>
-          <Field label="What">
-            <select value={f.activityKind} onChange={(e) => set({ activityKind: e.target.value as State['activityKind'] })}>
+          {/* A select gets an explicit label association — nesting it would
+              fold every option into the field's accessible name. */}
+          <div className="field">
+            <label className="field-label" htmlFor={kindSelectId}>
+              What
+            </label>
+            <select
+              id={kindSelectId}
+              value={f.activityKind}
+              onChange={(e) => set({ activityKind: e.target.value as State['activityKind'] })}
+            >
               <option value="restaurant">Restaurant</option>
               <option value="attraction">Attraction</option>
               <option value="transport">Transport</option>
               <option value="other">Other</option>
             </select>
-          </Field>
+          </div>
           <Field label="Name">
             <input value={f.name} onChange={(e) => set({ name: e.target.value })} required />
           </Field>

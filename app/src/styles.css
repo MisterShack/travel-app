@@ -76,7 +76,11 @@ a { color: var(--accent); }
 .tiny { font-size: 12px; }
 .mono { font-variant-numeric: tabular-nums; }
 
-label { display: block; margin: 12px 0 4px; font-size: 14px; color: var(--text-dim); }
+/* The control lives inside its label, so the label is a block container and the
+   caption is the span. */
+label.field, div.field { display: block; margin: 12px 0 0; }
+.field-label { display: block; margin-bottom: 4px; font-size: 14px; color: var(--text-dim); }
+label.field .muted.tiny, div.field .muted.tiny { display: block; margin-top: 4px; }
 
 input, select, textarea, button {
   font: inherit;
@@ -124,16 +128,17 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
 }
 
 .event { display: flex; gap: 12px; }
-.event .when { width: 88px; flex: none; padding-top: 2px; }
+.event .when { width: 96px; flex: none; padding-top: 2px; }
 .event .when .time { font-weight: 600; font-variant-numeric: tabular-nums; }
 .event .body { flex: 1; min-width: 0; }
 .event .title { font-weight: 600; }
 
 .zone {
-  display: inline-block; margin-left: 6px; padding: 1px 6px;
+  display: inline-block; margin-top: 2px; padding: 1px 6px;
   background: var(--surface-2); border-radius: 999px;
-  font-size: 11px; color: var(--text-dim); vertical-align: middle;
+  font-size: 11px; color: var(--text-dim);
 }
+.endday { color: var(--text-dim); }
 
 .kind {
   display: inline-block; width: 22px; text-align: center;
