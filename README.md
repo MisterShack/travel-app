@@ -7,11 +7,12 @@ trip, with reminders and (later) restaurant/attraction suggestions.
 - **CLAUDE.md** — project guide and non-negotiables for anyone (human or model) working here.
 - **DEPLOY.md** — the Railway/Litestream runbook.
 
+**Live at <https://trips.myze.ca>**
+
 ## Status
 
-**Phase 0 complete and verified** (2026-08-15) on Node 24.19.0 / npm 11.17.0:
-`typecheck`, `lint` and `test` (9 tests) all pass, `vite build` produces a client, and the server
-serves `/health` as JSON alongside the built client and its SPA fallback from one origin.
+Phases 0–3 are shipped: auth, shared trips, the merged timeline, and an installable PWA that
+still shows your itinerary with no network. 84 tests; `typecheck` and `lint` clean.
 
 The `linux/amd64` image also **builds and runs**: `/health` answers JSON while `/` and
 `/trips/abc` serve the client, `tsx` survives the prune, and only Linux native binaries are inside.

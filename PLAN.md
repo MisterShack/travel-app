@@ -457,11 +457,14 @@ verified Resend domain.
   configured **and a restore drill actually run**, Resend domain verified and `MAIL_FROM` set.
   Nothing real is stored yet, which is the point — this is the cheapest moment to get the
   infrastructure wrong.
-  **Deferred 2026-08-15** (needs dashboards David cannot reach while away); Phases 2–3 proceed
-  locally. David has also decided backups are not needed yet for either app, so the restore drill
-  no longer gates local work — it gates the moment this holds data worth keeping. Building and
-  running locally is unaffected either way, since a local SQLite file is not what Litestream is
-  for.
+  **Done 2026-08-15** — live at <https://trips.myze.ca>, valid certificate, `/health` answering,
+  the client served, SPA deep links resolving, and `/api/*` still returning JSON rather than being
+  shadowed by the static fallback. Registration and email verification work against real Resend
+  delivery.
+  **Except backups**, which David has deliberately deferred for both apps: `LITESTREAM_BUCKET` is
+  unset and the Railway volume is the only copy. The restore drill therefore has not been run.
+  That is a decision, not an oversight — but it means the volume is a single point of failure from
+  the moment real trips go in.
 - **Phase 2 — Auth & trips core:** port auth + membership + invites + middleware, Drizzle schema
   and migrations, `trips`/`tripMembers` CRUD, full invite flow, libSQL client setup.
 - **Phase 3 — Timeline core (the MVP, and the point this goes live):** `flights`/`lodging`/

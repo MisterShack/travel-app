@@ -54,25 +54,35 @@ re-discovering them the hard way.
 
 ## Status
 
-**Phase 3 complete and verified locally**, 2026-08-15 — the MVP is built. 82 tests
-(18 shared, 51 server, 13 app), typecheck, lint and `vite build` all pass, and the deployed shape
-works end to end: one process serving the PWA and the API, register → verify → create trip →
-add flight → merged timeline.
+**Live at <https://trips.myze.ca>** (Railway, deployed 2026-08-15). Verified from outside: valid
+certificate, `/health` answering JSON, the client served at `/`, SPA deep links resolving, and
+`/api/*` returning JSON rather than being shadowed by the static fallback. Registration and email
+verification work against real Resend delivery.
 
-**Phase 1 (deploy) is still deferred** — it needs the Railway and Namecheap dashboards. Backups
-are not gating local work by David's decision (2026-08-15).
+Phases 0, 1, 2 and 3 are done — the MVP is shipped. 84 tests, typecheck and lint clean.
+
+Two things that are true and worth keeping in view:
+
+- **There are no backups.** `LITESTREAM_BUCKET` is unset by David's decision (2026-08-15), so the
+  Railway volume is the only copy of every account and trip, and the restore drill in DEPLOY.md §6
+  has never been run. Deliberate, but it makes the volume a single point of failure.
+- **Registration is open.** The app is publicly reachable, so anyone with the URL can create an
+  account and consume the Resend quota. There is no invite gate.
+
+Outstanding: **Phase 4** (booking import — needs the Resend inbound domain, and note §13's open
+question about the verified-domain allowance) and **Phase 5** (notifications — needs VAPID keys).
 
 Findings from building that contradict a straight port from budget-app, all encoded:
 
 - **The API is mounted under `/api`.** Without it the client's `/trips/:id` page and the API's
   `/trips/:id` endpoint are the same URL, so deep-linking to a trip returns 401 JSON instead of
   the app. `/health` stays at the root because `railway.json` points there.
-- **`STATIC_DIR` must be absolute** — `serveStatic` resolves against the process cwd, so a
-  relative value 404s the whole client under `npm run start --workspace @travel/server`.
-- **The native-binary pin is Rolldown, not Rollup** (Vite 8 replaced it), and the npm/cli#4828
-  trap is still live on npm 11.17 — measured. DEPLOY.md §9.
-- **Vite alias order matters**: the specific `@travel/shared/airports` alias must precede
-  `@travel/shared`, or the bare one swallows it by prefix.
+- **`RESEND_API_KEY` is required to deploy at all** — `env.ts` throws on boot without it, and the
+  only symptom is a Railway healthcheck failure. DEPLOY.md §0 and §3.
+- **`STATIC_DIR` must be absolute** — `serveStatic` resolves against the process cwd.
+- **The native-binary pin is Rolldown, not Rollup** (Vite 8 replaced it), and npm/cli#4828 is
+  still live on npm 11.17 — measured. DEPLOY.md §9.
+- **Vite alias order matters**: `@travel/shared/airports` must precede `@travel/shared`.
 - **`.dockerignore` is load-bearing** — `npm ci` installs Linux binaries and `COPY . .` would put
   the host's macOS ones on top.
 - **`rateLimit`'s `fly-client-ip` check was not ported** — a Fly leftover that on Railway
