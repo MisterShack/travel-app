@@ -250,11 +250,21 @@ Revisit only if maintaining two accounts becomes a real annoyance in practice �
 
 ## 6. Booking import pipeline (Resend inbound)
 
-1. Namecheap: point a subdomain (e.g. `inbox.<domain>`) at Resend's inbound MX per their setup
-   docs, and verify the domain in Resend. The MX record must have the **lowest priority value** or
-   mail will not route to Resend. It must be a *different* label from the one the app is served
-   on: DNS forbids a CNAME coexisting with other record types, so the name carrying the app's
-   CNAME cannot also carry an MX. Keep it distinct from the outbound sending domain too.
+1. **DNS — settled 2026-08-15.** Inbound goes on **`mail.myze.ca`**, the domain already verified
+   in Resend for sending. Resend's plan allows one verified domain, and this needs no second one:
+   the DKIM record lives at `resend._domainkey.mail.myze.ca`, a subdomain, and `mail.myze.ca`
+   itself currently holds no MX, CNAME or A record, so an inbound MX has nothing to collide with.
+   The MX must have the **lowest priority value** present or mail will not route to Resend.
+
+   It cannot go on `trips.myze.ca`: that name is a CNAME to Railway, and DNS forbids a CNAME
+   coexisting with any other record type.
+
+   **Consequence to handle in the webhook.** An MX on `mail.myze.ca` makes *every* address at that
+   domain deliver to Resend — including `no-reply@mail.myze.ca`, the From address on every
+   verification, invite and reminder email. Anyone who replies to one of those would otherwise
+   land in the import pipeline. So the webhook matches on the **recipient**: only mail addressed
+   to the designated inbound address (`trips@mail.myze.ca`) is processed, and everything else is
+   discarded without creating a row. A reply to a reminder is not a booking confirmation.
 2. Resend receives mail sent to that address and POSTs a webhook event to
    `POST /webhooks/resend-inbound`. The payload is **metadata only** — no body, headers or
    attachments.
@@ -508,6 +518,10 @@ From the 2026-08-15 scoping conversation, plus three settled during the plan rev
 | **LLM tier** (2026-08-15) | **Paid** Gemini, not the free tier — see §6.7 |
 
 ## 13. Open questions
+
+**Settled 2026-08-15:** the Resend verified-domain question is closed — the plan allows one
+domain, `mail.myze.ca` is it, and it can carry both outbound DKIM and inbound MX. No add-on, no
+extra cost. See §6.1, including the recipient-filtering rule that comes with sharing the domain.
 
 **Settled in Phase 5:** default reminder lead times are flights 3h, check-in 2h, activities 1h
 (`DEFAULT_LEAD_MINUTES`), chosen as the warning each type actually needs to be useful. Per-event

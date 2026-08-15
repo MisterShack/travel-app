@@ -379,21 +379,27 @@ layer.
 
 ## 11. DNS for inbound email (Phase 4)
 
-Inbound booking email needs its own subdomain with Resend's inbound MX record, at the **lowest
-priority value** or mail will not route to Resend.
-
-> **It cannot be the same name the app is served from.** DNS forbids a CNAME coexisting with any
-> other record type on the same name, so if the app is at `trips.myze.ca` via CNAME (§4), that
-> name cannot also carry an MX record. Use a distinct label — `inbox.myze.ca`, or
-> `mail-in.myze.ca` — and keep it separate from `mail.myze.ca`, which budget-app already uses for
-> *outbound* sending.
+Inbound goes on **`mail.myze.ca`** — the domain already verified in Resend for sending. Confirmed
+2026-08-15 that this works with a one-domain plan: the DKIM record is at
+`resend._domainkey.mail.myze.ca` (a subdomain), and `mail.myze.ca` itself holds no MX, CNAME or A
+record, so there is nothing to collide with.
 
 | Type | Name | Value | Priority |
 |---|---|---|---|
-| `MX` | `inbox` | the target Resend gives you | lowest number present |
+| `MX` | `mail` | the target Resend gives you | lowest number present |
 
-Verify the domain in Resend's dashboard before pointing the webhook at it. §6 of PLAN.md covers
-what happens to the mail once it arrives.
+> **It cannot go on `trips.myze.ca`** — that name is a CNAME to Railway, and DNS forbids a CNAME
+> coexisting with any other record type. This is not a preference; the record would be rejected or
+> silently break the site.
+
+> **Adding this MX makes `mail.myze.ca` receive mail at every address**, including
+> `no-reply@mail.myze.ca`, which is the From address on every email the app sends. Replies to a
+> reminder will therefore arrive at the webhook. That is handled in code — the webhook processes
+> only mail addressed to `trips@mail.myze.ca` and discards the rest (PLAN.md §6.1) — but it is the
+> reason that filter exists, so do not remove it.
+
+Verify the domain's inbound setup in Resend's dashboard before pointing the webhook at it. PLAN.md
+§6 covers what happens to the mail once it arrives.
 
 ---
 
