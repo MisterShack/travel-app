@@ -279,14 +279,23 @@ Revisit only if maintaining two accounts becomes a real annoyance in practice �
    and assigned via `POST /imports/:id/assign`.
 7. **Parsing:** start with structured-source heuristics (airlines/OTAs send fairly regular HTML;
    look for known patterns first — confirmation code, flight number, airport codes, ISO-ish dates)
-   before reaching for an LLM. Where heuristics fail, fall back to a free-tier LLM call (Gemini,
-   per David's cost preference in §12) with the email text and a strict JSON schema for the
-   extraction. **When the LLM is unavailable, rate-limited or fails**, the import still lands as
+   before reaching for an LLM. Where heuristics fail, fall back to an LLM call (Gemini) with the
+   email text and a strict JSON schema for the extraction.
+
+   **On the paid tier, not the free one.** Gemini's free tier may use prompts to improve Google's
+   products, and the prompts here are booking confirmations: names, home addresses, flight
+   numbers, confirmation codes. At roughly 100 imports a year of a few thousand tokens each,
+   Flash-Lite costs well under a dollar annually — a trivial price for not handing a family's
+   travel documents to a training corpus. Cost was the original reason to pick the free tier
+   (§12); it is not a good enough reason. **When the LLM is unavailable, rate-limited or fails**, the import still lands as
    `needs_review` with `extractedFields` empty and `errorMessage` set — the user gets a row saying
    "we received this, couldn't read it, here's the source." Parsing failure is never silent and
    never drops the import.
 8. **Review screen** shows the extracted fields beside the source, fetched from Resend's API **on
-   demand** at review time. This is the reason to fetch rather than to have stored: the whole
+   demand** at review time. **Resend keeps received mail for 30 days**, so this is a 30-day
+   window: past it the source is gone and an unreviewed import is an extraction with nothing to
+   check it against. Acceptable — imports get reviewed in days, not months — but the review queue
+   should show the age of a pending import rather than let it quietly pass the line. This is the reason to fetch rather than to have stored: the whole
    justification for a human-review step is that a human can check the extraction against the
    original, and reviewing an extraction with nothing to compare it against is rubber-stamping.
    The user corrects or discards, and only then does data land in `flights` / `lodging` /
@@ -489,6 +498,9 @@ From the 2026-08-15 scoping conversation, plus three settled during the plan rev
 | **Offline** (review) | **Reading the itinerary without connectivity is a requirement.** Read-through IndexedDB cache ships with the MVP; offline writes stay out of scope |
 | **Push target** (review) | **iPhone.** Drives email-first reminders and the Home Screen install prompt (§7) |
 | **Launch point** (review) | **Goes live at Phase 3.** Deployment and backups therefore move to Phase 1 (§11) |
+| **Audience** (2026-08-15) | David, his family, and his **dev portfolio**. The third one is why the repo, its history and the UI's finish are part of the deliverable, not just the running app |
+| **Running cost** (2026-08-15) | Target **~$10/month**. A $20/month line item is disqualifying; a few dollars a year to avoid a compromise is not |
+| **LLM tier** (2026-08-15) | **Paid** Gemini, not the free tier — see §6.7 |
 
 ## 13. Open questions
 
@@ -499,12 +511,17 @@ drill rather than an aspiration).
 
 Still genuinely open:
 
+- **Resend verified-domain count.** Free includes only a limited number, and an extra domain is a
+  $20/month add-on — which alone would double the §12 budget. Inbound MX and outbound DKIM/TXT can
+  share one name (only a CNAME conflicts with other record types, which is why the *app's* domain
+  had to be separate — §6.1), so `mail.myze.ca` should be able to do both. Confirm against the
+  actual Resend account before Phase 4 rather than discovering it at DNS time.
 - **Default reminder timing.** How long before a flight / check-in / activity should a reminder
   fire by default, and is it the same per event type? Needs a decision before Phase 5, not before
   Phase 3. Straw man: flights 3h, check-in 2h, activities 1h, each user-overridable.
-- **LLM free-tier ceiling.** §6.4's per-user cap and §6.7's failure path bound the damage, but no
-  number is chosen for either. Needs Gemini's current free-tier rate limits checked at Phase 4,
-  not guessed now.
+- **LLM spend cap.** §6.4's per-user import cap and §6.7's failure path bound the damage, but no
+  number is chosen for either. On the paid tier the exposure is money rather than a quota, so set
+  a billing alert as well as a per-user cap when Phase 4 lands.
 - **`tzdata` refresh policy.** §4 makes the UTC instant a derived value that must be recomputed
   when timezone rules change. The container's ICU data is pinned at image build, so "when tzdata
   changes" in practice means "when we rebuild". Whether that needs anything more deliberate — a
