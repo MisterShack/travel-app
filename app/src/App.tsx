@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from '@/auth/useAuth';
 import {
@@ -29,9 +30,27 @@ function RequireUser({ children }: { children: React.ReactNode }) {
 
 export function App() {
   const { user, signOut, offline } = useAuth();
+  const location = useLocation();
+  const main = useRef<HTMLElement>(null);
+
+  /**
+   * Move focus to the main region on every route change.
+   *
+   * A single-page app swaps the view without a document load, so focus stays
+   * wherever it was — on a button that no longer exists. A screen-reader user
+   * hears nothing and is still reading the old page; a keyboard user tabs from
+   * the top of the document again. The browser does this for free on a real
+   * navigation; here it has to be done by hand.
+   */
+  useEffect(() => {
+    main.current?.focus();
+  }, [location.pathname]);
 
   return (
     <div className="app">
+      <a className="skip" href="#main">
+        Skip to content
+      </a>
       <header className="bar">
         <h1>
           <Link to="/" style={{ color: 'inherit', textDecoration: 'none' }}>
@@ -46,48 +65,50 @@ export function App() {
         )}
       </header>
 
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/verify" element={<VerifyPage />} />
-        <Route path="/forgot" element={<ForgotPage />} />
-        <Route path="/reset" element={<ResetPage />} />
-        <Route path="/invite" element={<InvitePage />} />
+      <main id="main" ref={main} tabIndex={-1}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/verify" element={<VerifyPage />} />
+          <Route path="/forgot" element={<ForgotPage />} />
+          <Route path="/reset" element={<ResetPage />} />
+          <Route path="/invite" element={<InvitePage />} />
 
-        <Route
-          path="/"
-          element={
-            <RequireUser>
-              <TripListPage />
-            </RequireUser>
-          }
-        />
-        <Route
-          path="/trips/new"
-          element={
-            <RequireUser>
-              <TripFormPage />
-            </RequireUser>
-          }
-        />
-        <Route
-          path="/trips/:tripId"
-          element={
-            <RequireUser>
-              <TripDetailPage />
-            </RequireUser>
-          }
-        />
-        <Route
-          path="/trips/:tripId/:kind/:id"
-          element={
-            <RequireUser>
-              <EventFormPage />
-            </RequireUser>
-          }
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          <Route
+            path="/"
+            element={
+              <RequireUser>
+                <TripListPage />
+              </RequireUser>
+            }
+          />
+          <Route
+            path="/trips/new"
+            element={
+              <RequireUser>
+                <TripFormPage />
+              </RequireUser>
+            }
+          />
+          <Route
+            path="/trips/:tripId"
+            element={
+              <RequireUser>
+                <TripDetailPage />
+              </RequireUser>
+            }
+          />
+          <Route
+            path="/trips/:tripId/:kind/:id"
+            element={
+              <RequireUser>
+                <EventFormPage />
+              </RequireUser>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
     </div>
   );
 }

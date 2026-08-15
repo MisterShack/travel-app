@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '@/api/client';
 import { useAuth } from '@/auth/useAuth';
@@ -27,6 +27,7 @@ export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const { busy, error, run } = useSubmit(signIn);
+  const errorId = useId();
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -39,8 +40,18 @@ export function LoginPage() {
   return (
     <form onSubmit={onSubmit}>
       <h2>Sign in</h2>
+      {/* Both fields point at the error: the server deliberately does not say
+          which of the two was wrong, so neither should the markup. */}
       <Field label="Email">
-        <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <input
+          type="email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          aria-invalid={error !== '' || undefined}
+          aria-describedby={error !== '' ? errorId : undefined}
+          required
+        />
       </Field>
       <Field label="Password">
         <input
@@ -48,10 +59,12 @@ export function LoginPage() {
           autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          aria-invalid={error !== '' || undefined}
+          aria-describedby={error !== '' ? errorId : undefined}
           required
         />
       </Field>
-      <ErrorText>{error}</ErrorText>
+      <ErrorText id={errorId}>{error}</ErrorText>
       <div className="actions">
         <button disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
         <Link to="/register">Create an account</Link>

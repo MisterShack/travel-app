@@ -41,9 +41,15 @@ export function Timeline({ items, homeTimezone }: { items: TimelineItem[]; homeT
               month: 'long',
             })}
           </h3>
-          {dayItems.map((item) => (
-            <Event key={`${item.kind}:${item.id}`} item={item} homeTimezone={homeTimezone} />
-          ))}
+          {/* A list, so assistive tech can say how many events the day holds
+              and let the user move between them as items. */}
+          <ul className="events">
+            {dayItems.map((item) => (
+              <li key={`${item.kind}:${item.id}`}>
+                <Event item={item} homeTimezone={homeTimezone} />
+              </li>
+            ))}
+          </ul>
         </section>
       ))}
     </>

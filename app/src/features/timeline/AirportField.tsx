@@ -25,8 +25,23 @@ export function AirportField({
   timezone: string;
   onChange: (code: string, timezone: string) => void;
 }) {
-  const [suggestions, setSuggestions] = useState<Airport[]>([]);
+  const listId = useId();
+  /**
+   * What the user has typed, kept apart from the committed three-letter code.
+   *
+   * The first version wrote straight through to `code` and sliced input to
+   * three characters — which silently made the whole city search unreachable,
+   * since "lisb" became "LIS" before it could ever be searched for. A separate
+   * query is what lets someone who does not know the code find it by city.
+   */
+  const [query, setQuery] = useState(code);
+  const [options, setOptions] = useState<Airport[]>([]);
   const [resolved, setResolved] = useState<Airport | null>(null);
+
+  // Keep the box in step when the form loads an existing entity.
+  useEffect(() => {
+    setQuery((q) => (code !== '' && code !== q ? code : q));
+  }, [code]);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,56 +49,66 @@ export function AirportField({
       const { lookupAirport, searchAirports } = await import('@travel/shared/airports');
       if (cancelled) return;
 
-      const exact = code.length === 3 ? lookupAirport(code) : undefined;
+      const exact = lookupAirport(query);
       setResolved(exact ?? null);
-      if (exact) {
-        setSuggestions([]);
-        if (exact.timeZone !== timezone) onChange(exact.iata, exact.timeZone);
-      } else {
-        setSuggestions(searchAirports(code, 6));
+      setOptions(exact ? [] : searchAirports(query, 8));
+      if (exact && (exact.iata !== code || exact.timeZone !== timezone)) {
+        onChange(exact.iata, exact.timeZone);
       }
     })();
     return () => {
       cancelled = true;
     };
-    // `onChange` and `timezone` are deliberately excluded: including them
-    // re-runs the effect on the very change it makes, which loops.
+    // `onChange`, `code` and `timezone` are excluded deliberately: including
+    // them re-runs the effect on the very change it just made, which loops.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code]);
+  }, [query]);
+
+  const hintId = `${listId}-hint`;
 
   return (
-    <label className="field">
-      <span className="field-label">{label}</span>
+    <div className="field">
+      <label className="field-label" htmlFor={listId + '-input'}>
+        {label}
+      </label>
+      {/*
+        A native <datalist> rather than a hand-rolled suggestion list.
+        The previous version rendered a <ul> of buttons with no combobox
+        semantics: arrow keys did nothing, Escape did not dismiss it, nothing
+        announced that options had appeared, and the only way past the field was
+        to Tab through every suggestion. The browser implements all of that
+        correctly for free, and there is no good reason to reimplement it worse.
+      */}
       <input
-        value={code}
-        onChange={(e) => onChange(e.target.value.toUpperCase().slice(0, 3), timezone)}
-        placeholder="LHR"
-        autoCapitalize="characters"
+        id={listId + '-input'}
+        aria-describedby={hintId}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onBlur={() => setQuery(code !== '' ? code : query)}
+        list={listId}
+        placeholder="LHR, or a city"
         autoCorrect="off"
         spellCheck={false}
         required
       />
-      {resolved !== null ? (
-        <span className="muted tiny">
-          {resolved.name}, {resolved.city} — {resolved.timeZone}
-        </span>
-      ) : code.length === 3 ? (
-        <span className="muted tiny">
-          Unknown code. Pick the timezone below so the departure time is stored correctly.
-        </span>
-      ) : null}
-      {suggestions.length > 0 && (
-        <ul className="suggestions">
-          {suggestions.map((a) => (
-            <li key={a.iata}>
-              <button type="button" onClick={() => onChange(a.iata, a.timeZone)}>
-                <strong>{a.iata}</strong> — {a.city}, {a.country}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </label>
+      <datalist id={listId}>
+        {options.map((a) => (
+          <option key={a.iata} value={a.iata}>
+            {a.city}, {a.country} — {a.name}
+          </option>
+        ))}
+      </datalist>
+      {/* A description, not part of the name: it changes as you type, and a
+          field whose *name* changes under you is disorienting to anyone
+          navigating by name. */}
+      <span className="muted tiny" id={hintId}>
+        {resolved !== null
+          ? `${resolved.name}, ${resolved.city} — ${resolved.timeZone}`
+          : query.trim() !== ''
+            ? 'No airport matches yet. Type a code like LHR, or a city name.'
+            : ''}
+      </span>
+    </div>
   );
 }
 

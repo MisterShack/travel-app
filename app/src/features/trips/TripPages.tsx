@@ -48,8 +48,8 @@ export function TripListPage() {
     <>
       {state.stale && <StaleBanner savedAt={state.savedAt} />}
       <div className="actions" style={{ marginTop: 0 }}>
-        <Link to="/trips/new">
-          <button>New trip</button>
+        <Link className="btn" to="/trips/new">
+          New trip
         </Link>
       </div>
 
@@ -210,14 +210,14 @@ export function TripDetailPage() {
       </div>
 
       <div className="actions" style={{ marginTop: 0 }}>
-        <Link to={`/trips/${tripId}/flight/new`}>
-          <button className="secondary">+ Flight</button>
+        <Link className="btn secondary" to={`/trips/${tripId}/flight/new`}>
+          + Flight
         </Link>
-        <Link to={`/trips/${tripId}/lodging/new`}>
-          <button className="secondary">+ Stay</button>
+        <Link className="btn secondary" to={`/trips/${tripId}/lodging/new`}>
+          + Stay
         </Link>
-        <Link to={`/trips/${tripId}/activity/new`}>
-          <button className="secondary">+ Activity</button>
+        <Link className="btn secondary" to={`/trips/${tripId}/activity/new`}>
+          + Activity
         </Link>
       </div>
 
