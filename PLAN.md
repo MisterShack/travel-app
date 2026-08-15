@@ -437,9 +437,13 @@ verified Resend domain.
 - **Phase 0 — Workspace scaffold:** npm workspaces (`shared`/`app`/`server`), TS config, ESLint,
   Vitest, `railway.json`, Dockerfile, and a Hono server that answers `/health`. (The structural
   package.json files already exist; Phase 0 fills them in for real.)
-- **Phase 1 — Deploy skeleton:** Railway service, volume at `/data`, Litestream configured **and a
-  restore drill actually run**, Resend domain verified and `MAIL_FROM` set. Nothing real is stored
-  yet, which is the point — this is the cheapest moment to get the infrastructure wrong.
+- **Phase 1 — Deploy skeleton:** Railway service at `trips.myze.ca`, volume at `/data`, Litestream
+  configured **and a restore drill actually run**, Resend domain verified and `MAIL_FROM` set.
+  Nothing real is stored yet, which is the point — this is the cheapest moment to get the
+  infrastructure wrong.
+  **Deferred 2026-08-15** (needs dashboards David cannot reach while away); Phase 2 proceeds
+  locally. The rule that made the ordering matter still binds: **nothing real is stored in a
+  deployed instance until Phase 1 is finished.** Phase 3 cannot go live before it.
 - **Phase 2 — Auth & trips core:** port auth + membership + invites + middleware, Drizzle schema
   and migrations, `trips`/`tripMembers` CRUD, full invite flow, libSQL client setup.
 - **Phase 3 — Timeline core (the MVP, and the point this goes live):** `flights`/`lodging`/

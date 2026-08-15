@@ -21,6 +21,12 @@ PLAN.md §11 puts deployment at **Phase 1**, before auth and before any real tri
 ordering is deliberate: this is the cheapest moment to get the infrastructure wrong. Phase 1 is
 not complete until §6's restore drill has actually been run.
 
+> **Status: deferred, 2026-08-15.** Everything here needs the Railway and Namecheap dashboards,
+> which David cannot reach while away. Phase 2 is being built locally in the meantime. The
+> ordering rationale is unchanged and the constraint that protects it is simply restated: **no
+> real data goes into a deployed instance until this runbook has been completed through §6.**
+> Building Phase 2 locally costs nothing, because nothing is at risk until something is live.
+
 ---
 
 ## 0. Before the first deploy
@@ -91,6 +97,9 @@ mailer.
 ---
 
 ## 4. Point the domain at it
+
+The domain is **`trips.myze.ca`** (decided 2026-08-15), the parallel to budget-app's
+`ledger.myze.ca`. So `APP_ORIGIN` and `PUBLIC_URL` are both `https://trips.myze.ca`.
 
 Service → **Settings** → **Networking** → **Custom Domain**. Railway shows a CNAME target like
 `xyz.up.railway.app`; add it at Namecheap:
