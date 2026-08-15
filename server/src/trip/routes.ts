@@ -30,6 +30,7 @@ import {
   createFlight,
   createLodging,
   deleteEntity,
+  getEntity,
   getTimeline,
   timeAnomalies,
   tripIdOf,
@@ -334,6 +335,12 @@ export function createTripRoutes(deps: TripDeps) {
       }
       return { id, tripId };
     };
+
+    app.get(path, auth, async (c) => {
+      const found = await authorise(c);
+      if ('error' in found) return found.error;
+      return c.json({ item: await getEntity(db, kind, found.id) });
+    });
 
     app.patch(path, auth, async (c) => {
       const found = await authorise(c);

@@ -207,15 +207,21 @@ From outside, once the domain resolves:
 curl -sS https://<your-domain>/health
 curl -sSI https://<your-domain>/ | grep -iE '^(HTTP|content-type)'
 curl -sS -o /dev/null -w '%{http_code}\n' https://<your-domain>/trips/anything
+curl -sS -o /dev/null -w '%{http_code}\n' https://<your-domain>/api/trips/anything
 ```
 
-Expect JSON, an HTML content type, and `200` (the SPA fallback) respectively.
+Expect JSON, an HTML content type, `200` (the SPA fallback), and `401` — the
+last one matters. The API is mounted under `/api` precisely so the client's
+`/trips/:id` page and the API's `/trips/:id` endpoint stop being the same URL;
+if the third command returns JSON, the prefix has been lost and every deep link
+into a trip serves the API instead of the app.
 
 Phase 1 checklist — there is no auth or data yet, so this is deliberately short:
 
 - [ ] `/health` returns `{"status":"ok",...}` over a valid certificate.
 - [ ] `/` serves the client shell.
-- [ ] A deep link like `/trips/anything` serves the shell rather than 404ing.
+- [ ] A deep link like `/trips/anything` serves the shell, while
+      `/api/trips/anything` returns 401 JSON.
 - [ ] Deploy logs do **not** contain `LITESTREAM_BUCKET is not set`.
 - [ ] `litestream snapshots` lists a generation (§6).
 - [ ] **Redeploy, then check `/health` again.** Confirms the volume survives a deploy — this is

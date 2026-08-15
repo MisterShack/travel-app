@@ -54,30 +54,30 @@ re-discovering them the hard way.
 
 ## Status
 
-**Phase 2 (auth & trips core) complete and verified locally**, 2026-08-15. `typecheck`, `lint`,
-43 tests and `vite build` all pass on Node 24.19.0 / npm 11.17.0, and the whole flow works against
-a real SQLite file outside the test harness: register → verify → create trip → invite → redeem.
+**Phase 3 complete and verified locally**, 2026-08-15 — the MVP is built. 82 tests
+(18 shared, 51 server, 13 app), typecheck, lint and `vite build` all pass, and the deployed shape
+works end to end: one process serving the PWA and the API, register → verify → create trip →
+add flight → merged timeline.
 
-**Phase 1 (deploy) is deferred, not done** — it needs the Railway and Namecheap dashboards. The
-rule it existed to enforce still binds: **nothing real is stored in a deployed instance until
-DEPLOY.md is complete through its restore drill**, and Phase 3 cannot launch before it.
+**Phase 1 (deploy) is still deferred** — it needs the Railway and Namecheap dashboards. Backups
+are not gating local work by David's decision (2026-08-15).
 
-Findings from building Phase 0–2 that contradict a straight port from budget-app, all encoded:
+Findings from building that contradict a straight port from budget-app, all encoded:
 
-- **`STATIC_DIR` must be absolute.** Hono's `serveStatic` resolves its root against the process
-  cwd, so a relative value works from the repo root and 404s the entire client under
-  `npm run start --workspace @travel/server`. `env.ts` refuses a relative value at boot.
-- **The native-binary pin is Rolldown, not Rollup.** Vite 8 replaced Rollup, so budget-app's
-  `@rollup/rollup-linux-x64-gnu` pins a package this tree lacks. The npm/cli#4828 trap is still
-  live on npm 11.17 — measured: removing `optionalDependencies` drops the lockfile's Linux
-  entries from 22 to zero. DEPLOY.md §9.
-- **`.dockerignore` is load-bearing.** The Dockerfile runs `npm ci` (Linux binaries) then
-  `COPY . .`; without it the host's macOS `node_modules` lands on top of them.
-- **`rateLimit`'s `fly-client-ip` check was deliberately not ported.** It is a leftover from
-  budget-app's abandoned Fly deploy; on Railway it always misses, collapsing every client into
-  one shared bucket.
-- **Registration creates nothing.** No auto-created "personal" trip, unlike budget-app's ledger —
-  a new account has an empty trip list until it creates a trip or redeems an invite.
+- **The API is mounted under `/api`.** Without it the client's `/trips/:id` page and the API's
+  `/trips/:id` endpoint are the same URL, so deep-linking to a trip returns 401 JSON instead of
+  the app. `/health` stays at the root because `railway.json` points there.
+- **`STATIC_DIR` must be absolute** — `serveStatic` resolves against the process cwd, so a
+  relative value 404s the whole client under `npm run start --workspace @travel/server`.
+- **The native-binary pin is Rolldown, not Rollup** (Vite 8 replaced it), and the npm/cli#4828
+  trap is still live on npm 11.17 — measured. DEPLOY.md §9.
+- **Vite alias order matters**: the specific `@travel/shared/airports` alias must precede
+  `@travel/shared`, or the bare one swallows it by prefix.
+- **`.dockerignore` is load-bearing** — `npm ci` installs Linux binaries and `COPY . .` would put
+  the host's macOS ones on top.
+- **`rateLimit`'s `fly-client-ip` check was not ported** — a Fly leftover that on Railway
+  collapses every client into one bucket.
+- **Registration creates nothing** — no auto-created "personal" trip, unlike budget-app's ledger.
 
 ## Quality workflow
 

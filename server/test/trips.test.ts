@@ -159,7 +159,7 @@ describe('invites', () => {
     await h.app.request(jsonRequest(`/trips/${id}/invite`, 'POST', { email: 'b@example.com' }, owner));
     const token = tokenFromMail(h.mailer, 'b@example.com');
 
-    const res = await h.app.request(`http://localhost/invites/${token}`);
+    const res = await h.app.request(`http://localhost/api/invites/${token}`);
     expect(res.status).toBe(200);
     const body = (await res.json()) as { invite: Record<string, unknown> };
     expect(body.invite).toMatchObject({ trip: 'Lisbon', email: 'b@example.com' });

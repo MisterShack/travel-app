@@ -225,6 +225,13 @@ export async function tripIdOf(db: Db, kind: EntityKind, id: string): Promise<st
   return rows[0]?.tripId ?? null;
 }
 
+/** One entity, for the edit form to populate itself from. */
+export async function getEntity(db: Db, kind: EntityKind, id: string) {
+  const table = TABLES[kind];
+  const rows = await db.select().from(table).where(eq(table.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
 export async function deleteEntity(db: Db, kind: EntityKind, id: string, tripId: string) {
   const table = TABLES[kind];
   await db.delete(table).where(and(eq(table.id, id), eq(table.tripId, tripId)));

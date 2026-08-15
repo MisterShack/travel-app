@@ -48,9 +48,20 @@ export function buildApp({ db, env, mailer, now }: AppDeps) {
     }
   });
 
-  app.route('/auth', createAuthRoutes({ db, mailer, env, now }));
-  app.route('/', createTripRoutes({ db, mailer, env, now }));
-  app.route('/', createInviteRoutes({ db, mailer, env, now }));
+  /**
+   * The API lives under `/api`, the client owns everything else.
+   *
+   * Without the prefix the two share a URL space and collide: the client's trip
+   * page is `/trips/:id` and so is the API's, so a browser deep-linking to a
+   * trip receives `401 {"error":"unauthenticated"}` as JSON instead of the app
+   * shell. Found by opening the deployed shape rather than by reading it.
+   *
+   * `/health` deliberately stays at the root — `railway.json` points its
+   * healthcheck there, and moving it would silently fail deploys.
+   */
+  app.route('/api/auth', createAuthRoutes({ db, mailer, env, now }));
+  app.route('/api', createTripRoutes({ db, mailer, env, now }));
+  app.route('/api', createInviteRoutes({ db, mailer, env, now }));
 
   // Static file serving is registered *after* the API routes so it can never
   // shadow them, and only when STATIC_DIR is set — which is how one process

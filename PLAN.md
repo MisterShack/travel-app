@@ -386,6 +386,12 @@ rather than re-learning them:
 
 ## 10. API surface (sketch, not final)
 
+**Everything below is mounted under `/api`.** The client owns every other path,
+and without the prefix the two collide: the client's trip page is `/trips/:id`
+and so was the API's, so a browser deep-linking to a trip received
+`401 {"error":"unauthenticated"}` instead of the app shell. `/health` stays at
+the root because `railway.json` points its healthcheck there.
+
 ```
 POST   /auth/register /auth/login /auth/logout /auth/verify /auth/reset
 
@@ -418,7 +424,8 @@ POST   /imports/:id/apply | /imports/:id/reject
 
 POST   /webhooks/resend-inbound        Resend inbound webhook; signature-verified, rate-limited
 POST   /push/subscribe | /push/unsubscribe
-GET    /health
+
+GET    /health                         at the root, not under /api
 ```
 
 Authorization: a trip id in a request is a claim, never an authorisation. Every route above

@@ -53,8 +53,14 @@ export async function createHarness(overrides: Partial<NodeJS.ProcessEnv> = {}):
   };
 }
 
+/**
+ * Builds a request against the API, which is mounted under `/api` so it cannot
+ * collide with the client's own routes (see `app.ts`). Specs pass the logical
+ * path and the prefix is added here, so they stay readable and the prefix lives
+ * in one place.
+ */
 export function jsonRequest(path: string, method: string, body?: unknown, cookie?: string) {
-  return new Request(`http://localhost${path}`, {
+  return new Request(`http://localhost/api${path}`, {
     method,
     headers: {
       'content-type': 'application/json',

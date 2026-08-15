@@ -1,0 +1,156 @@
+/* Palette defined on bare :root so the light theme is never conditional, then
+   overridden for dark. A page whose only colour definition lives inside a media
+   query renders unstyled where that query does not match. */
+:root {
+  color-scheme: light dark;
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #eef0f4;
+  --text: #14161c;
+  --text-dim: #5b6270;
+  --border: #d9dde5;
+  --accent: #2f5bd7;
+  --accent-text: #ffffff;
+  --danger: #b3261e;
+  --warn-bg: #fff4e0;
+  --warn-text: #7a4a00;
+  --radius: 12px;
+  --pad: 16px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12131a;
+    --surface: #1b1d26;
+    --surface-2: #23262f;
+    --text: #e9ebf0;
+    --text-dim: #9aa1b1;
+    --border: #2f333e;
+    --accent: #7d9bff;
+    --accent-text: #0e1017;
+    --danger: #ff8a80;
+    --warn-bg: #3a2c12;
+    --warn-text: #ffd08a;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Home-screen PWAs sit under the status bar without this. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.app { max-width: 720px; margin: 0 auto; padding: var(--pad); }
+
+header.bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0; margin-bottom: 8px;
+}
+header.bar h1 { font-size: 20px; margin: 0; flex: 1; }
+header.bar a, header.bar button { font-size: 14px; }
+
+h2 { font-size: 18px; margin: 24px 0 8px; }
+
+a { color: var(--accent); }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--pad);
+  margin-bottom: 12px;
+}
+
+.card.link { display: block; text-decoration: none; color: inherit; }
+.card.link:hover { border-color: var(--accent); }
+
+.row { display: flex; gap: 12px; align-items: baseline; }
+.row .grow { flex: 1; min-width: 0; }
+
+.muted { color: var(--text-dim); font-size: 14px; }
+.tiny { font-size: 12px; }
+.mono { font-variant-numeric: tabular-nums; }
+
+label { display: block; margin: 12px 0 4px; font-size: 14px; color: var(--text-dim); }
+
+input, select, textarea, button {
+  font: inherit;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  width: 100%;
+}
+textarea { min-height: 72px; resize: vertical; }
+
+button {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: transparent;
+  font-weight: 600;
+  cursor: pointer;
+  width: auto;
+  padding: 10px 16px;
+}
+button.secondary { background: var(--surface-2); color: var(--text); border-color: var(--border); }
+button.danger { background: transparent; color: var(--danger); border-color: var(--border); }
+button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.actions { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
+
+.error { color: var(--danger); font-size: 14px; margin-top: 12px; }
+
+.banner {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+/* Timeline ---------------------------------------------------------------- */
+
+.day { margin-top: 20px; }
+.day > h3 {
+  font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-dim); margin: 0 0 8px;
+}
+
+.event { display: flex; gap: 12px; }
+.event .when { width: 88px; flex: none; padding-top: 2px; }
+.event .when .time { font-weight: 600; font-variant-numeric: tabular-nums; }
+.event .body { flex: 1; min-width: 0; }
+.event .title { font-weight: 600; }
+
+.zone {
+  display: inline-block; margin-left: 6px; padding: 1px 6px;
+  background: var(--surface-2); border-radius: 999px;
+  font-size: 11px; color: var(--text-dim); vertical-align: middle;
+}
+
+.kind {
+  display: inline-block; width: 22px; text-align: center;
+}
+
+.empty { color: var(--text-dim); text-align: center; padding: 40px 0; }
+
+.suggestions {
+  list-style: none; margin: 4px 0 0; padding: 0;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); overflow: hidden;
+}
+.suggestions li button {
+  width: 100%; text-align: left; background: none; color: inherit;
+  border: 0; border-radius: 0; padding: 8px 12px; font-weight: 400;
+}
+.suggestions li button:hover { background: var(--surface-2); }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+@media (max-width: 480px) { .grid2 { grid-template-columns: 1fr; } }
