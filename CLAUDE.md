@@ -116,7 +116,7 @@ root, and the phase's own acceptance criterion in PLAN.md §11 is met.
 
 | Trigger | Run |
 |---|---|
-| Any UI change, and before showing the app to anyone | `accessibility-reviewer` agent |
+| Any UI change, and before showing the app to anyone | `web-accessibility-reviewer` agent |
 | Wanting to see the app rather than its test output | `node app/e2e/drive.mjs` (see its header) |
 
 Both exist because the unit suites were green and the app was still wrong: a browser drive found
