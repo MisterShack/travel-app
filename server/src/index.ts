@@ -26,13 +26,11 @@ if (swept.sessions + swept.tokens > 0) {
 
 const mailer = createMailer({ resendApiKey: env.RESEND_API_KEY, from: env.MAIL_FROM });
 const inbound = env.RESEND_API_KEY ? new ResendInboundClient(env.RESEND_API_KEY) : null;
-const app = buildApp({ db, env, mailer, inbound });
 
 /**
- * The reminder sweep. One instance and a file database means there is nowhere
- * else for it to live (PLAN.md §4) — but unlike `purgeExpired` above, missing a
- * run here costs a missed flight, so it claims rows before sending and drops
- * work that is too late to be useful rather than delivering it anyway.
+ * Web push, used by two things: the reminder sweep, and telling someone a
+ * booking arrived while they were away. Null when VAPID is unset, which
+ * degrades both features rather than breaking anything.
  */
 const pusher =
   env.VAPID_PUBLIC_KEY !== undefined && env.VAPID_PRIVATE_KEY !== undefined
@@ -46,6 +44,14 @@ const pusher =
       )
     : null;
 
+const app = buildApp({ db, env, mailer, inbound, pusher });
+
+/**
+ * The reminder sweep. One instance and a file database means there is nowhere
+ * else for it to live (PLAN.md §4) — but unlike `purgeExpired` above, missing a
+ * run here costs a missed flight, so it claims rows before sending and drops
+ * work that is too late to be useful rather than delivering it anyway.
+ */
 startSweep({ db, mailer, pusher }, env.SWEEP_INTERVAL_MS);
 
 serve({ fetch: app.fetch, port: env.PORT }, (info) => {

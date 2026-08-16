@@ -24,6 +24,9 @@
   --warn-bg: #fdf3e6;
   --alert: #a4232c;
   --focus: #b45309;
+  --kind-flight: #2c5c8a;
+  --kind-lodging: #2f6b4f;
+  --kind-activity: #6b4a8a;
 
   /* Type — 1.25 from a 16px base. Nothing between the steps. */
   --text-xs: 0.75rem;    --lh-xs: 1rem;
@@ -40,8 +43,8 @@
   --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
   --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 48px;
 
-  --radius: 10px;
-  --radius-sm: 8px;
+  --radius: 14px;
+  --radius-sm: 12px;
   --measure: 34rem;
 }
 
@@ -60,6 +63,9 @@
     --warn-bg: #2a1f10;
     --alert: #ff8a8a;
     --focus: #f0a03c;
+    --kind-flight: #7fb3e0;
+    --kind-lodging: #7fc9a3;
+    --kind-activity: #bda1e0;
   }
 }
 
@@ -115,10 +121,26 @@ header.bar .wordmark {
 }
 header.bar .wordmark svg { display: block; width: 22px; height: 22px; }
 header.bar h1 { margin: 0; flex: 1; font-size: inherit; }
-header.bar > a:not(.wordmark):not(.skip) {
-  display: inline-block; padding: var(--space-3) var(--space-2);
-  margin: calc(var(--space-3) * -1) 0;
-  font-size: var(--text-sm); color: var(--accent);
+/* Chips, not bare links. Underlined text in a header reads as prose, and the
+   first version's affordances were too quiet to find. */
+header.bar .navlink {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  min-height: 44px; padding: 0 var(--space-3);
+  background: var(--surface-sunk); border: 1px solid var(--rule);
+  border-radius: 999px;
+  font: 600 var(--text-sm)/1 var(--sans); color: var(--ink);
+  text-decoration: none;
+}
+header.bar .navlink:hover { border-color: var(--field); }
+
+/* The count of things awaiting review. Absent when zero — a zero badge is
+   noise that trains people to ignore the badge. */
+.count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 20px; padding: 0 6px;
+  background: var(--accent); color: var(--accent-ink);
+  border-radius: 999px;
+  font: 600 var(--text-xs)/1 var(--sans); font-variant-numeric: tabular-nums;
 }
 
 /* ------------------------------------------------------------- typography -- */
@@ -161,8 +183,22 @@ a { color: var(--accent); text-underline-offset: 2px; }
   padding: var(--space-4);
   margin-bottom: var(--space-3);
 }
-.card.link { display: block; text-decoration: none; color: inherit; }
-.card.link:hover { border-color: var(--accent); }
+ul.events > li { margin-bottom: var(--space-3); }
+ul.events > li > .card { margin-bottom: 0; }
+.card.link {
+  display: block; text-decoration: none; color: inherit;
+  position: relative; padding-right: var(--space-8);
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+/* A chevron, so a whole-card link does not have to be guessed at. */
+.card.link::after {
+  content: ''; position: absolute; right: var(--space-4); top: 50%;
+  width: 8px; height: 8px; margin-top: -5px;
+  border-right: 2px solid var(--ink-soft); border-top: 2px solid var(--ink-soft);
+  transform: rotate(45deg); opacity: 0.7;
+}
+.card.link:hover { background: var(--surface-sunk); border-color: var(--field); }
+.card.link:hover::after { border-color: var(--accent); opacity: 1; }
 
 .row { display: flex; gap: var(--space-3); align-items: baseline; }
 .row .grow { flex: 1; min-width: 0; }
@@ -206,8 +242,9 @@ button, a.btn {
   text-decoration: none;
 }
 button.secondary, a.btn.secondary {
-  background: var(--surface); color: var(--ink); border-color: var(--field);
+  background: var(--surface-sunk); color: var(--ink); border-color: var(--rule);
 }
+button.secondary:hover, a.btn.secondary:hover { border-color: var(--field); }
 /* Destructive is never a filled block: a filled red button invites the
    accidental press it exists to discourage. */
 button.danger {
@@ -264,7 +301,19 @@ ul.events { list-style: none; margin: 0; padding: 0; }
   letter-spacing: -0.01em;
   display: flex; gap: var(--space-2); align-items: baseline;
 }
-.event .kind { flex: none; color: var(--ink-soft); font-family: var(--sans); font-size: var(--text-sm); }
+.event .kind {
+  flex: none; font-family: var(--sans); font-size: var(--text-sm);
+  color: var(--kind, var(--ink-soft));
+}
+/* A hue rail, low saturation: it says what kind of thing this is at a glance
+   and never competes with a warning, which is where saturation lives. */
+li.event-item { position: relative; }
+li.event-item > .card {
+  border-left: 3px solid var(--kind, var(--rule));
+}
+.kind-flight { --kind: var(--kind-flight); }
+.kind-lodging { --kind: var(--kind-lodging); }
+.kind-activity { --kind: var(--kind-activity); }
 .endday { color: var(--ink-soft); }
 
 /* Metadata, never the accent — badges are not calls to action. */

@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from '@/auth/useAuth';
 import { Mark } from '@/components/Mark';
+import { api } from '@/api/client';
 import {
   ForgotPage,
   InvitePage,
@@ -36,6 +37,26 @@ export function App() {
   const main = useRef<HTMLElement>(null);
 
   /**
+   * How many imports await review.
+   *
+   * Re-read on every navigation rather than polled on a timer: it changes when
+   * mail arrives, which is rare, and a timer would wake the app up for nothing
+   * on a device where battery and signal are scarce. Push tells you about
+   * arrivals while you are away; this keeps the badge honest while you are here.
+   */
+  const [pending, setPending] = useState(0);
+  const refreshCount = useCallback(() => {
+    if (!user) return setPending(0);
+    void api
+      .get<{ count: number }>('/imports/count')
+      .then((r) => setPending(r.count))
+      .catch(() => {
+        /* offline or signed out — leave the last known count alone */
+      });
+  }, [user]);
+  useEffect(refreshCount, [refreshCount, location.pathname]);
+
+  /**
    * Move focus to the main region on every route change.
    *
    * A single-page app swaps the view without a document load, so focus stays
@@ -65,7 +86,16 @@ export function App() {
         {offline && <span className="muted tiny">offline</span>}
         {user !== null && (
           <>
-            <Link to="/imports">Inbox</Link>
+            <Link className="navlink" to="/imports">
+              Inbox
+              {/* Absent at zero: a zero badge is noise that trains people to
+                  stop looking at the badge. */}
+              {pending > 0 && (
+                <span className="count" aria-label={`${pending} awaiting review`}>
+                  {pending}
+                </span>
+              )}
+            </Link>
             <button className="secondary" onClick={() => void signOut()}>
               Sign out
             </button>

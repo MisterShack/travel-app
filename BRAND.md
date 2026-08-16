@@ -31,9 +31,18 @@ Design consequence: the app should feel like a well-set document, not a dashboar
 
 ### The principle
 
-**Colour carries information, not decoration.** Saturation is reserved for meaning — a warning, a
-conflict, a live state. Everything else is ink on paper. A screen where every element is coloured
-has no way to say "look here" when it needs to.
+**Hue encodes kind. Saturation encodes urgency.**
+
+Colour still carries information rather than decoration, but the two axes do different jobs. *Hue*
+tells you what a thing is — a flight, a stay, something to do — and is used at low saturation on
+small elements, because knowing the kind is useful at a glance and never urgent. *Saturation* is
+reserved for state: a warning, a conflict, an error. That is what keeps a DST warning salient on a
+screen where every row already carries a colour.
+
+The failure this avoids is the common one: colouring everything brightly, so nothing can say "look
+here" when it needs to. The failure it also avoids is the opposite one, which the first version of
+this system fell into — so little colour that the interface reads as a document and nothing looks
+interactive.
 
 This is deliberately the inverse of the McDonald's logic. Red and yellow are chosen to arouse and
 attract at distance; the person using Waypoint is already stressed, often late, and does not need
@@ -63,6 +72,9 @@ Ink on warm paper, with a single amber accent.
 | `--warn` | `#a8500a` | `#f5b25e` | DST anomalies, stale data |
 | `--alert` | `#a4232c` | `#ff8a8a` | Errors, destructive actions |
 | `--focus` | `#b45309` | `#f0a03c` | Focus ring |
+| `--kind-flight` | `#2c5c8a` | `#7fb3e0` | Flights — hue only, low saturation |
+| `--kind-lodging` | `#2f6b4f` | `#7fc9a3` | Stays |
+| `--kind-activity` | `#6b4a8a` | `#bda1e0` | Activities |
 
 **Why amber.** It is the colour of a split-flap departure board, which is the right reference for a
 timeline of times — apt without being literal. It is also not the default travel-app blue, and
@@ -127,11 +139,18 @@ constant at every breakpoint so the text column never shifts under the reader.
 
 ## 6. Shape and depth
 
-- **Radius:** 10px on cards and inputs, 999px on badges, 8px on buttons. One step, not three.
+- **Radius:** 14px on cards, 12px on inputs and buttons, 999px on badges and chips. Rounder than
+  the first version, which read as severe.
 - **No shadows.** Depth comes from a 1px rule and a surface shift. Shadows on a warm paper
   background read as grubby, and they are the first thing to look dated.
-- **Borders over fills** for grouping. A hairline rule is quieter than a filled block and survives
-  both themes without retuning.
+- **Cards lift off the page by surface contrast**, not by weight of border. `--surface` sits
+  clearly above `--paper`; the rule is a hairline that defines the edge rather than draws it.
+- **Every action is filled.** A bordered-transparent button is the mistake the first version made:
+  it is quiet to the point of not reading as a control. Primary takes the accent; secondary takes
+  `--surface-sunk`; only destructive stays outlined, because a filled red block invites the press
+  it exists to discourage.
+- **Tappable rows say so** — a chevron at the trailing edge, and a surface shift on hover and
+  focus. If a whole card is a link, the user should not have to guess.
 
 ## 7. Components
 

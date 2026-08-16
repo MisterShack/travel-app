@@ -45,7 +45,7 @@ export function Timeline({ items, homeTimezone }: { items: TimelineItem[]; homeT
               and let the user move between them as items. */}
           <ul className="events">
             {dayItems.map((item) => (
-              <li key={`${item.kind}:${item.id}`}>
+              <li className={`event-item kind-${item.kind}`} key={`${item.kind}:${item.id}`}>
                 <Event item={item} homeTimezone={homeTimezone} />
               </li>
             ))}

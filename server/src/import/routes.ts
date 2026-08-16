@@ -3,7 +3,7 @@ import { and, desc, eq, gte, isNull } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Db } from '../db/client';
-import { bookingImports, tripMembers, trips, users } from '../db/schema';
+import { bookingImports, pushSubscriptions, tripMembers, trips, users } from '../db/schema';
 import type { Env } from '../env';
 import { rateLimit } from '../middleware/rateLimit';
 import { requireUser, type AuthedVars } from '../middleware/requireUser';
@@ -11,16 +11,19 @@ import { roleIn } from '../trip/membership';
 import { addressOf, type InboundClient } from './resendInbound';
 import { parseBooking } from './parse';
 import { verifyWebhook } from './signature';
+import { GoneError, type Pusher } from '../notify/push';
 
 export type ImportDeps = {
   db: Db;
   env: Env;
   inbound: InboundClient | null;
+  /** Used to tell the owner an import arrived while they were away. */
+  pusher?: Pusher | null;
   now?: () => Date;
 };
 
 export function createImportRoutes(deps: ImportDeps) {
-  const { db, env, inbound } = deps;
+  const { db, env, inbound, pusher = null } = deps;
   const now = deps.now ?? (() => new Date());
   const app = new Hono<{ Variables: AuthedVars }>();
   const auth = requireUser(db, env, now);
@@ -189,6 +192,38 @@ export function createImportRoutes(deps: ImportDeps) {
         createdAt: at,
       });
 
+      /**
+       * Tell them now, not next time they open the app.
+       *
+       * This is the moment the information is true, and a badge they have not
+       * looked at yet cannot convey it. Failure here never fails the import —
+       * the row exists either way, and a missed notification is a smaller
+       * problem than a rejected webhook that Resend will retry.
+       */
+      if (pusher) {
+        try {
+          const subs = await db
+            .select()
+            .from(pushSubscriptions)
+            .where(eq(pushSubscriptions.userId, sender.id));
+          for (const sub of subs) {
+            await pusher
+              .send(sub, {
+                title: 'Waypoint',
+                body: parsed.ok
+                  ? `A ${parsed.draft.type} booking arrived and needs review.`
+                  : 'A booking arrived but could not be read. Tap to review it.',
+                url: '/imports',
+              })
+              .catch((error: unknown) => {
+                if (!(error instanceof GoneError)) throw error;
+              });
+          }
+        } catch (error) {
+          console.warn(`Inbound webhook: could not notify ${from}:`, error);
+        }
+      }
+
       console.info(
         `Inbound webhook: imported ${messageId} for ${from} — ` +
           `${parsed.ok ? `${parsed.draft.type} via ${parsed.by}` : `unreadable (${parsed.reason})`}` +
@@ -210,6 +245,19 @@ export function createImportRoutes(deps: ImportDeps) {
       .where(eq(bookingImports.userId, c.get('user').id))
       .orderBy(desc(bookingImports.createdAt));
     return c.json({ imports: rows.filter((r) => r.status !== 'applied' && r.status !== 'rejected') });
+  });
+
+  /**
+   * How many imports await review. Its own route rather than a field on a
+   * bigger payload, because the header polls it on every navigation and should
+   * not be shipping rows to render a numeral.
+   */
+  app.get('/imports/count', auth, async (c) => {
+    const rows = await db
+      .select({ id: bookingImports.id })
+      .from(bookingImports)
+      .where(eq(bookingImports.userId, c.get('user').id));
+    return c.json({ count: rows.length });
   });
 
   app.get('/trips/:id/imports', auth, async (c) => {
