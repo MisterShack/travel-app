@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { TripSummary } from '@travel/shared';
 import { api, ApiError } from '@/api/client';
-import { ErrorText } from '@/components/Bits';
+import { ErrorText, Skeleton } from '@/components/Bits';
 
 /**
  * The booking-import review queue (PLAN.md §4, §6.8).
@@ -86,11 +86,11 @@ export function ImportsPage() {
   useEffect(load, []);
 
   if (error) return <p className="error">{error}</p>;
-  if (!rows) return <p className="muted">Loading…</p>;
+  if (!rows) return <Skeleton rows={2} label="Loading your inbox" />;
 
   return (
     <>
-      <h2 style={{ marginTop: 0 }}>Forwarded bookings</h2>
+      <h2 className="screen-title">Forwarded bookings</h2>
       <p className="muted tiny">
         Forward a confirmation to your import address and it shows up here. Nothing is added to a
         trip until you say so.

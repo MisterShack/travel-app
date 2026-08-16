@@ -1,4 +1,12 @@
-import { cloneElement, isValidElement, useId, type ReactElement, type ReactNode } from 'react';
+import {
+  cloneElement,
+  isValidElement,
+  useEffect,
+  useId,
+  useRef,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 
 /**
  * The banner shown when a view is rendering a cached copy because the network
@@ -86,6 +94,123 @@ export function Warnings({ items }: { items: string[] }) {
     <div className="banner" role="status">
       {items.map((w) => (
         <div key={w}>{w}</div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * A bottom sheet — the only floating layer in the app (BRAND.md §6b).
+ *
+ * It exists so that adding something to a trip is one primary action instead of
+ * a row of three, which made the user choose a type before they had decided to
+ * add anything at all.
+ *
+ * A dialog that does not manage focus is a dialog only to sighted mouse users:
+ * without the trap, Tab walks straight out into the page behind it; without the
+ * restore, dismissing it leaves focus on `<body>` and the next Tab starts from
+ * the top of the document.
+ */
+export function Sheet({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const panel = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab' || panel.current === null) return;
+      const focusable = panel.current.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKey);
+    // The first focusable, not the first `button` — a sheet whose options are
+    // links would otherwise open with focus still behind the backdrop.
+    panel.current
+      ?.querySelector<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      )
+      ?.focus();
+
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = previousOverflow;
+      opener?.focus();
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="sheet-backdrop"
+      // Only a click that both starts and ends on the backdrop dismisses;
+      // otherwise a drag that begins on a sheet control and releases outside it
+      // closes the sheet under the user's finger.
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="sheet" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={panel}>
+        <div className="grabber" aria-hidden="true" />
+        <h2 id={titleId}>{title}</h2>
+        {children}
+        {/* Backdrop and Esc are not discoverable on a phone; a labelled way out
+            is the only one some people will find. */}
+        <div className="actions">
+          <button type="button" className="secondary block" onClick={onClose}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Placeholder rows in the shape of what is loading.
+ *
+ * "Loading…" is one short line that the real content then shoves off the
+ * screen; a skeleton holds the layout still and says how much is coming. The
+ * live region announces it once, because a screen reader gets nothing at all
+ * from a grey rectangle.
+ */
+export function Skeleton({ rows = 3, label = 'Loading' }: { rows?: number; label?: string }) {
+  return (
+    <div className="skeleton-stack" role="status" aria-live="polite" aria-busy="true">
+      <span className="visually-hidden">{label}</span>
+      {Array.from({ length: rows }, (_, i) => (
+        <div className="skeleton-row" key={i} aria-hidden="true">
+          <span className="skeleton disc" />
+          <span className="lines">
+            <span className="skeleton" style={{ width: '60%' }} />
+            <span className="skeleton" style={{ width: '35%' }} />
+          </span>
+        </div>
       ))}
     </div>
   );

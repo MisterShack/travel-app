@@ -78,7 +78,13 @@ await page.waitForLoadState('networkidle');
 await shot(page, '06-empty-trip');
 
 // --- add a flight, exercising the airport picker ---
-await page.getByRole('link', { name: /\+ Flight/i }).click();
+// Adding is one primary action that opens a sheet, not three side-by-side
+// buttons (BRAND.md §6b), so every add goes through `addFrom`.
+const addFrom = async (kind) => {
+  await page.getByRole('button', { name: /add to trip/i }).click();
+  await page.getByRole('dialog').getByRole('link', { name: new RegExp(kind, 'i') }).click();
+};
+await addFrom('Flight');
 await page.getByLabel('Airline').fill('TAP Air Portugal');
 await page.getByLabel('Flight number').fill('TP1233');
 await page.getByLabel('From').fill('LHR');
@@ -96,7 +102,7 @@ await page.waitForLoadState('networkidle');
 await shot(page, '09-trip-one-flight');
 
 // --- lodging + activity, so the timeline has something to group ---
-await page.getByRole('link', { name: /\+ Stay/i }).click();
+await addFrom('Stay');
 await page.getByLabel('Name', { exact: true }).fill('Hotel Bairro Alto');
 await page.getByLabel('Address').fill('Praça Luís de Camões 2');
 await page.locator('input[type=datetime-local]').first().fill('2026-09-10T15:00');
@@ -104,7 +110,7 @@ await page.locator('input[type=datetime-local]').nth(1).fill('2026-09-18T11:00')
 await page.getByRole('button', { name: /^Add$/ }).click();
 await page.waitForURL(/\/trips\/trp_[^/]+$/);
 
-await page.getByRole('link', { name: /\+ Activity/i }).click();
+await addFrom('Activity');
 await page.locator('select').first().selectOption('restaurant');
 await page.getByLabel('Name', { exact: true }).fill('Cervejaria Ramiro');
 await page.getByLabel('Where').fill('Av. Almirante Reis 1');
@@ -113,6 +119,23 @@ await page.getByRole('button', { name: /^Add$/ }).click();
 await page.waitForURL(/\/trips\/trp_[^/]+$/);
 await page.waitForLoadState('networkidle');
 await shot(page, '10-timeline-full');
+
+// --- the add sheet, and the settings screen it no longer shares a page with ---
+await page.getByRole('button', { name: /add to trip/i }).click();
+await page.getByRole('dialog').waitFor();
+// The sheet animates in over 220ms, and it is `position: fixed` — so this one
+// is a viewport shot, not a full-page one, or the backdrop is captured at the
+// top of a page it is not covering.
+await page.waitForTimeout(400);
+await page.screenshot({ path: `${SHOTS}/10b-add-sheet.png` });
+console.log('  shot: 10b-add-sheet');
+await page.keyboard.press('Escape');
+await page.getByRole('link', { name: /manage/i }).click();
+await page.waitForURL(/\/settings$/);
+await page.waitForLoadState('networkidle');
+await shot(page, '10c-trip-settings');
+await page.goBack();
+await page.waitForLoadState('networkidle');
 
 // --- trip list with content ---
 await page.getByRole('link', { name: /Waypoint/ }).click();

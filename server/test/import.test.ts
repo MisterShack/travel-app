@@ -187,17 +187,74 @@ describe('the review queue', () => {
 
 describe('heuristics', () => {
   it('claims a flight only on two independent signals', () => {
-    // A flight number alone, or one airport alone, is far too easy to hit by
-    // accident — a wrong guess costs a human more than no guess.
+    // A labelled flight number alone, or a route alone, is far too easy to hit
+    // by accident — a wrong guess costs a human more than no guess.
     expect(parseHeuristic(email({ text: 'Flight TP 1233 confirmed.' }))).toBeNull();
     expect(parseHeuristic(email({ text: 'LHR to LIS next week.' }))).toBeNull();
-    const both = parseHeuristic(email({ text: 'TP 1233 from LHR to LIS' }));
+    const both = parseHeuristic(email({ text: 'Flight TP 1233, LHR to LIS' }));
     expect(both?.ok).toBe(true);
+  });
+
+  it('requires the email to call the flight number a flight number', () => {
+    // Unanchored, `([A-Z]{2}|[A-Z]\d|\d[A-Z])\s?(\d{1,4})` matches a postal
+    // code, a table number, a tax line and half of every street address.
+    expect(parseHeuristic(email({ text: 'Table M5 12 at LHR to LIS Bistro' }))).toBeNull();
   });
 
   it('does not treat ordinary three-letter words as airports', () => {
     // "VAT" and "USD" are not airports; an unchecked match invents itineraries.
     expect(parseHeuristic(email({ text: 'Total inc VAT in USD was 250. Ref AB12345' }))).toBeNull();
+  });
+
+  it('does not turn a restaurant reservation into a flight', () => {
+    /*
+     * This is the one that shipped wrong. `ADD`, `SEE` and `EAT` are all live
+     * IATA codes, so "ADD TO CALENDAR" and "SEE MENU" in an OpenTable
+     * confirmation supplied two "airports", and a table number supplied the
+     * "flight number". Nothing in this text is a flight, and the parser must
+     * hand it to the model rather than guess.
+     */
+    const opentable = [
+      'Your reservation is confirmed',
+      'Cervejaria Ramiro, table for 4 at 8:30 PM',
+      'ADD TO CALENDAR   SEE MENU   EAT LATER',
+      'Confirmation ABC12345',
+    ].join('\n');
+    expect(parseHeuristic(email({ subject: 'Table for 4', text: opentable }))).toBeNull();
+  });
+
+  it('reads the route as a pair, not the first two codes in the document', () => {
+    /*
+     * Document order is not itinerary order. A code in a footer, an advert or a
+     * fare rule used to become the departure airport — which is how a Winnipeg
+     * to Ottawa flight was imported as departing Toronto.
+     */
+    const westjet = [
+      'WestJet Rewards: earn dollars on every flight from YYZ.',
+      'Flight WS 3120',
+      'YWG - YOW',
+      'Booking reference ABCDEF',
+    ].join('\n');
+    const parsed = parseHeuristic(email({ text: westjet }));
+    expect(parsed?.ok).toBe(true);
+    expect(parsed?.ok === true && parsed.draft.fields).toMatchObject({
+      flightNumber: 'WS3120',
+      departureAirport: 'YWG',
+      arrivalAirport: 'YOW',
+    });
+  });
+
+  it('reads a route written as departure and arrival labels', () => {
+    const text = [
+      'Flight WS 3120',
+      'Departing Winnipeg (YWG) at 07:15',
+      'Arriving Ottawa (YOW) at 10:40',
+    ].join('\n');
+    const parsed = parseHeuristic(email({ text }));
+    expect(parsed?.ok === true && parsed.draft.fields).toMatchObject({
+      departureAirport: 'YWG',
+      arrivalAirport: 'YOW',
+    });
   });
 
   it('reads an HTML-only email', () => {
@@ -252,7 +309,7 @@ describe('attachments', () => {
     // number there while the real itinerary sits unread in the PDF is worse
     // than going straight to the model.
     const { parseBooking } = await import('../src/import/parse');
-    const withSignals = email({ text: 'TP 1233 from LHR to LIS' });
+    const withSignals = email({ text: 'Flight TP 1233, LHR to LIS' });
 
     // No key, so the LLM path cannot run — the result tells us which branch
     // was taken.
@@ -263,7 +320,7 @@ describe('attachments', () => {
 
   it('still uses heuristics when there are none', async () => {
     const { parseBooking } = await import('../src/import/parse');
-    const result = await parseBooking(email({ text: 'TP 1233 from LHR to LIS' }), {
+    const result = await parseBooking(email({ text: 'Flight TP 1233, LHR to LIS' }), {
       apiKey: undefined,
       model: 'm',
     });

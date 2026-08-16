@@ -14,6 +14,7 @@ LIGHT = {
     "field": "#8f887c",
     "kind-flight": "#2c5c8a", "kind-lodging": "#2f6b4f", "kind-activity": "#6b4a8a",
     "accent": "#b45309", "accent-ink": "#ffffff",
+    "accent-wash": "#fdf3e8", "accent-line": "#e8c9a6",
     "warn": "#a8500a", "alert": "#a4232c", "focus": "#b45309",
 }
 DARK = {
@@ -22,6 +23,7 @@ DARK = {
     "field": "#6b7280",
     "kind-flight": "#7fb3e0", "kind-lodging": "#7fc9a3", "kind-activity": "#bda1e0",
     "accent": "#f0a03c", "accent-ink": "#1a1204",
+    "accent-wash": "#241a0c", "accent-line": "#4a3517",
     "warn": "#f5b25e", "alert": "#ff8a8a", "focus": "#f0a03c",
 }
 
@@ -49,6 +51,12 @@ PAIRS = [
     ("focus", "paper", 3.0, "focus ring on the page"),
     ("focus", "surface", 3.0, "focus ring on a card"),
     ("accent", "surface-sunk", 3.0, "accent on an inset area"),
+    # The accent wash is a *surface*, so everything set on it owes the same as
+    # it would on any other surface. This is the whole reason the wash is pale:
+    # a tint that cannot carry --ink is a decoration, not a surface.
+    ("ink", "accent-wash", 4.5, "text on the trip header"),
+    ("ink-soft", "accent-wash", 4.5, "secondary text on the trip header"),
+    ("accent", "accent-wash", 4.5, "accent text on its own wash"),
     # Kind hues mark small non-text elements, so 3:1 is the bar that applies.
     ("kind-flight", "surface", 3.0, "flight marker"),
     ("kind-lodging", "surface", 3.0, "stay marker"),

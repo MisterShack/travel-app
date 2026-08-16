@@ -1,11 +1,7 @@
 import { instantToLocal, zoneLabel, type TimelineItem } from '@travel/shared';
 import { Link } from 'react-router-dom';
-
-const ICON: Record<TimelineItem['kind'], string> = {
-  flight: '✈',
-  lodging: '⌂',
-  activity: '◆',
-};
+import { KindChip } from '@/components/Icons';
+import { KIND_LABEL } from '@/components/kinds';
 
 /**
  * Groups by the **local calendar day of each event's own zone**, not the trip's.
@@ -96,14 +92,18 @@ function Event({ item, homeTimezone }: { item: TimelineItem; homeTimezone: strin
           {end !== null && (
             <div className="until mono">
               → {end}
-              {endDate !== null && <span className="endday"> {endDate}</span>}
+              {endDate !== null && <span className="endday">{endDate}</span>}
             </div>
           )}
           {end !== null && showEndZone && <div className="zone">{zoneLabel(item.endTimezone!)}</div>}
         </div>
+        <KindChip kind={item.kind} />
         <div className="body">
           <div className="title">
-            <span className="kind">{ICON[item.kind]}</span>
+            {/* The chip is decorative to assistive tech, so the kind is said
+                here. It used to be a bare `✈` character, which a screen reader
+                announces inconsistently and sometimes not at all. */}
+            <span className="visually-hidden">{KIND_LABEL[item.kind]}: </span>
             {item.title}
           </div>
           {item.subtitle !== null && item.subtitle !== '' && <div className="muted">{item.subtitle}</div>}

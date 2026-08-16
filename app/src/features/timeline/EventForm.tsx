@@ -398,7 +398,9 @@ export function EventFormPage() {
 
       <div className="actions">
         <button disabled={busy}>{savedId !== null || !isNew ? 'Save' : 'Add'}</button>
-        <Link to={`/trips/${tripId}`}>{warnings.length > 0 ? 'Back to trip' : 'Cancel'}</Link>
+        <Link className="btn secondary" to={`/trips/${tripId}`}>
+          {warnings.length > 0 ? 'Back to trip' : 'Cancel'}
+        </Link>
         {(!isNew || savedId !== null) && (
           <button type="button" className="danger" onClick={remove}>
             Delete

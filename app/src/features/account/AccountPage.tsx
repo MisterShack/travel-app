@@ -27,8 +27,8 @@ export function AccountPage() {
       <div className="card">
         <h3>Reminders</h3>
         <p className="muted tiny" style={{ marginTop: 0 }}>
-          Reminders are set per trip, on the trip&apos;s own screen. Email always works; push is an
-          extra you turn on per device.
+          Reminders are set per trip, under <strong>Manage</strong> on the trip. Email always
+          works; push is an extra you turn on per device.
         </p>
       </div>
 

@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import type { TripSummary } from '@travel/shared';
+import type { TimelineItem, TripSummary } from '@travel/shared';
 import { api, ApiError } from '@/api/client';
 import { useAuth } from '@/auth/useAuth';
-import { ErrorText, Field, StaleBanner } from '@/components/Bits';
+import { ErrorText, Field, Sheet, Skeleton, StaleBanner } from '@/components/Bits';
+import { BackIcon, KindChip, ManageIcon, PlusIcon } from '@/components/Icons';
+import { KIND_LABEL } from '@/components/kinds';
+import { tripStatus } from '@/features/trips/status';
 import { loadTimeline, loadTrip, loadTrips, type Loaded } from '@/data/repository';
 import { Timeline } from '@/features/timeline/Timeline';
 import { Issues } from '@/features/timeline/Issues';
@@ -11,6 +14,14 @@ import { NotificationSettings } from '@/features/notify/NotificationSettings';
 import { TimezoneField } from '@/features/timeline/AirportField';
 
 const guessZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+const KINDS = ['flight', 'lodging', 'activity'] as const;
+
+const ADD_HINT: Record<TimelineItem['kind'], string> = {
+  flight: 'Departure and arrival, each in its own timezone',
+  lodging: 'Check-in and check-out',
+  activity: 'A booking, a reservation, or something to be somewhere for',
+};
 
 /**
  * A date range, rendered in the reader's locale. Noon UTC avoids the classic
@@ -27,6 +38,26 @@ function formatRange(startDate: string, endDate: string): string {
   return `${fmt(startDate, false)} – ${fmt(endDate, true)}`;
 }
 
+function Tallies({ items }: { items: TimelineItem[] }) {
+  const counts = KINDS.map((kind) => [kind, items.filter((i) => i.kind === kind).length] as const)
+    // A row of zeroes is a report about emptiness, not information.
+    .filter(([, n]) => n > 0);
+  if (counts.length === 0) return null;
+
+  return (
+    <div className="tallies">
+      {counts.map(([kind, n]) => (
+        <span className={`tally kind-${kind}`} key={kind}>
+          <span className="dot" aria-hidden="true" />
+          <b>{n}</b> {n === 1 ? KIND_LABEL[kind].toLowerCase() : `${KIND_LABEL[kind].toLowerCase()}s`}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ list -- */
+
 export function TripListPage() {
   const { user } = useAuth();
   const [state, setState] = useState<Loaded<TripSummary[]> | null>(null);
@@ -40,7 +71,7 @@ export function TripListPage() {
   }, [user]);
 
   if (error) return <p className="error">{error}</p>;
-  if (!state) return <p className="muted">Loading…</p>;
+  if (!state) return <Skeleton rows={3} label="Loading your trips" />;
 
   const now = new Date().toISOString().slice(0, 10);
   const upcoming = state.data.filter((t) => t.endDate >= now);
@@ -49,13 +80,25 @@ export function TripListPage() {
   return (
     <>
       {state.stale && <StaleBanner savedAt={state.savedAt} />}
-      <div className="actions" style={{ marginTop: 0 }}>
+
+      <div className="section-head">
+        <h2 className="screen-title">Trips</h2>
         <Link className="btn" to="/trips/new">
+          <PlusIcon size={18} />
           New trip
         </Link>
       </div>
 
-      {state.data.length === 0 && <p className="empty">No trips yet.</p>}
+      {state.data.length === 0 && (
+        <div className="empty">
+          <p>No trips yet.</p>
+          <p className="muted">
+            Start one, then add flights and stays — or forward a confirmation email and it will be
+            waiting in your inbox.
+          </p>
+        </div>
+      )}
+
       {upcoming.length > 0 && <h2>Upcoming</h2>}
       {upcoming.map((t) => (
         <TripCard key={t.id} trip={t} />
@@ -69,7 +112,7 @@ export function TripListPage() {
 }
 
 function TripCard({ trip }: { trip: TripSummary }) {
-  const range = formatRange(trip.startDate, trip.endDate);
+  const status = tripStatus(trip);
 
   return (
     <Link className="card link" to={`/trips/${trip.id}`}>
@@ -78,14 +121,17 @@ function TripCard({ trip }: { trip: TripSummary }) {
           <div className="title">{trip.name}</div>
           <div className="muted">
             {trip.destination !== null && trip.destination !== '' ? `${trip.destination} · ` : ''}
-            {range}
+            {formatRange(trip.startDate, trip.endDate)}
           </div>
+          <span className={`status ${status.tone}`}>{status.text}</span>
         </div>
         {trip.memberCount > 1 && <span className="muted tiny">{trip.memberCount} people</span>}
       </div>
     </Link>
   );
 }
+
+/* ------------------------------------------------------------------ form -- */
 
 export function TripFormPage() {
   const navigate = useNavigate();
@@ -120,7 +166,7 @@ export function TripFormPage() {
 
   return (
     <form onSubmit={onSubmit}>
-      <h2>New trip</h2>
+      <h2 className="screen-title">New trip</h2>
       <Field label="Name">
         <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
       </Field>
@@ -160,16 +206,26 @@ export function TripFormPage() {
       <ErrorText>{error}</ErrorText>
       <div className="actions">
         <button disabled={busy}>Create trip</button>
-        <Link to="/">Cancel</Link>
+        {/* A button, not a bare link: an action row of one filled control and
+            one underlined word reads as a form on a web page (BRAND.md §6). */}
+        <Link className="btn secondary" to="/">
+          Cancel
+        </Link>
       </div>
     </form>
   );
 }
 
-export function TripDetailPage() {
-  const { tripId = '' } = useParams();
+/* ---------------------------------------------------------------- detail -- */
+
+/**
+ * Loads a trip and its timeline together.
+ *
+ * Shared by the trip screen and its settings screen so that navigating between
+ * them does not re-derive the same two requests in two different shapes.
+ */
+function useTrip(tripId: string) {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof loadTrip>> | null>(null);
   const [timeline, setTimeline] = useState<Awaited<ReturnType<typeof loadTimeline>> | null>(null);
   const [error, setError] = useState('');
@@ -191,73 +247,144 @@ export function TripDetailPage() {
   }, [tripId, user]);
 
   useEffect(load, [load]);
+  return { detail, timeline, error, reload: load, userId: user?.id };
+}
+
+export function TripDetailPage() {
+  const { tripId = '' } = useParams();
+  const { detail, timeline, error } = useTrip(tripId);
+  const [adding, setAdding] = useState(false);
+  const closeSheet = useCallback(() => setAdding(false), []);
 
   if (error) return <p className="error">{error}</p>;
-  if (!detail || !timeline) return <p className="muted">Loading…</p>;
+  if (!detail || !timeline) return <Skeleton rows={4} label="Loading this trip" />;
 
   const stale = detail.stale || timeline.stale;
   const trip = detail.data.trip;
+  const status = tripStatus(trip);
 
   return (
     <>
       {stale && <StaleBanner savedAt={timeline.savedAt ?? detail.savedAt} />}
-      <div className="row">
-        <div className="grow">
-          <h2 className="screen-title">{trip.name}</h2>
-          <p className="muted" style={{ marginTop: -4 }}>
-            {trip.destination !== null && trip.destination !== '' ? `${trip.destination} · ` : ''}
-            {formatRange(trip.startDate, trip.endDate)}
-          </p>
-        </div>
-      </div>
 
-      <div className="actions" style={{ marginTop: 0 }}>
-        <Link className="btn secondary" to={`/trips/${tripId}/flight/new`}>
-          + Flight
-        </Link>
-        <Link className="btn secondary" to={`/trips/${tripId}/lodging/new`}>
-          + Stay
-        </Link>
-        <Link className="btn secondary" to={`/trips/${tripId}/activity/new`}>
-          + Activity
-        </Link>
-      </div>
+      <section className="screen-head">
+        <div className="top">
+          <div className="grow">
+            <h2 className="screen-title">{trip.name}</h2>
+            <p className="meta">
+              {trip.destination !== null && trip.destination !== '' ? `${trip.destination} · ` : ''}
+              {formatRange(trip.startDate, trip.endDate)}
+            </p>
+          </div>
+          <Link className="btn secondary" to={`/trips/${tripId}/settings`}>
+            <ManageIcon />
+            Manage
+          </Link>
+        </div>
+        <span className={`status ${status.tone}`}>{status.text}</span>
+        <Tallies items={timeline.data} />
+      </section>
+
+      {/* One primary action. Three side-by-side "+ Flight / + Stay / + Activity"
+          buttons made the user pick a type before deciding to add anything. */}
+      <button className="block" onClick={() => setAdding(true)}>
+        <PlusIcon size={18} />
+        Add to trip
+      </button>
 
       <Issues items={timeline.data} trip={trip} />
 
       <Timeline items={timeline.data} homeTimezone={trip.homeTimezone} />
 
+      {adding && (
+        <Sheet title="Add to trip" onClose={closeSheet}>
+          <div className="sheet-options">
+            {KINDS.map((kind) => (
+              <Link
+                key={kind}
+                className={`sheet-option kind-${kind}`}
+                to={`/trips/${tripId}/${kind}/new`}
+                onClick={closeSheet}
+              >
+                <KindChip kind={kind} size="lg" />
+                <span>
+                  <span className="label">{KIND_LABEL[kind]}</span>
+                  <span className="sub">{ADD_HINT[kind]}</span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        </Sheet>
+      )}
+    </>
+  );
+}
+
+/* -------------------------------------------------------------- settings -- */
+
+/**
+ * People, reminders and deletion.
+ *
+ * They used to sit below the timeline on the trip screen, which meant the trip
+ * screen ended in a delete button — a settings page pretending to be a view
+ * (BRAND.md §6b).
+ */
+export function TripSettingsPage() {
+  const { tripId = '' } = useParams();
+  const navigate = useNavigate();
+  const { detail, error, reload, userId } = useTrip(tripId);
+
+  if (error) return <p className="error">{error}</p>;
+  if (!detail) return <Skeleton rows={3} label="Loading trip settings" />;
+
+  const trip = detail.data.trip;
+  const me = detail.data.members.find((m) => m.userId === userId);
+
+  return (
+    <>
+      <Link className="btn secondary backlink" to={`/trips/${tripId}`}>
+        <BackIcon />
+        {trip.name}
+      </Link>
+
+      <h2 className="screen-title">Trip settings</h2>
+
       <h2>Notifications</h2>
-      <NotificationSettings
-        tripId={tripId}
-        enabled={
-          detail.data.members.find((m) => m.userId === user?.id)?.remindersEnabled !== 'false'
-        }
-      />
+      <NotificationSettings tripId={tripId} enabled={me?.remindersEnabled !== 'false'} />
 
       <h2>People</h2>
       {detail.data.members.map((m) => (
         <div className="card" key={m.userId}>
           <div className="row">
             <span className="grow">{m.email}</span>
-            <span className="muted tiny">{m.role}</span>
+            <span className="zone">{m.role}</span>
           </div>
         </div>
       ))}
-      {trip.role === 'owner' && <InviteBox tripId={tripId} onDone={load} />}
+      {trip.role === 'owner' && <InviteBox tripId={tripId} onDone={reload} />}
 
       {trip.role === 'owner' && (
-        <div className="actions">
-          <button
-            className="danger"
-            onClick={() => {
-              if (!confirm(`Delete "${trip.name}" and everything on it? This cannot be undone.`)) return;
-              void api.delete(`/trips/${tripId}`).then(() => navigate('/', { replace: true }));
-            }}
-          >
-            Delete trip
-          </button>
-        </div>
+        <>
+          <h2>Danger zone</h2>
+          <div className="card">
+            <p className="muted" style={{ marginTop: 0 }}>
+              Deleting removes the trip for everyone on it, along with every flight, stay and
+              activity. It cannot be undone.
+            </p>
+            <div className="actions" style={{ marginTop: 0 }}>
+              <button
+                className="danger"
+                onClick={() => {
+                  if (!confirm(`Delete "${trip.name}" and everything on it? This cannot be undone.`))
+                    return;
+                  void api.delete(`/trips/${tripId}`).then(() => navigate('/', { replace: true }));
+                }}
+              >
+                Delete trip
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </>
   );

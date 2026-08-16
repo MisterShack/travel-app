@@ -1,8 +1,30 @@
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '@/api/client';
 import { useAuth } from '@/auth/useAuth';
-import { ErrorText, Field } from '@/components/Bits';
+import { ErrorText, Field, Skeleton } from '@/components/Bits';
+
+/**
+ * The frame every signed-out screen sits in: the wordmark, then one narrow
+ * card.
+ *
+ * A sign-in form running the full width of a desktop window is a form on a web
+ * page (BRAND.md §6b). The wordmark appears here rather than in the app header,
+ * which does not exist until there is an app behind it.
+ */
+function AuthShell({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="auth">
+      <p className="brandline">
+        <span className="wordmark">Waypoint</span>
+      </p>
+      <div className="panel">
+        <h2>{title}</h2>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 function useSubmit<T>(action: (...args: never[]) => Promise<T>) {
   const [busy, setBusy] = useState(false);
@@ -38,8 +60,8 @@ export function LoginPage() {
   };
 
   return (
-    <form onSubmit={onSubmit}>
-      <h2>Sign in</h2>
+    <AuthShell title="Sign in">
+      <form onSubmit={onSubmit}>
       {/* Both fields point at the error: the server deliberately does not say
           which of the two was wrong, so neither should the markup. */}
       <Field label="Email">
@@ -65,12 +87,20 @@ export function LoginPage() {
         />
       </Field>
       <ErrorText id={errorId}>{error}</ErrorText>
+      {/* Buttons, not bare links. A filled control beside two underlined words
+          is the clearest single tell that a screen is a web page with a form on
+          it (BRAND.md §6). */}
       <div className="actions">
         <button disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
-        <Link to="/register">Create an account</Link>
-        <Link to="/forgot">Forgot password</Link>
+        <Link className="btn secondary" to="/register">
+          Create an account
+        </Link>
+        <Link className="btn secondary" to="/forgot">
+          Forgot password
+        </Link>
       </div>
-    </form>
+      </form>
+    </AuthShell>
   );
 }
 
@@ -92,21 +122,22 @@ export function RegisterPage() {
   // server deliberately does not say, and neither does this.
   if (done) {
     return (
-      <>
-        <h2>Check your email</h2>
+      <AuthShell title="Check your email">
         <p className="muted">
           If that address can be registered, a verification link is on its way. The link signs you in.
         </p>
-        <p>
-          <Link to="/login">Back to sign in</Link>
-        </p>
-      </>
+        <div className="actions">
+          <Link className="btn secondary" to="/login">
+            Back to sign in
+          </Link>
+        </div>
+      </AuthShell>
     );
   }
 
   return (
-    <form onSubmit={onSubmit}>
-      <h2>Create an account</h2>
+    <AuthShell title="Create an account">
+      <form onSubmit={onSubmit}>
       <Field label="Email">
         <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
       </Field>
@@ -123,9 +154,12 @@ export function RegisterPage() {
       <ErrorText>{error}</ErrorText>
       <div className="actions">
         <button disabled={busy}>{busy ? 'Creating…' : 'Create account'}</button>
-        <Link to="/login">I already have an account</Link>
+        <Link className="btn secondary" to="/login">
+          I already have an account
+        </Link>
       </div>
-    </form>
+      </form>
+    </AuthShell>
   );
 }
 
@@ -180,15 +214,21 @@ export function VerifyPage() {
     })();
   }, [token, refresh, navigate]);
 
-  if (state === 'working') return <p className="muted">Verifying…</p>;
+  if (state === 'working')
+    return (
+      <AuthShell title="Verifying">
+        <Skeleton rows={1} label="Verifying your email address" />
+      </AuthShell>
+    );
   return (
-    <>
-      <h2>That link is no longer valid</h2>
+    <AuthShell title="That link is no longer valid">
       <p className="muted">Verification links last 24 hours and can only be used once.</p>
-      <p>
-        <Link to="/login">Back to sign in</Link>
-      </p>
-    </>
+      <div className="actions">
+        <Link className="btn secondary" to="/login">
+          Back to sign in
+        </Link>
+      </div>
+    </AuthShell>
   );
 }
 
@@ -199,18 +239,20 @@ export function ForgotPage() {
 
   if (done) {
     return (
-      <>
-        <h2>Check your email</h2>
+      <AuthShell title="Check your email">
         <p className="muted">If that address has an account, a reset link is on its way.</p>
-        <p>
-          <Link to="/login">Back to sign in</Link>
-        </p>
-      </>
+        <div className="actions">
+          <Link className="btn secondary" to="/login">
+            Back to sign in
+          </Link>
+        </div>
+      </AuthShell>
     );
   }
 
   return (
-    <form
+    <AuthShell title="Reset your password">
+      <form
       onSubmit={(e) => {
         e.preventDefault();
         void run(async () => {
@@ -219,16 +261,18 @@ export function ForgotPage() {
         });
       }}
     >
-      <h2>Reset your password</h2>
       <Field label="Email">
         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
       </Field>
       <ErrorText>{error}</ErrorText>
       <div className="actions">
         <button disabled={busy}>Send reset link</button>
-        <Link to="/login">Back</Link>
+        <Link className="btn secondary" to="/login">
+          Back to sign in
+        </Link>
       </div>
-    </form>
+      </form>
+    </AuthShell>
   );
 }
 
@@ -240,7 +284,8 @@ export function ResetPage() {
   const token = params.get('token') ?? '';
 
   return (
-    <form
+    <AuthShell title="Choose a new password">
+      <form
       onSubmit={(e) => {
         e.preventDefault();
         void run(async () => {
@@ -249,7 +294,6 @@ export function ResetPage() {
         });
       }}
     >
-      <h2>Choose a new password</h2>
       <Field label="New password" hint="At least 10 characters.">
         <input
           type="password"
@@ -265,7 +309,8 @@ export function ResetPage() {
         <button disabled={busy}>Change password</button>
       </div>
       <p className="muted tiny">Every device signed in with the old password will be signed out.</p>
-    </form>
+      </form>
+    </AuthShell>
   );
 }
 
@@ -300,25 +345,30 @@ export function InvitePage() {
 
   if (notFound) {
     return (
-      <>
-        <h2>That invitation is no longer valid</h2>
+      <AuthShell title="That invitation is no longer valid">
         <p className="muted">Invitations last 7 days, can only be used once, and can be revoked.</p>
-      </>
+      </AuthShell>
     );
   }
-  if (!invite) return <p className="muted">Loading…</p>;
+  if (!invite)
+    return (
+      <AuthShell title="Invitation">
+        <Skeleton rows={1} label="Loading this invitation" />
+      </AuthShell>
+    );
 
   return (
-    <>
-      <h2>You have been invited to {invite.trip}</h2>
+    <AuthShell title={`You have been invited to ${invite.trip}`}>
       <p className="muted">
         This invitation was sent to <strong>{invite.email}</strong> and can only be accepted by that
         account.
       </p>
       {user === null ? (
-        <p>
-          <Link to={`/login?next=/invite?token=${encodeURIComponent(token)}`}>Sign in to accept</Link>
-        </p>
+        <div className="actions">
+          <Link className="btn" to={`/login?next=/invite?token=${encodeURIComponent(token)}`}>
+            Sign in to accept
+          </Link>
+        </div>
       ) : (
         <>
           <ErrorText>{error}</ErrorText>
@@ -343,6 +393,6 @@ export function InvitePage() {
           )}
         </>
       )}
-    </>
+    </AuthShell>
   );
 }

@@ -35,21 +35,63 @@ function plainText(email: ReceivedEmail): string {
 
 const CONFIRMATION =
   /\b(?:confirmation|booking|reservation|reference|record locator|PNR)\b[^A-Z0-9]{0,20}([A-Z0-9]{5,8})\b/i;
-/** e.g. "TP 1233", "BA249", "U2 8501". Two letters or letter+digit, then 1–4 digits. */
-const FLIGHT_NUMBER = /\b([A-Z]{2}|[A-Z]\d|\d[A-Z])\s?(\d{1,4})\b/;
 
 /**
- * Airport codes are only believed when the table knows them **and** the word is
- * genuinely standalone. Three capitals appear all over ordinary prose ("VAT",
- * "PDF", "USD"), so an unchecked match would invent an itinerary.
+ * A flight number, but only where the email says it is one.
+ *
+ * The previous pattern matched `([A-Z]{2}|[A-Z]\d|\d[A-Z])\s?(\d{1,4})` anywhere
+ * in the text, which fires on a postal code, a table number, a tax line and a
+ * street address. Requiring the word *flight* immediately before it is what
+ * makes this a signal rather than a coincidence.
+ *
+ * Case-insensitive for the label only: the code itself must be upper case, and
+ * that is checked after the match, because one regex cannot mix flags.
  */
-function airportCodes(text: string): string[] {
-  const seen: string[] = [];
-  for (const m of text.matchAll(/\b([A-Z]{3})\b/g)) {
-    const code = m[1]!;
-    if (airportTimeZone(code) && !seen.includes(code)) seen.push(code);
+const FLIGHT_NUMBER =
+  /\b(?:flight|flt)\b[^A-Za-z0-9]{0,14}([A-Za-z]{2}|[A-Za-z]\d|\d[A-Za-z])\s?(\d{1,4})\b/i;
+
+/** `YWG → YOW`, `YWG - YOW`, `YWG to YOW`. The order is the itinerary's. */
+const ROUTE = /\b([A-Z]{3})\b\s*(?:→|-+>|–|—|-|\bto\b)\s*\b([A-Z]{3})\b/g;
+
+/** `Departing Winnipeg (YWG)` … `Arriving Ottawa (YOW)`. */
+const LABELLED_FROM = /\b(?:depart\w*|origin|from)\b[^()\n]{0,80}\(\s*([A-Z]{3})\s*\)/i;
+const LABELLED_TO = /\b(?:arriv\w*|destination|to)\b[^()\n]{0,80}\(\s*([A-Z]{3})\s*\)/i;
+
+/**
+ * The departure and arrival airports, **as an ordered pair**.
+ *
+ * The previous version collected every three-letter word the airport table
+ * recognised and took the first two in document order as the route. That is
+ * wrong twice over.
+ *
+ * It is wrong about *what* is an airport: `ADD`, `SEE`, `EAT`, `ALL`, `THE`,
+ * `FOR`, `AND`, `NOT`, `CAR`, `BUS`, `SAT`, `SUN` and `HST` are all live IATA
+ * codes, so an OpenTable confirmation containing "ADD TO CALENDAR" and "SEE
+ * MENU" produced a two-airport itinerary out of nothing — which is exactly how
+ * a restaurant reservation arrived as a flight.
+ *
+ * And it is wrong about *which is which*: document order is not itinerary
+ * order, so a code appearing in a footer, an advertisement or a fare rule ahead
+ * of the real route became the departure airport.
+ *
+ * Both are fixed by only ever reading a route as a pair the email itself has
+ * joined — with an arrow, a dash, the word "to", or departure/arrival labels. A
+ * single loose code is never enough to place anyone anywhere.
+ */
+function flightRoute(text: string): { from: string; to: string } | null {
+  const usable = (from: string, to: string) =>
+    from !== to && airportTimeZone(from) !== undefined && airportTimeZone(to) !== undefined;
+
+  for (const m of text.matchAll(ROUTE)) {
+    const [from, to] = [m[1]!, m[2]!];
+    if (usable(from, to)) return { from, to };
   }
-  return seen;
+
+  const from = LABELLED_FROM.exec(text)?.[1];
+  const to = LABELLED_TO.exec(text)?.[1];
+  if (from !== undefined && to !== undefined && usable(from, to)) return { from, to };
+
+  return null;
 }
 
 export function parseHeuristic(email: ReceivedEmail): ParseResult | null {
@@ -57,24 +99,26 @@ export function parseHeuristic(email: ReceivedEmail): ParseResult | null {
   if (text.trim() === '') return null;
 
   const confirmation = CONFIRMATION.exec(text)?.[1];
-  const codes = airportCodes(text);
+  const route = flightRoute(text);
   const flight = FLIGHT_NUMBER.exec(text);
+  const carrier = flight?.[1];
 
   /**
-   * A flight is only claimed on two independent signals — a flight number *and*
-   * two known airports. One alone is far too easy to hit by accident, and a
-   * wrong guess here costs a human more time than no guess at all.
+   * A flight is only claimed on two independent signals — a flight number the
+   * email labelled as one, *and* a route the email wrote as a route. One alone
+   * is far too easy to hit by accident, and a wrong guess costs a human more
+   * time than no guess at all.
    */
-  if (flight && codes.length >= 2) {
+  if (flight && carrier !== undefined && carrier === carrier.toUpperCase() && route) {
     return {
       ok: true,
       by: 'heuristic',
       draft: {
         type: 'flight',
         fields: {
-          flightNumber: `${flight[1]}${flight[2]}`,
-          departureAirport: codes[0],
-          arrivalAirport: codes[1],
+          flightNumber: `${carrier}${flight[2]}`,
+          departureAirport: route.from,
+          arrivalAirport: route.to,
           ...(confirmation ? { confirmationCode: confirmation } : {}),
         },
       },
@@ -106,6 +150,10 @@ Return ONLY JSON matching this shape, with no prose and no markdown fence:
 Rules:
 - Times are LOCAL wall-clock at the place they happen. Never convert to UTC and never add an offset.
 - Airports are three-letter IATA codes.
+- departureAirport is where the passenger boards and arrivalAirport is where they finally get off.
+  Take both from the itinerary itself. Airports named in fare rules, baggage terms, advertisements,
+  loyalty-programme text or the airline's own mailing address are not part of this booking.
+- If the booking covers several flights, extract only the first one.
 - If a field is not stated in the email, use null. Do not infer, guess or invent.
 - A train, coach or ferry booking is an activity with kind "transport". Put the route in the name
   ("Via Rail 55, Ottawa to Toronto"), the origin in location, and the arrival time in endLocal —

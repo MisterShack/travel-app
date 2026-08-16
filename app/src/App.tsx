@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from '@/auth/useAuth';
-import { Mark } from '@/components/Mark';
 import { api } from '@/api/client';
+import { Skeleton } from '@/components/Bits';
 import {
   ForgotPage,
   InvitePage,
@@ -11,7 +11,12 @@ import {
   ResetPage,
   VerifyPage,
 } from '@/features/auth/AuthPages';
-import { TripDetailPage, TripFormPage, TripListPage } from '@/features/trips/TripPages';
+import {
+  TripDetailPage,
+  TripFormPage,
+  TripListPage,
+  TripSettingsPage,
+} from '@/features/trips/TripPages';
 import { ImportsPage } from '@/features/imports/ImportsPage';
 import { AccountPage } from '@/features/account/AccountPage';
 import { TabBar } from '@/components/TabBar';
@@ -28,7 +33,7 @@ function RequireUser({ children }: { children: React.ReactNode }) {
   const { user, status } = useAuth();
   const location = useLocation();
 
-  if (status === 'loading') return <p className="muted">Loading…</p>;
+  if (status === 'loading') return <Skeleton rows={2} label="Signing you in" />;
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   return <>{children}</>;
 }
@@ -76,25 +81,26 @@ export function App() {
       <a className="skip" href="#main">
         Skip to content
       </a>
-      <header className="bar">
-        <h1>
-          <Link className="wordmark" to="/">
-            <span style={{ color: 'var(--accent)' }}>
-              <Mark />
+      {/* Signed out, the wordmark belongs above the sign-in card rather than in
+          a title bar over an empty page — so the header only exists once there
+          is an app behind it. */}
+      {user !== null && (
+        <header className="bar">
+          <h1>
+            <Link className="wordmark" to="/">
+              Waypoint
+            </Link>
+          </h1>
+          {/* Navigation lives in the tab bar. The header is a title bar and an
+              offline indicator, nothing else — two navigations competing is how
+              a web page looks. */}
+          {offline && (
+            <span className="offline-chip" role="status">
+              Offline
             </span>
-            Waypoint
-          </Link>
-        </h1>
-        {offline && <span className="muted tiny">offline</span>}
-        {/* Navigation lives in the tab bar. The header is a title bar and an
-            offline indicator, nothing else — two navigations competing is how a
-            web page looks. */}
-        {offline && (
-          <span className="offline-chip" role="status">
-            Offline
-          </span>
-        )}
-      </header>
+          )}
+        </header>
+      )}
 
       <main id="main" ref={main} tabIndex={-1}>
         <Routes>
@@ -134,6 +140,14 @@ export function App() {
             element={
               <RequireUser>
                 <TripDetailPage />
+              </RequireUser>
+            }
+          />
+          <Route
+            path="/trips/:tripId/settings"
+            element={
+              <RequireUser>
+                <TripSettingsPage />
               </RequireUser>
             }
           />
