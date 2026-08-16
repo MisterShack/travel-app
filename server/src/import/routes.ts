@@ -80,9 +80,23 @@ export function createImportRoutes(deps: ImportDeps) {
         return c.json({ error: 'invalid_request' }, 400);
       }
 
+      /**
+       * Every outcome is logged, not only the rejections.
+       *
+       * Before this, a successful import and every deliberate ignore wrote
+       * nothing, so "no webhook in the logs" was indistinguishable between
+       * working perfectly, silently discarding the mail, and never being
+       * called at all. An endpoint whose success is invisible cannot be
+       * operated.
+       */
+      const ignore = (reason: string) => {
+        console.info(`Inbound webhook ignored (${reason})`);
+        return c.json({ ok: true, ignored: reason });
+      };
+
       const messageId = event.data?.email_id ?? event.data?.id;
-      if (!messageId) return c.json({ ok: true, ignored: 'no message id' });
-      if (!inbound) return c.json({ ok: true, ignored: 'inbound not configured' });
+      if (!messageId) return ignore('no message id in the event payload');
+      if (!inbound) return ignore('RESEND_API_KEY is not set, so the message cannot be fetched');
 
       // Idempotency: the provider retries, and a retry must not import twice.
       const seen = await db
@@ -90,19 +104,23 @@ export function createImportRoutes(deps: ImportDeps) {
         .from(bookingImports)
         .where(eq(bookingImports.resendMessageId, messageId))
         .limit(1);
-      if (seen[0]) return c.json({ ok: true, duplicate: true });
+      if (seen[0]) {
+        console.info(`Inbound webhook: message ${messageId} already imported; ignoring retry`);
+        return c.json({ ok: true, duplicate: true });
+      }
 
       let message;
       try {
         message = await inbound.fetchMessage(messageId);
       } catch (error) {
+        console.error(`Inbound webhook: could not fetch ${messageId} from Resend:`, error);
         return c.json({ ok: false, error: (error as Error).message }, 502);
       }
 
       const wanted = env.INBOUND_ADDRESS.toLowerCase();
       if (!message.to.map(addressOf).includes(wanted)) {
         // A reply to a reminder is not a booking confirmation.
-        return c.json({ ok: true, ignored: 'not addressed to the import address' });
+        return ignore(`addressed to ${message.to.join(', ')}, not ${wanted}`);
       }
 
       const from = addressOf(message.from);
@@ -111,7 +129,7 @@ export function createImportRoutes(deps: ImportDeps) {
       // `From` is trivially forged, so this is cost and noise control, not
       // authentication — the human-review step is what contains the damage.
       if (!sender || sender.emailVerifiedAt === null) {
-        return c.json({ ok: true, ignored: 'unknown sender' });
+        return ignore(`sender ${from} is not a verified account on this app`);
       }
 
       const since = new Date(now().getTime() - 24 * 60 * 60 * 1000).toISOString();
@@ -120,7 +138,7 @@ export function createImportRoutes(deps: ImportDeps) {
         .from(bookingImports)
         .where(and(eq(bookingImports.userId, sender.id), gte(bookingImports.createdAt, since)));
       if (today.length >= env.IMPORT_DAILY_CAP) {
-        return c.json({ ok: true, ignored: 'daily cap reached' });
+        return ignore(`daily cap of ${env.IMPORT_DAILY_CAP} reached for ${from}`);
       }
 
       const parsed = await parseBooking(message, {
@@ -161,6 +179,11 @@ export function createImportRoutes(deps: ImportDeps) {
         createdAt: at,
       });
 
+      console.info(
+        `Inbound webhook: imported ${messageId} for ${from} — ` +
+          `${parsed.ok ? `${parsed.draft.type} via ${parsed.by}` : `unreadable (${parsed.reason})`}` +
+          `${tripId ? ', matched to a trip' : ', no trip matched'}`,
+      );
       return c.json({ ok: true });
     },
   );
