@@ -1,7 +1,8 @@
 # Travel App — project guide
 
 Personal/family travel agent: flights, lodging, and activities merged into one timeline per trip,
-with reminders. **PLAN.md** is the spec — read it before implementing anything. It has not been
+with reminders. **PLAN.md** is the V1 spec (shipped, phases 0–5). **PLAN-V2.md** is a draft, not
+started — Terraform and Playwright. Read the relevant one before implementing anything. It has not been
 built against yet; if you're about to start Phase 0, confirm PLAN.md has been through
 `.claude/skills/plan-review` first (§ of PLAN.md's header note).
 
