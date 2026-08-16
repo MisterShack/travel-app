@@ -487,7 +487,8 @@ verified Resend domain.
 - **Phase 3 — Timeline core (the MVP, and the point this goes live):** `flights`/`lodging`/
   `activities` CRUD + Zod schemas, IATA→IANA table, merged timeline query, PWA client with trip
   list + timeline view + add/edit forms, **and the offline read cache** (§8). Manual entry only.
-- **Phase 4 — Booking import: done 2026-08-15.** Signature-verified webhook, recipient and
+- **Phase 4 — Booking import: done and verified 2026-08-15**, against a real forwarded airline
+  confirmation with two per-passenger PDF tickets. Extraction was correct. Signature-verified webhook, recipient and
   verified-sender gates, per-user daily cap, idempotency on the provider's message id, heuristic
   parser with a paid-Gemini fallback, single-candidate trip matching, and the review-and-apply UI.
   Needs `RESEND_WEBHOOK_SECRET`, `GEMINI_API_KEY` and the inbound MX record (DEPLOY.md §11) to run

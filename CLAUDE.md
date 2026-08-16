@@ -62,7 +62,10 @@ verification work against real Resend delivery.
 
 **All phases (0–5) are done.** 118 tests, typecheck and lint clean.
 
-**Phase 4 (booking import) shipped 2026-08-15**: a Svix-signature-verified webhook (implemented
+**Phase 4 (booking import) shipped and verified end to end against a real forwarded airline
+confirmation, 2026-08-15** — including two per-passenger PDF tickets, read correctly.
+
+Implementation: a Svix-signature-verified webhook (implemented
 directly rather than via an SDK, so it is testable without a network), then three more gates —
 recipient (an MX on the sending domain delivers replies to our own `no-reply` too), verified
 sender, and a per-user daily cap. Heuristics run first and claim a flight only on two independent
