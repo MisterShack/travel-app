@@ -19,6 +19,27 @@ export type SignatureHeaders = {
   signature: string | undefined;
 };
 
+/**
+ * The signing key, from whatever form the secret was pasted in.
+ *
+ * Svix secrets are `whsec_` + base64, and Resend's documentation does not
+ * promise the prefix — so both are accepted. Surrounding quotes are stripped
+ * because pasting `"whsec_…"` into a dashboard variable is easy and produces a
+ * failure indistinguishable from a wrong secret.
+ *
+ * If the remainder is not valid base64 it is used as raw bytes rather than
+ * silently decoding to garbage, which would fail every request with no clue as
+ * to why.
+ */
+function secretKey(secret: string): Buffer {
+  const cleaned = secret.trim().replace(/^["']|["']$/g, '').replace(/^whsec_/, '');
+  const decoded = Buffer.from(cleaned, 'base64');
+  // Round-tripping catches input that base64-decodes but was never base64.
+  return decoded.toString('base64').replace(/=+$/, '') === cleaned.replace(/=+$/, '')
+    ? decoded
+    : Buffer.from(cleaned, 'utf8');
+}
+
 /** Five minutes, matching Svix's own tolerance. */
 const TOLERANCE_MS = 5 * 60 * 1000;
 
@@ -46,7 +67,7 @@ export function verifyWebhook(
     return { ok: false, reason: 'stale' };
   }
 
-  const key = Buffer.from(secret.replace(/^whsec_/, ''), 'base64');
+  const key = secretKey(secret);
   const expected = createHmac('sha256', key)
     .update(`${headers.id}.${headers.timestamp}.${rawBody}`)
     .digest('base64');

@@ -56,7 +56,20 @@ export function createImportRoutes(deps: ImportDeps) {
         now(),
       );
       if (!verified.ok) {
-        // Deliberately terse: a probing client learns only that it failed.
+        /**
+         * Terse to the caller, specific in the log. A probing client learns
+         * only that it failed; the operator needs to tell a wrong secret from
+         * a clock skew from a missing header, and without this the only signal
+         * is an unexplained 401 on both sides.
+         */
+        console.warn(
+          `Inbound webhook rejected: ${verified.reason}` +
+            (verified.reason === 'missing_headers'
+              ? ` (svix-id=${c.req.header('svix-id') ? 'yes' : 'no'},` +
+                ` svix-timestamp=${c.req.header('svix-timestamp') ? 'yes' : 'no'},` +
+                ` svix-signature=${c.req.header('svix-signature') ? 'yes' : 'no'})`
+              : ''),
+        );
         return c.json({ error: 'unauthorised' }, 401);
       }
 

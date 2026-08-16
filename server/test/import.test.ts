@@ -212,3 +212,34 @@ describe('addressOf', () => {
     expect(addressOf('  b@example.com ')).toBe('b@example.com');
   });
 });
+
+describe('signing-secret formats', () => {
+  const raw = '{"a":1}';
+  const ts = String(Math.floor(NOW.getTime() / 1000));
+  const sign = (keyBytes: Buffer) =>
+    createHmac('sha256', keyBytes).update(`msg_1.${ts}.${raw}`).digest('base64');
+  const hdrs = (sig: string) => ({ id: 'msg_1', timestamp: ts, signature: `v1,${sig}` });
+
+  it('accepts a secret with the whsec_ prefix', () => {
+    const b64 = Buffer.from('some-secret-bytes-here-32-chars!').toString('base64');
+    expect(verifyWebhook(`whsec_${b64}`, hdrs(sign(Buffer.from(b64, 'base64'))), raw, NOW).ok).toBe(true);
+  });
+
+  it('accepts the same secret without the prefix', () => {
+    // Resend's docs do not promise the prefix, so both forms must work.
+    const b64 = Buffer.from('some-secret-bytes-here-32-chars!').toString('base64');
+    expect(verifyWebhook(b64, hdrs(sign(Buffer.from(b64, 'base64'))), raw, NOW).ok).toBe(true);
+  });
+
+  it('tolerates quotes around a pasted secret', () => {
+    // Pasting "whsec_…" into a dashboard variable fails identically to a wrong
+    // secret, which is an expensive hour to spend.
+    const b64 = Buffer.from('some-secret-bytes-here-32-chars!').toString('base64');
+    expect(verifyWebhook(`"whsec_${b64}"`, hdrs(sign(Buffer.from(b64, 'base64'))), raw, NOW).ok).toBe(true);
+  });
+
+  it('treats a non-base64 secret as raw bytes rather than decoding to garbage', () => {
+    const plain = 'not-base64-at-all!!';
+    expect(verifyWebhook(plain, hdrs(sign(Buffer.from(plain, 'utf8'))), raw, NOW).ok).toBe(true);
+  });
+});
