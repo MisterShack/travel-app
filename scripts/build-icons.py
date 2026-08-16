@@ -1,54 +1,61 @@
 #!/usr/bin/env python3
-"""Generates the PWA icons referenced by app/vite.config.ts's manifest.
+"""Generates Waypoint's app icons from the chart-waypoint mark.
 
-Pure stdlib (zlib + struct) so there is no image-library dependency for three
-flat-colour marks. Run: python3 scripts/build-icons.py
+Pure stdlib (zlib + struct): three flat-colour marks do not justify an image
+dependency. Run: python3 scripts/build-icons.py
+
+The mark is BRAND.md §9 — an aeronautical waypoint triangle with the point at
+its centroid, in accent on ink.
 """
 import math, pathlib, struct, zlib
 
 OUT = pathlib.Path(__file__).resolve().parent.parent / 'app' / 'public' / 'icons'
 OUT.mkdir(parents=True, exist_ok=True)
 
-BG = (0x12, 0x13, 0x1A)
-FG = (0x7D, 0x9B, 0xFF)
+BG = (0x10, 0x12, 0x16)      # --paper, dark
+FG = (0xF0, 0xA0, 0x3C)      # --accent, dark
+
+
+def inside_triangle(px, py, pts):
+    def sign(a, b, c):
+        return (a[0] - c[0]) * (b[1] - c[1]) - (b[0] - c[0]) * (a[1] - c[1])
+    d1, d2, d3 = (sign((px, py), pts[i], pts[(i + 1) % 3]) for i in range(3))
+    has_neg = min(d1, d2, d3) < 0
+    has_pos = max(d1, d2, d3) > 0
+    return not (has_neg and has_pos)
 
 
 def png(path, size, safe):
-    """A rising flight path: a thick diagonal with a disc at its head.
-
-    `safe` shrinks the mark into the middle so a maskable icon survives being
-    cropped to a circle by the launcher.
-    """
-    cx, cy = size / 2, size / 2
-    span = size * safe
-
-    # Line runs lower-left to upper-right through the centre.
-    x0, y0 = cx - span / 2, cy + span / 2
-    x1, y1 = cx + span / 2 * 0.72, cy - span / 2 * 0.72
-    half = size * 0.055           # half the stroke width
-    head_r = size * 0.135         # disc at the head of the path
+    """`safe` shrinks the mark so a maskable icon survives a circular crop."""
+    cx = cy = size / 2
+    r = size * safe / 2
+    # Equilateral triangle, flat side down, centred.
+    outer = [(cx + r * math.cos(math.radians(a)), cy + r * math.sin(math.radians(a)))
+             for a in (-90, 30, 150)]
+    stroke = size * 0.085
+    inner_r = r - stroke * 1.9
+    inner = [(cx + inner_r * math.cos(math.radians(a)), cy + inner_r * math.sin(math.radians(a)))
+             for a in (-90, 30, 150)]
+    # The point itself. Sized and placed so it stays clear of the inner edge of
+    # the base stroke — at the first attempt it overlapped, and the mark read as
+    # a filled blob rather than a triangle containing a point.
+    dot_y = cy + size * 0.018
+    dot_r = size * 0.058
 
     rows = bytearray()
     for y in range(size):
-        rows.append(0)  # PNG filter type 0 for this scanline
+        rows.append(0)
         for x in range(size):
             px, py = x + 0.5, y + 0.5
-
-            # Distance from the point to the line segment.
-            dx, dy = x1 - x0, y1 - y0
-            t = max(0.0, min(1.0, ((px - x0) * dx + (py - y0) * dy) / (dx * dx + dy * dy)))
-            lx, ly = x0 + t * dx, y0 + t * dy
-            on_line = math.hypot(px - lx, py - ly) <= half
-
-            on_head = math.hypot(px - x1, py - y1) <= head_r
-
-            rows.extend(FG if (on_line or on_head) else BG)
+            on_ring = inside_triangle(px, py, outer) and not inside_triangle(px, py, inner)
+            on_dot = math.hypot(px - cx, py - dot_y) <= dot_r
+            rows.extend(FG if (on_ring or on_dot) else BG)
 
     def chunk(tag, data):
         return (struct.pack('>I', len(data)) + tag + data
                 + struct.pack('>I', zlib.crc32(tag + data) & 0xFFFFFFFF))
 
-    ihdr = struct.pack('>IIBBBBB', size, size, 8, 2, 0, 0, 0)  # 8-bit truecolour
+    ihdr = struct.pack('>IIBBBBB', size, size, 8, 2, 0, 0, 0)
     blob = (b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', ihdr)
             + chunk(b'IDAT', zlib.compress(bytes(rows), 9)) + chunk(b'IEND', b''))
     path.write_bytes(blob)
@@ -56,11 +63,9 @@ def png(path, size, safe):
 
 
 for name, size, safe in [
-    ('icon-192.png', 192, 0.72),
-    ('icon-512.png', 512, 0.72),
-    # Maskable icons get cropped to a circle by some launchers, so the mark sits
-    # inside the middle 60% and the background bleeds to the edge.
-    ('icon-maskable-512.png', 512, 0.52),
+    ('icon-192.png', 192, 0.74),
+    ('icon-512.png', 512, 0.74),
+    ('icon-maskable-512.png', 512, 0.54),
 ]:
     n = png(OUT / name, size, safe)
-    print(f'  {name}  {size}x{size}  {n/1024:.1f} KB')
+    print(f'  {name}  {size}x{size}  {n / 1024:.1f} KB')
