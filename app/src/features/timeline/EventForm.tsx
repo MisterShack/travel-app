@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError } from '@/api/client';
 import { ErrorText, Field, Warnings } from '@/components/Bits';
 import { AirportField, TimezoneField } from './AirportField';
+import { ACTIVITY_KINDS, applyDraft, type ActivityKind } from './draft';
 
 /**
  * Add/edit form for the three timeline entity types.
@@ -37,7 +38,7 @@ type State = {
   name: string;
   address: string;
   location: string;
-  activityKind: 'restaurant' | 'attraction' | 'transport' | 'other';
+  activityKind: ActivityKind;
   startLocal: string;
   startTimezone: string;
   endLocal: string;
@@ -101,23 +102,7 @@ export function EventFormPage() {
   useEffect(() => {
     const d = handover.draft;
     if (!d) return;
-    const str = (k: string) => (typeof d[k] === 'string' ? (d[k] as string) : '');
-    setF((prev) => ({
-      ...prev,
-      airline: str('airline') || prev.airline,
-      flightNumber: str('flightNumber') || prev.flightNumber,
-      departureAirport: str('departureAirport') || prev.departureAirport,
-      departureLocal: str('departureLocal') || prev.departureLocal,
-      arrivalAirport: str('arrivalAirport') || prev.arrivalAirport,
-      arrivalLocal: str('arrivalLocal') || prev.arrivalLocal,
-      seat: str('seat') || prev.seat,
-      name: str('name') || prev.name,
-      address: str('address') || prev.address,
-      location: str('location') || prev.location,
-      startLocal: str('startLocal') || str('checkInLocal') || prev.startLocal,
-      endLocal: str('endLocal') || str('checkOutLocal') || prev.endLocal,
-      confirmationCode: str('confirmationCode') || prev.confirmationCode,
-    }));
+    setF((prev) => applyDraft(prev, d));
     // Handover happens once, on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -343,15 +328,19 @@ export function EventFormPage() {
             <label className="field-label" htmlFor={kindSelectId}>
               What
             </label>
+            {/* Options come from the same list the import mapping validates
+                against, so the two cannot drift into disagreeing about what a
+                kind is. */}
             <select
               id={kindSelectId}
               value={f.activityKind}
-              onChange={(e) => set({ activityKind: e.target.value as State['activityKind'] })}
+              onChange={(e) => set({ activityKind: e.target.value as ActivityKind })}
             >
-              <option value="restaurant">Restaurant</option>
-              <option value="attraction">Attraction</option>
-              <option value="transport">Transport</option>
-              <option value="other">Other</option>
+              {ACTIVITY_KINDS.map((k) => (
+                <option value={k} key={k}>
+                  {k[0]!.toUpperCase() + k.slice(1)}
+                </option>
+              ))}
             </select>
           </div>
           <Field label="Name">

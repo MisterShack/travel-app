@@ -1,0 +1,63 @@
+import { describe, expect, it } from 'vitest';
+import { applyDraft } from './draft';
+
+const form = {
+  airline: '',
+  flightNumber: '',
+  departureAirport: '',
+  departureLocal: '',
+  arrivalAirport: '',
+  arrivalLocal: '',
+  seat: '',
+  name: '',
+  address: '',
+  location: '',
+  activityKind: 'other' as const,
+  startLocal: '',
+  endLocal: '',
+  confirmationCode: '',
+};
+
+describe('applyDraft', () => {
+  it('carries the activity kind the model reported', () => {
+    // A forwarded OpenTable booking used to arrive on the form as "Other",
+    // because the mapping never read `kind` — on the one screen the import
+    // flow exists to save work on.
+    const next = applyDraft(form, {
+      kind: 'restaurant',
+      name: 'Cervejaria Ramiro',
+      location: 'Av. Almirante Reis 1',
+      startLocal: '2026-09-10T20:30',
+      confirmationCode: 'ABC12345',
+    });
+    expect(next).toMatchObject({
+      activityKind: 'restaurant',
+      name: 'Cervejaria Ramiro',
+      location: 'Av. Almirante Reis 1',
+      startLocal: '2026-09-10T20:30',
+      confirmationCode: 'ABC12345',
+    });
+  });
+
+  it('ignores a kind it does not recognise', () => {
+    // The value comes from a language model. An unrecognised string would leave
+    // the select showing nothing at all.
+    expect(applyDraft(form, { kind: 'dinner' }).activityKind).toBe('other');
+    expect(applyDraft(form, { kind: 42 }).activityKind).toBe('other');
+  });
+
+  it('maps lodging fields onto the shared start and end', () => {
+    const next = applyDraft(form, {
+      name: 'Hotel Bairro Alto',
+      checkInLocal: '2026-09-10T15:00',
+      checkOutLocal: '2026-09-18T11:00',
+    });
+    expect(next.startLocal).toBe('2026-09-10T15:00');
+    expect(next.endLocal).toBe('2026-09-18T11:00');
+  });
+
+  it('leaves anything the draft does not mention alone', () => {
+    const next = applyDraft({ ...form, seat: '14C' }, { name: 'X' });
+    expect(next.seat).toBe('14C');
+  });
+});

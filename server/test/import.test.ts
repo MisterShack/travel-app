@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { bookingImports } from '../src/db/schema';
 import { parseHeuristic } from '../src/import/parse';
@@ -388,6 +388,84 @@ describe('GEMINI_MODEL', () => {
   it('defaults to an alias that cannot go stale', async () => {
     const { loadEnv } = await import('../src/env');
     expect(loadEnv({} as NodeJS.ProcessEnv).GEMINI_MODEL).toBe('gemini-flash-lite-latest');
+  });
+});
+
+describe('the model path', () => {
+  /** Gemini's wire shape, so the whole decode runs rather than a hand-made Draft. */
+  const geminiReplying = (payload: unknown) =>
+    vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          candidates: [{ content: { parts: [{ text: JSON.stringify(payload) }] } }],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('reads a forwarded restaurant booking as a restaurant', async () => {
+    /*
+     * The email that started this: an OpenTable confirmation imported as a
+     * flight, because "ADD TO CALENDAR" and "SEE MENU" supplied two IATA codes.
+     * The heuristic now declines it, so this is the path it actually takes —
+     * and `kind` has to survive the decode for the review form to prefill.
+     */
+    const opentable = email({
+      subject: 'Your table at Cervejaria Ramiro is confirmed',
+      text: [
+        'Your reservation is confirmed',
+        'Cervejaria Ramiro — table for 4',
+        'Thursday, September 10 at 8:30 PM',
+        'Av. Almirante Reis 1, Lisbon',
+        'ADD TO CALENDAR   SEE MENU',
+        'Confirmation ABC12345',
+      ].join('\n'),
+    });
+    expect(parseHeuristic(opentable)).toBeNull();
+
+    vi.stubGlobal(
+      'fetch',
+      geminiReplying({
+        type: 'activity',
+        confirmationCode: 'ABC12345',
+        flight: null,
+        lodging: null,
+        activity: {
+          kind: 'restaurant',
+          name: 'Cervejaria Ramiro',
+          location: 'Av. Almirante Reis 1, Lisbon',
+          startLocal: '2026-09-10T20:30',
+          endLocal: null,
+        },
+      }),
+    );
+
+    const { parseBooking } = await import('../src/import/parse');
+    const result = await parseBooking(opentable, { apiKey: 'k', model: 'm' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.by).toBe('llm');
+      expect(result.draft.type).toBe('activity');
+      expect(result.draft.fields).toMatchObject({
+        kind: 'restaurant',
+        name: 'Cervejaria Ramiro',
+        startLocal: '2026-09-10T20:30',
+        confirmationCode: 'ABC12345',
+      });
+    }
+  });
+
+  it('does not invent a booking out of an email that is not one', async () => {
+    vi.stubGlobal('fetch', geminiReplying({ type: 'unknown' }));
+    const { parseBooking } = await import('../src/import/parse');
+    const result = await parseBooking(email({ text: 'Your statement is ready.' }), {
+      apiKey: 'k',
+      model: 'm',
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toMatch(/not recognised/i);
   });
 });
 

@@ -155,6 +155,10 @@ Rules:
   loyalty-programme text or the airline's own mailing address are not part of this booking.
 - If the booking covers several flights, extract only the first one.
 - If a field is not stated in the email, use null. Do not infer, guess or invent.
+- A restaurant booking — OpenTable, Resy, Tock, or the restaurant writing directly — is an activity
+  with kind "restaurant". The restaurant's name goes in name and its address in location. Leave
+  endLocal null: a table booking states when to arrive, not when to leave, and inventing a sitting
+  length would put a wrong end time on the timeline.
 - A train, coach or ferry booking is an activity with kind "transport". Put the route in the name
   ("Via Rail 55, Ottawa to Toronto"), the origin in location, and the arrival time in endLocal —
   without it the arrival is lost entirely.
