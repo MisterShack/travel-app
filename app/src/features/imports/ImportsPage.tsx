@@ -28,6 +28,49 @@ type ImportRow = {
 
 const PATH = { flight: 'flight', lodging: 'lodging', activity: 'activity' } as const;
 
+/**
+ * Human labels for the extracted fields.
+ *
+ * The parser's keys are internal names — `departureLocal`, `checkOutLocal` —
+ * and rendering them raw made the review screen read like a database dump.
+ * Reviewing means comparing this against the email, which is hard if the
+ * reader first has to decode the field names.
+ */
+const LABEL: Record<string, string> = {
+  airline: 'Airline',
+  flightNumber: 'Flight',
+  departureAirport: 'From',
+  departureLocal: 'Departs',
+  arrivalAirport: 'To',
+  arrivalLocal: 'Arrives',
+  seat: 'Seat',
+  name: 'Name',
+  address: 'Address',
+  location: 'Where',
+  checkInLocal: 'Check in',
+  checkOutLocal: 'Check out',
+  startLocal: 'Starts',
+  endLocal: 'Ends',
+  kind: 'Kind',
+  confirmationCode: 'Reference',
+};
+
+/** `2026-09-10T10:00` → a readable local date and time. */
+function pretty(key: string, value: unknown): string {
+  const text = String(value);
+  if (/Local$/.test(key) && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(text)) {
+    const [date, time] = text.split('T') as [string, string];
+    const shown = new Date(`${date}T12:00:00Z`).toLocaleDateString(undefined, {
+      day: 'numeric',
+      month: 'short',
+    });
+    return `${shown}, ${time}`;
+  }
+  return text;
+}
+
+const DATE = { day: 'numeric', month: 'short', year: 'numeric' } as const;
+
 export function ImportsPage() {
   const [rows, setRows] = useState<ImportRow[] | null>(null);
   const [trips, setTrips] = useState<TripSummary[]>([]);
@@ -53,9 +96,16 @@ export function ImportsPage() {
         trip until you say so.
       </p>
       {rows.length === 0 && <p className="empty">Nothing waiting to be reviewed.</p>}
-      {rows.map((row) => (
-        <ImportCard key={row.id} row={row} trips={trips} onChange={load} />
-      ))}
+      {/*
+        Actionable imports first, unreadable ones last. They arrive in whatever
+        order the mail did, and a "couldn't read this" card at the top pushes
+        the booking you actually need to file below the fold.
+      */}
+      {[...rows]
+        .sort((a, b) => Number(a.status === 'failed') - Number(b.status === 'failed'))
+        .map((row) => (
+          <ImportCard key={row.id} row={row} trips={trips} onChange={load} />
+        ))}
     </>
   );
 }
@@ -106,7 +156,7 @@ function ImportCard({
         <div className="grow">
           <div className="title">{row.subject}</div>
           <div className="muted tiny">
-            from {row.fromAddress} · {new Date(row.receivedAt).toLocaleDateString()}
+            from {row.fromAddress} · {new Date(row.receivedAt).toLocaleDateString(undefined, DATE)}
             {row.parsedBy === 'llm' && ' · read by AI'}
           </div>
         </div>
@@ -121,12 +171,13 @@ function ImportCard({
       )}
 
       {fields && (
-        <dl className="muted tiny" style={{ margin: '8px 0' }}>
+        <dl className="extracted">
           {Object.entries(fields)
-            .filter(([, v]) => v !== null && v !== '')
+            .filter(([, v]) => v !== null && v !== '' && v !== undefined)
             .map(([k, v]) => (
               <div key={k}>
-                <strong>{k}</strong>: {String(v)}
+                <dt>{LABEL[k] ?? k}</dt>
+                <dd>{pretty(k, v)}</dd>
               </div>
             ))}
         </dl>
@@ -156,9 +207,12 @@ function ImportCard({
         </select>
       </div>
 
+      {tripId === '' && (
+        <p className="muted tiny">Choose a trip to continue.</p>
+      )}
       <div className="actions">
         <button disabled={tripId === ''} onClick={() => void review()}>
-          Review and add
+          {row.status === 'failed' ? 'Add by hand' : 'Review and add'}
         </button>
         <button className="secondary" onClick={() => void showSource()}>
           Show original

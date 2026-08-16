@@ -60,6 +60,21 @@ main:focus { outline: none; }
 /* The timeline is a list of events; say so in the markup. */
 ul.events { list-style: none; margin: 0; padding: 0; }
 
+/* Extracted import fields: a label/value grid, not a wall of key: value. */
+dl.extracted { margin: 10px 0; font-size: 14px; }
+dl.extracted > div { display: flex; gap: 10px; padding: 3px 0; }
+dl.extracted dt { flex: none; width: 92px; color: var(--text-dim); }
+dl.extracted dd { margin: 0; min-width: 0; word-break: break-word; }
+
+/* A disabled action must read as disabled, not merely as a paler shade of the
+   same button — 0.6 alpha on an accent fill is easy to mistake for enabled. */
+button:disabled, a.btn[aria-disabled='true'] {
+  opacity: 1;
+  background: var(--surface-2);
+  color: var(--text-dim);
+  border-color: var(--border);
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -78,6 +93,8 @@ header.bar {
 header.bar h1 { font-size: 20px; margin: 0; flex: 1; }
 /* At least a 44px tap target; the bare link was 35x17. */
 header.bar h1 a { display: inline-block; padding: 13px 6px; margin: -13px -6px; }
+/* Same 44px floor as every other tap target. */
+header.bar > a { display: inline-block; padding: 12px 8px; margin: -12px 0; }
 header.bar a, header.bar button { font-size: 14px; }
 
 h2 { font-size: 18px; margin: 24px 0 8px; }

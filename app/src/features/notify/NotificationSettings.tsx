@@ -33,11 +33,32 @@ const isIOS = () =>
   // iPadOS reports as a Mac; the touch points give it away.
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
-type PushState = 'unsupported' | 'needs-install' | 'available' | 'enabled' | 'denied' | 'unconfigured';
+type PushState =
+  | 'checking'
+  | 'unsupported'
+  | 'needs-install'
+  | 'available'
+  | 'enabled'
+  | 'denied'
+  | 'unconfigured';
+
+/**
+ * `navigator.serviceWorker.ready` never settles when no worker is registered —
+ * it waits forever rather than rejecting. In development the service worker is
+ * deliberately disabled, so awaiting it strands this component in its initial
+ * state with nothing rendered and no explanation. Race it.
+ */
+async function readyWorker(timeoutMs = 3000): Promise<ServiceWorkerRegistration | null> {
+  if (!('serviceWorker' in navigator)) return null;
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+  ]);
+}
 
 export function NotificationSettings({ tripId, enabled }: { tripId: string; enabled: boolean }) {
   const [muted, setMuted] = useState(!enabled);
-  const [push, setPush] = useState<PushState>('unsupported');
+  const [push, setPush] = useState<PushState>('checking');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -59,7 +80,12 @@ export function NotificationSettings({ tripId, enabled }: { tripId: string; enab
       }
       if (Notification.permission === 'denied') return setPush('denied');
 
-      const reg = await navigator.serviceWorker.ready;
+      const reg = await readyWorker();
+      if (!reg) {
+        // No service worker: normal in development, and the honest answer in a
+        // browser that never registered one.
+        return setPush('unsupported');
+      }
       const existing = await reg.pushManager.getSubscription();
       setPush(existing ? 'enabled' : 'available');
     })();
@@ -77,7 +103,8 @@ export function NotificationSettings({ tripId, enabled }: { tripId: string; enab
         setPush(permission === 'denied' ? 'denied' : 'available');
         return;
       }
-      const reg = await navigator.serviceWorker.ready;
+      const reg = await readyWorker();
+      if (!reg) throw new Error('No service worker is registered on this device.');
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: decodeKey(publicKey),
@@ -95,8 +122,8 @@ export function NotificationSettings({ tripId, enabled }: { tripId: string; enab
   const disablePush = async () => {
     setBusy(true);
     try {
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.getSubscription();
+      const reg = await readyWorker();
+      const sub = await reg?.pushManager.getSubscription();
       if (sub) {
         await api.post('/push/unsubscribe', { endpoint: sub.endpoint });
         await sub.unsubscribe();
@@ -129,7 +156,23 @@ export function NotificationSettings({ tripId, enabled }: { tripId: string; enab
         <span className="grow">Remind me about this trip</span>
       </label>
 
-      {push === 'unconfigured' && <p className="muted tiny">Push is not set up on this server; reminders go by email.</p>}
+      {/* Every state says something. An empty region reads as a broken card,
+          and the user cannot tell "checking" from "not possible here". */}
+      {push === 'checking' && <p className="muted tiny">Checking this device…</p>}
+
+      {push === 'unconfigured' && (
+        <p className="muted tiny">Push isn’t set up on this server, so reminders come by email.</p>
+      )}
+
+      {push === 'unsupported' && (
+        // Deliberately about the device rather than the browser: the cause may
+        // be a browser without PushManager, or a service worker that never
+        // registered. Both are true as "not available here"; only one is a
+        // browser limitation, and guessing wrong is a small lie.
+        <p className="muted tiny">
+          Push notifications aren’t available on this device, so reminders come by email.
+        </p>
+      )}
 
       {push === 'needs-install' && (
         <p className="muted tiny">
