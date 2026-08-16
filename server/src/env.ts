@@ -126,7 +126,21 @@ export const envSchema = z.object({
 
   /** Paid tier, deliberately — see PLAN.md §6.7. Absent means heuristics only. */
   GEMINI_API_KEY: z.string().min(1).optional(),
-  GEMINI_MODEL: z.string().min(1).default('gemini-2.5-flash-lite'),
+
+  /**
+   * The model id, as it appears in `ListModels` **without** the `models/`
+   * prefix — the request path adds it, and including it yields a 404 that
+   * looks exactly like a nonexistent model.
+   *
+   * Defaults to the `-latest` alias rather than a pinned version so it cannot
+   * quietly go stale as Google retires older ids; pin an exact version here
+   * when reproducibility matters more than currency.
+   */
+  GEMINI_MODEL: z
+    .string()
+    .min(1)
+    .default('gemini-flash-lite-latest')
+    .transform((m) => m.trim().replace(/^models\//, '')),
 
   /** Ceiling on imports per user per day; the inbound address is public. */
   IMPORT_DAILY_CAP: z.coerce.number().int().positive().default(50),

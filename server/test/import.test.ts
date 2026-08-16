@@ -284,3 +284,19 @@ describe('attachments', () => {
     expect(rows[0]?.errorMessage).toBeTruthy();
   });
 });
+
+describe('GEMINI_MODEL', () => {
+  it('strips a models/ prefix and surrounding whitespace', async () => {
+    // The request path already adds `models/`. Including it produces a 404
+    // indistinguishable from a model that does not exist.
+    const { loadEnv } = await import('../src/env');
+    expect(loadEnv({ GEMINI_MODEL: ' models/gemini-2.5-flash-lite ' } as NodeJS.ProcessEnv).GEMINI_MODEL).toBe(
+      'gemini-2.5-flash-lite',
+    );
+  });
+
+  it('defaults to an alias that cannot go stale', async () => {
+    const { loadEnv } = await import('../src/env');
+    expect(loadEnv({} as NodeJS.ProcessEnv).GEMINI_MODEL).toBe('gemini-flash-lite-latest');
+  });
+});
