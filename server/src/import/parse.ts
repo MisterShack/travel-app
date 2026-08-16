@@ -99,13 +99,17 @@ Return ONLY JSON matching this shape, with no prose and no markdown fence:
   "lodging": { "name": string, "address": string | null,
                "checkInLocal": "YYYY-MM-DDTHH:mm", "checkOutLocal": "YYYY-MM-DDTHH:mm" } | null,
   "activity": { "kind": "restaurant"|"attraction"|"transport"|"other", "name": string,
-                "location": string | null, "startLocal": "YYYY-MM-DDTHH:mm" } | null
+                "location": string | null, "startLocal": "YYYY-MM-DDTHH:mm",
+                "endLocal": "YYYY-MM-DDTHH:mm" | null } | null
 }
 
 Rules:
 - Times are LOCAL wall-clock at the place they happen. Never convert to UTC and never add an offset.
 - Airports are three-letter IATA codes.
 - If a field is not stated in the email, use null. Do not infer, guess or invent.
+- A train, coach or ferry booking is an activity with kind "transport". Put the route in the name
+  ("Via Rail 55, Ottawa to Toronto"), the origin in location, and the arrival time in endLocal —
+  without it the arrival is lost entirely.
 - If the email is not a travel booking, return {"type":"unknown"} and nothing else.`;
 
 /**

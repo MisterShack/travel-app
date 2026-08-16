@@ -80,12 +80,59 @@ Does anyone want this? It was listed at the original scoping as a "later" idea a
 asked for since. Building it because it is on an old list is a poor reason. The honest test is
 whether, after a real trip using the app, its absence was ever felt.
 
+## 3a. Rail, coach and ferry — the modelling gap
+
+Asked on 2026-08-15 whether conflict detection would cover OpenTable and Via Rail. The answers
+differ, and the difference is a gap in the data model rather than in the feature.
+
+**A restaurant reservation fits.** It is an `activity` with a kind, a location and a start. Nothing
+is lost.
+
+**A rail journey does not.** A train has what a flight has — origin, destination, departure,
+arrival — but only `flights` models that shape. A train currently lands as a generic `activity`
+with a single `location` and a start, so the destination is lost entirely. That is precisely the
+data a conflict needs: *"you arrive in Toronto at 14:00 but your hotel is in Montreal"* is
+undetectable if the app does not know you arrive anywhere.
+
+Mitigated immediately by teaching the parser to record an activity's end time and to put the route
+in the name (2026-08-15). That stops the arrival being thrown away; it does not make the
+destination structured.
+
+### The real fix: generalise `flights` into `segments`
+
+One table for anything that carries you from one place to another, with a `mode` of `air`, `rail`,
+`coach` or `ferry`. The endpoints become places rather than strictly airports — an IATA code for
+air, a station name for rail — and the timezone triple works unchanged on both ends.
+
+**Why this is worth doing rather than tolerating.** Most travel apps are US-built and flight-first;
+rail is an afterthought in them. In Canada and Europe it is not. Treating rail as a first-class
+journey is a real point of difference that costs no third-party API, works offline, and reuses the
+timezone machinery already built — which is the same argument that makes conflict detection
+attractive and is the opposite of what maps and suggestions offer.
+
+**What it costs.** A migration on live data, a parser change, and every screen that says "flight".
+The migration must move existing rows rather than recreate them, and it is the first change in this
+project to touch a table holding real bookings, so it needs a rehearsal against a copy of the
+production database rather than only a test fixture.
+
+**Open question:** whether the airport table (`shared/src/airports.ts`) has a rail equivalent worth
+bundling. There is no IATA for stations, and station-name geocoding is a different problem — the
+zone can most likely be derived from the trip or asked for, as lodging already does.
+
 ## 4. Phases
 
 - **Phase 8 — Directions hand-off.** §2 step 1. Small, offline-safe, free. A day.
 - **Phase 9 — Geocode on import.** §2 step 2. Needs a geocoding provider and a cost check; store
   coordinates only.
 - **Phase 10 — Suggestions, if wanted.** §3, gated on the question in §3 having a real answer.
+- **Phase 11 — Conflict and gap detection.** The differentiator that emerges from the architecture
+  rather than being bolted on: impossible overlaps, tight connections, unbooked nights. It needs
+  correct instants across zones, which is the expensive thing this project already paid for and
+  which competitors mostly have not. No API, no network, no cost per use, and it speaks only when
+  something is wrong — which suits an app whose stated character is quiet.
+- **Phase 12 — Segments.** §3a. Rail, coach and ferry as first-class journeys. Sequenced after
+  Phase 11 so the conflict rules exist before the data model widens under them, and because it is
+  the first migration to touch live bookings.
 
 ## 5. Open questions
 

@@ -300,3 +300,17 @@ describe('GEMINI_MODEL', () => {
     expect(loadEnv({} as NodeJS.ProcessEnv).GEMINI_MODEL).toBe('gemini-flash-lite-latest');
   });
 });
+
+describe('non-flight journeys', () => {
+  it('asks the model for an activity end time', async () => {
+    // A train booked as an activity loses its arrival entirely if the schema
+    // never requests one, which makes an arrival-based conflict undetectable.
+    const parse = await import('../src/import/parse');
+    const source = parse.parseWithLlm.toString();
+    expect(source).toBeTruthy();
+    const { readFileSync } = await import('node:fs');
+    const file = readFileSync(new URL('../src/import/parse.ts', import.meta.url), 'utf8');
+    expect(file).toMatch(/"endLocal"/);
+    expect(file).toMatch(/kind "transport"/);
+  });
+});
