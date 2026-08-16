@@ -11,6 +11,7 @@ export * from './auth';
 export * from './trip';
 export * from './time';
 export * from './timeline';
+export * from './conflicts';
 
 // `./airports` is deliberately NOT re-exported here: it is a 280 KB table that
 // only the flight form needs, and pulling it through the barrel would put it in

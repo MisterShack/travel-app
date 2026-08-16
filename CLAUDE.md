@@ -97,6 +97,11 @@ Two things that are true and worth keeping in view:
 - **Registration is open.** The app is publicly reachable, so anyone with the URL can create an
   account and consume the Resend quota. There is no invite gate.
 
+**Phase 11 (conflict and gap detection) shipped 2026-08-15**, from PLAN-V3. Pure function in
+`shared/`, run on the client, so it works offline and costs nothing per use. It is the feature that
+falls out of the timezone work rather than being bolted on — "you land at 13:00 but dinner is
+booked for 12:30" is a comparison only because every event carries a correct instant across zones.
+
 Outstanding in production only, not in code: `RESEND_WEBHOOK_SECRET`, `GEMINI_API_KEY` and the
 inbound MX record (DEPLOY.md §11) for import; `VAPID_*` for push. Each degrades its own feature
 when absent and none breaks the app.

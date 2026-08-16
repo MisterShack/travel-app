@@ -125,11 +125,21 @@ zone can most likely be derived from the trip or asked for, as lodging already d
 - **Phase 9 — Geocode on import.** §2 step 2. Needs a geocoding provider and a cost check; store
   coordinates only.
 - **Phase 10 — Suggestions, if wanted.** §3, gated on the question in §3 having a real answer.
-- **Phase 11 — Conflict and gap detection.** The differentiator that emerges from the architecture
-  rather than being bolted on: impossible overlaps, tight connections, unbooked nights. It needs
+- **Phase 11 — Conflict and gap detection: done 2026-08-15.** The differentiator that emerges from
+  the architecture rather than being bolted on: impossible overlaps, tight connections, unbooked nights. It needs
   correct instants across zones, which is the expensive thing this project already paid for and
   which competitors mostly have not. No API, no network, no cost per use, and it speaks only when
   something is wrong — which suits an app whose stated character is quiet.
+
+  Shipped as a pure function in `shared/`, so it runs on the client over the timeline already in
+  hand: no network, no round trip, no cost per use. Five rules — overlap, tight connection, airport
+  change, unbooked night, event outside the trip's dates.
+
+  **The design constraint throughout was false positives.** An app that cries wolf gets ignored,
+  and is then worse than silent. Two rules exist mainly to stay quiet: lodging is excluded from
+  overlap checks entirely, because a hotel spans the whole stay and would otherwise conflict with
+  every dinner; and an overnight flight counts as covering a night, because telling someone to book
+  a hotel they are flying through would be wrong.
 - **Phase 12 — Segments.** §3a. Rail, coach and ferry as first-class journeys. Sequenced after
   Phase 11 so the conflict rules exist before the data model widens under them, and because it is
   the first migration to touch live bookings.

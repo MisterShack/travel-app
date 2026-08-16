@@ -364,6 +364,37 @@ li.event-item > .card {
   font-size: var(--text-xs); line-height: 1.125rem;
 }
 
+/* ---------------------------------------------------------------- issues -- */
+
+/*
+ * Saturation is reserved for state (BRAND.md §3), and this is the state it was
+ * reserved for. A conflict is the one thing on a trip screen that should stop
+ * the eye.
+ */
+.issues { margin: var(--space-4) 0 var(--space-6); }
+.issue-group {
+  border: 1px solid; border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
+}
+.issue-group h3 {
+  font: 700 var(--text-sm)/var(--lh-sm) var(--sans);
+  margin: 0 0 var(--space-1);
+}
+.issue-group ul { margin: 0; padding-left: var(--space-5); }
+.issue-group li { font-size: var(--text-sm); line-height: var(--lh-sm); padding: 2px 0; }
+
+.issue-conflict {
+  color: var(--alert);
+  border-color: color-mix(in srgb, var(--alert) 40%, transparent);
+  background: color-mix(in srgb, var(--alert) 8%, var(--surface));
+}
+.issue-warning {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 35%, transparent);
+  background: var(--warn-bg);
+}
+
 /* --------------------------------------------------------------- imports -- */
 
 dl.extracted { margin: var(--space-3) 0; font-size: var(--text-sm); }

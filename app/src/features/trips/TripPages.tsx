@@ -6,6 +6,7 @@ import { useAuth } from '@/auth/useAuth';
 import { ErrorText, Field, StaleBanner } from '@/components/Bits';
 import { loadTimeline, loadTrip, loadTrips, type Loaded } from '@/data/repository';
 import { Timeline } from '@/features/timeline/Timeline';
+import { Issues } from '@/features/timeline/Issues';
 import { NotificationSettings } from '@/features/notify/NotificationSettings';
 import { TimezoneField } from '@/features/timeline/AirportField';
 
@@ -221,6 +222,8 @@ export function TripDetailPage() {
           + Activity
         </Link>
       </div>
+
+      <Issues items={timeline.data} trip={trip} />
 
       <Timeline items={timeline.data} homeTimezone={trip.homeTimezone} />
 
