@@ -1,6 +1,6 @@
-# travel-app
+# Waypoint
 
-A personal/family travel agent — flights, lodging, and activities merged into one timeline per
+A personal/family travel planner — flights, lodging, and activities merged into one timeline per
 trip, with reminders and (later) restaurant/attraction suggestions.
 
 - **PLAN.md** — the spec. Read this first.

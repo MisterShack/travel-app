@@ -1,10 +1,15 @@
-# Travel App — project guide
+# Waypoint — project guide
 
 Personal/family travel agent: flights, lodging, and activities merged into one timeline per trip,
 with reminders. **PLAN.md** is the V1 spec (shipped, phases 0–5). **PLAN-V2.md** is a draft, not
 started — Terraform and Playwright. Read the relevant one before implementing anything. It has not been
 built against yet; if you're about to start Phase 0, confirm PLAN.md has been through
 `.claude/skills/plan-review` first (§ of PLAN.md's header note).
+
+**The product is called Waypoint** (BRAND.md). The repo directory, the npm workspaces
+(`@travel/*`) and the domain (`trips.myze.ca`) still say *travel* — those are identifiers rather
+than the product name, and renaming them buys nothing but churn and a broken deploy. Change them
+only if the domain moves.
 
 ## Layout (npm workspaces)
 

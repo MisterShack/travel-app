@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from '@/auth/useAuth';
+import { Mark } from '@/components/Mark';
 import {
   ForgotPage,
   InvitePage,
@@ -54,8 +55,11 @@ export function App() {
       </a>
       <header className="bar">
         <h1>
-          <Link to="/" style={{ color: 'inherit', textDecoration: 'none' }}>
-            Trips
+          <Link className="wordmark" to="/">
+            <span style={{ color: 'var(--accent)' }}>
+              <Mark />
+            </span>
+            Waypoint
           </Link>
         </h1>
         {offline && <span className="muted tiny">offline</span>}

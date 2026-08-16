@@ -202,7 +202,7 @@ export function TripDetailPage() {
       {stale && <StaleBanner savedAt={timeline.savedAt ?? detail.savedAt} />}
       <div className="row">
         <div className="grow">
-          <h2 style={{ marginTop: 0 }}>{trip.name}</h2>
+          <h2 className="screen-title">{trip.name}</h2>
           <p className="muted" style={{ marginTop: -4 }}>
             {trip.destination !== null && trip.destination !== '' ? `${trip.destination} · ` : ''}
             {formatRange(trip.startDate, trip.endDate)}

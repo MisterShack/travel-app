@@ -102,9 +102,17 @@ A 1.25 ratio from a 16px base. Nothing between the steps.
 | `--text-xs` | 12 / 16 | Metadata, badges |
 | `--text-sm` | 14 / 20 | Secondary, labels |
 | `--text-base` | 16 / 24 | Body, inputs |
-| `--text-lg` | 20 / 28 | Card titles |
-| `--text-xl` | 25 / 32 | Screen titles |
-| `--text-2xl` | 31 / 38 | The one big moment per screen |
+| `--text-lg` | 20 / 28 | Section headings; card titles at ≥30rem |
+| `--text-xl` | 25 / 32 | Reserved |
+| `--text-2xl` | 31 / 38 | The screen title — one per screen |
+
+**Card titles step down below 30rem.** A serif at `--text-lg` wraps an ordinary flight name onto
+two lines at 390px, which reads as a layout fault rather than a long title; they take `--text-base`
+there and the larger step only where there is room. Found by looking at the rendered screen, which
+is the only way this kind of thing is ever found.
+
+**The screen title outranks section headings.** It takes `--text-2xl` and sections take
+`--text-lg`; at one step apart the trip name and "People" competed and the page had no focal point.
 
 Never below 16px for anything a user types into — iOS zooms the viewport on focus for smaller
 inputs, which feels like a bug.

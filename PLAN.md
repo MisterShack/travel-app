@@ -1,4 +1,4 @@
-# Travel App — Implementation Plan
+# Waypoint — Implementation Plan
 
 > **Workflow note:** Authored by Sonnet from a scoping conversation with David (2026-08-15); see
 > §12 for the settled decisions it rests on. Reviewed adversarially by Opus on 2026-08-15

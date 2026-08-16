@@ -88,7 +88,7 @@ export const envSchema = z.object({
    * Must be an address on a domain verified with the provider — see the
    * production guard in `loadEnv`.
    */
-  MAIL_FROM: z.string().min(1).default('Trips <no-reply@mail.myze.ca>'),
+  MAIL_FROM: z.string().min(1).default('Waypoint <no-reply@mail.myze.ca>'),
 
   /**
    * Web Push (PLAN.md §7). Optional: without a key pair the app still sends

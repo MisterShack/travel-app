@@ -94,7 +94,7 @@ export function createAuthRoutes(deps: AuthDeps) {
       // the owner a note instead, and answer exactly as for a new account.
       await mailer.send({
         to: email,
-        subject: 'Someone tried to register your Trips account',
+        subject: 'Someone tried to register your Waypoint account',
         text: 'An account already exists for this address. If this was you, sign in instead — or reset your password if you have forgotten it.',
       });
       return c.json({ ok: true, message: 'Check your email to finish signing up.' }, 201);
@@ -117,7 +117,7 @@ export function createAuthRoutes(deps: AuthDeps) {
     const token = await issueToken(userId, 'verify');
     await mailer.send({
       to: email,
-      subject: 'Verify your Trips account',
+      subject: 'Verify your Waypoint account',
       text: `Confirm your address to finish signing up:\n\n${linkOrigin}/verify?token=${token}\n\nThis link expires in 24 hours.`,
     });
 
@@ -181,7 +181,7 @@ export function createAuthRoutes(deps: AuthDeps) {
       const token = await issueToken(user.id, 'verify');
       await mailer.send({
         to: user.email,
-        subject: 'Verify your Trips account',
+        subject: 'Verify your Waypoint account',
         text: `Confirm your address to finish signing up:\n\n${linkOrigin}/verify?token=${token}\n\nThis link expires in 24 hours.`,
       });
     }
@@ -256,7 +256,7 @@ export function createAuthRoutes(deps: AuthDeps) {
       const token = await issueToken(user.id, 'reset');
       await mailer.send({
         to: user.email,
-        subject: 'Reset your Trips password',
+        subject: 'Reset your Waypoint password',
         text: `Set a new password:\n\n${linkOrigin}/reset?token=${token}\n\nThis link expires in an hour. If you did not ask for it, ignore this message.`,
       });
     }

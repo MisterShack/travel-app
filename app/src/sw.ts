@@ -54,7 +54,7 @@ self.addEventListener('push', (event) => {
   try {
     payload = event.data.json() as PushPayload;
   } catch {
-    payload = { title: 'Trips', body: event.data.text() };
+    payload = { title: 'Waypoint', body: event.data.text() };
   }
 
   event.waitUntil(

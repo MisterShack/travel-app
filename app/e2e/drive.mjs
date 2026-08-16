@@ -65,7 +65,7 @@ await page.waitForLoadState('networkidle');
 await shot(page, '04-empty-trip-list');
 
 // --- create a trip ---
-await page.getByRole('button', { name: /new trip/i }).click();
+await page.getByRole('link', { name: /new trip/i }).click();
 await page.locator('input').first().fill('Lisbon');
 await page.locator('input').nth(1).fill('Portugal');
 await page.locator('input[type=date]').first().fill('2026-09-10');
@@ -78,7 +78,7 @@ await page.waitForLoadState('networkidle');
 await shot(page, '06-empty-trip');
 
 // --- add a flight, exercising the airport picker ---
-await page.getByRole('button', { name: /\+ Flight/i }).click();
+await page.getByRole('link', { name: /\+ Flight/i }).click();
 await page.getByLabel('Airline').fill('TAP Air Portugal');
 await page.getByLabel('Flight number').fill('TP1233');
 await page.getByLabel('From').fill('LHR');
@@ -96,7 +96,7 @@ await page.waitForLoadState('networkidle');
 await shot(page, '09-trip-one-flight');
 
 // --- lodging + activity, so the timeline has something to group ---
-await page.getByRole('button', { name: /\+ Stay/i }).click();
+await page.getByRole('link', { name: /\+ Stay/i }).click();
 await page.getByLabel('Name', { exact: true }).fill('Hotel Bairro Alto');
 await page.getByLabel('Address').fill('Praça Luís de Camões 2');
 await page.locator('input[type=datetime-local]').first().fill('2026-09-10T15:00');
@@ -104,7 +104,7 @@ await page.locator('input[type=datetime-local]').nth(1).fill('2026-09-18T11:00')
 await page.getByRole('button', { name: /^Add$/ }).click();
 await page.waitForURL(/\/trips\/trp_[^/]+$/);
 
-await page.getByRole('button', { name: /\+ Activity/i }).click();
+await page.getByRole('link', { name: /\+ Activity/i }).click();
 await page.locator('select').first().selectOption('restaurant');
 await page.getByLabel('Name', { exact: true }).fill('Cervejaria Ramiro');
 await page.getByLabel('Where').fill('Av. Almirante Reis 1');
@@ -115,7 +115,7 @@ await page.waitForLoadState('networkidle');
 await shot(page, '10-timeline-full');
 
 // --- trip list with content ---
-await page.getByRole('link', { name: 'Trips' }).click();
+await page.getByRole('link', { name: /Waypoint/ }).click();
 await page.waitForLoadState('networkidle');
 await shot(page, '11-trip-list');
 
@@ -125,7 +125,7 @@ await shot(page, '11-trip-list');
 // fails before any of this code runs. Navigating within the SPA is what
 // actually exercises the IndexedDB fallback; the service worker's own offline
 // behaviour is checked against the production build separately.
-await page.getByRole('link', { name: 'Trips' }).click();
+await page.getByRole('link', { name: /Waypoint/ }).click();
 await page.waitForLoadState('networkidle');
 await page.context().setOffline(true);
 await page.getByRole('link', { name: /Lisbon/ }).first().click();

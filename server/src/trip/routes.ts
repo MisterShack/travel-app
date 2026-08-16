@@ -251,7 +251,7 @@ export function createTripRoutes(deps: TripDeps) {
     await mailer.send({
       to: body.data.email,
       subject: `You have been invited to ${trip.name}`,
-      text: `${c.get('user').email} invited you to the trip "${trip.name}".\n\nJoin it here:\n\n${linkOrigin}/invite?token=${token}\n\nThis link expires in 7 days and can only be used by this email address.`,
+      text: `${c.get('user').email} invited you to the trip "${trip.name}" on Waypoint.\n\nJoin it here:\n\n${linkOrigin}/invite?token=${token}\n\nThis link expires in 7 days and can only be used by this email address.`,
     });
 
     return c.json({ ok: true, message: 'Invitation sent.' }, 201);

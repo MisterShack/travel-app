@@ -176,7 +176,7 @@ export function NotificationSettings({ tripId, enabled }: { tripId: string; enab
 
       {push === 'needs-install' && (
         <p className="muted tiny">
-          To get push notifications on iPhone, add Trips to your Home Screen first — Share, then
+          To get push notifications on iPhone, add Waypoint to your Home Screen first — Share, then
           <strong> Add to Home Screen</strong>, then open it from there. Until then, reminders
           still arrive by email.
         </p>

@@ -94,7 +94,7 @@ function Event({ item, homeTimezone }: { item: TimelineItem; homeTimezone: strin
           <div className="time">{start}</div>
           {showStartZone && <div className="zone">{zoneLabel(item.startTimezone)}</div>}
           {end !== null && (
-            <div className="muted tiny mono">
+            <div className="until mono">
               → {end}
               {endDate !== null && <span className="endday"> {endDate}</span>}
             </div>

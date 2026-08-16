@@ -1,4 +1,4 @@
-# Travel App — Plan V2: infrastructure as code, and browser testing
+# Waypoint — Plan V2: infrastructure as code, and browser testing
 
 > **Status: draft, not started.** Authored by Opus on 2026-08-15 from a scoping request by David.
 > Provider capabilities in §2 were checked against the registries and repositories on that date

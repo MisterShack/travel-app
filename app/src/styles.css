@@ -1,218 +1,296 @@
-/* Palette defined on bare :root so the light theme is never conditional, then
-   overridden for dark. A page whose only colour definition lives inside a media
-   query renders unstyled where that query does not match. */
+/*
+ * Waypoint — see BRAND.md. Tokens are the contract; screens use them and never
+ * literal colours, sizes or spacing.
+ *
+ * The light palette is defined on bare :root so it is never conditional; dark
+ * only overrides the tokens. A page whose only colour definition lives inside a
+ * media query renders unstyled wherever that query does not match.
+ */
+
 :root {
   color-scheme: light dark;
-  --bg: #f6f7f9;
+
+  /* Colour — BRAND.md §3. Saturation is reserved for meaning. */
+  --ink: #16181d;
+  --ink-soft: #5a6473;
+  --paper: #faf9f7;
   --surface: #ffffff;
-  --surface-2: #eef0f4;
-  --text: #14161c;
-  --text-dim: #5b6270;
-  --border: #d9dde5;
-  --accent: #2f5bd7;
-  --accent-text: #ffffff;
-  --danger: #b3261e;
+  --surface-sunk: #f1efec;
+  --rule: #dcd8d2;          /* decorative: card edges, dividers */
+  --field: #8f887c;         /* the only thing showing where a control is */
+  --accent: #b45309;
+  --accent-ink: #ffffff;
+  --warn: #a8500a;
+  --warn-bg: #fdf3e6;
+  --alert: #a4232c;
   --focus: #b45309;
-  --warn-bg: #fff4e0;
-  --warn-text: #7a4a00;
-  --radius: 12px;
-  --pad: 16px;
+
+  /* Type — 1.25 from a 16px base. Nothing between the steps. */
+  --text-xs: 0.75rem;    --lh-xs: 1rem;
+  --text-sm: 0.875rem;   --lh-sm: 1.25rem;
+  --text-base: 1rem;     --lh-base: 1.5rem;
+  --text-lg: 1.25rem;    --lh-lg: 1.75rem;
+  --text-xl: 1.5625rem;  --lh-xl: 2rem;
+  --text-2xl: 1.9375rem; --lh-2xl: 2.375rem;
+
+  --serif: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
+  --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Space — 4px base, multiples of 4 only. */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 48px;
+
+  --radius: 10px;
+  --radius-sm: 8px;
+  --measure: 34rem;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #12131a;
-    --surface: #1b1d26;
-    --surface-2: #23262f;
-    --text: #e9ebf0;
-    --text-dim: #9aa1b1;
-    --border: #2f333e;
-    --accent: #7d9bff;
-    --accent-text: #0e1017;
-    --danger: #ff8a80;
-  --focus: #ffb454;
-    --warn-bg: #3a2c12;
-    --warn-text: #ffd08a;
+    --ink: #eceef2;
+    --ink-soft: #98a2b3;
+    --paper: #101216;
+    --surface: #191c22;
+    --surface-sunk: #22262e;
+    --rule: #2c313a;
+    --field: #6b7280;
+    --accent: #f0a03c;
+    --accent-ink: #1a1204;
+    --warn: #f5b25e;
+    --warn-bg: #2a1f10;
+    --alert: #ff8a8a;
+    --focus: #f0a03c;
   }
 }
 
 * { box-sizing: border-box; }
 
-/* An explicit focus ring. The browser default survives, but its blue is close
-   to --accent and all but vanishes on a primary button. */
-:focus-visible {
-  outline: 3px solid var(--focus);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-
-/* Visible only once focused, which is the entire point: it lets a keyboard user
-   skip the header on every page instead of tabbing through it. */
-.skip {
-  position: absolute; left: -9999px; top: 0; z-index: 10;
-  background: var(--surface); color: var(--text);
-  border: 1px solid var(--border); border-radius: 8px; padding: 10px 16px;
-}
-.skip:focus { left: 8px; top: 8px; }
-
-main:focus { outline: none; }
-
-/* The timeline is a list of events; say so in the markup. */
-ul.events { list-style: none; margin: 0; padding: 0; }
-
-/* Extracted import fields: a label/value grid, not a wall of key: value. */
-dl.extracted { margin: 10px 0; font-size: 14px; }
-dl.extracted > div { display: flex; gap: 10px; padding: 3px 0; }
-dl.extracted dt { flex: none; width: 92px; color: var(--text-dim); }
-dl.extracted dd { margin: 0; min-width: 0; word-break: break-word; }
-
-/* A disabled action must read as disabled, not merely as a paler shade of the
-   same button — 0.6 alpha on an accent fill is easy to mistake for enabled. */
-button:disabled, a.btn[aria-disabled='true'] {
-  opacity: 1;
-  background: var(--surface-2);
-  color: var(--text-dim);
-  border-color: var(--border);
-}
+html { -webkit-text-size-adjust: 100%; }
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font: var(--text-base)/var(--lh-base) var(--sans);
   /* Home-screen PWAs sit under the status bar without this. */
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+           env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
-.app { max-width: 720px; margin: 0 auto; padding: var(--pad); }
+.app { max-width: var(--measure); margin: 0 auto; padding: var(--space-4); }
+
+/* Focus — an explicit ring. The browser default's blue all but vanishes
+   against the accent, and it is the one affordance a keyboard user has. */
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Visible only once focused, which is the point: it lets a keyboard user skip
+   the header instead of tabbing through it on every page. */
+.skip {
+  position: absolute; left: -9999px; top: 0; z-index: 10;
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--rule); border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+}
+.skip:focus { left: var(--space-2); top: var(--space-2); }
+main:focus { outline: none; }
+
+/* ---------------------------------------------------------------- header -- */
 
 header.bar {
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 0; margin-bottom: 8px;
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) 0 var(--space-4);
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: var(--space-5);
 }
-header.bar h1 { font-size: 20px; margin: 0; flex: 1; }
-/* At least a 44px tap target; the bare link was 35x17. */
-header.bar h1 a { display: inline-block; padding: 13px 6px; margin: -13px -6px; }
-/* Same 44px floor as every other tap target. */
-header.bar > a { display: inline-block; padding: 12px 8px; margin: -12px 0; }
-header.bar a, header.bar button { font-size: 14px; }
+header.bar .wordmark {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  font: 600 var(--text-lg)/var(--lh-lg) var(--serif);
+  letter-spacing: -0.01em;
+  color: inherit; text-decoration: none;
+  padding: var(--space-2) var(--space-1); margin: calc(var(--space-2) * -1) 0;
+}
+header.bar .wordmark svg { display: block; width: 22px; height: 22px; }
+header.bar h1 { margin: 0; flex: 1; font-size: inherit; }
+header.bar > a:not(.wordmark):not(.skip) {
+  display: inline-block; padding: var(--space-3) var(--space-2);
+  margin: calc(var(--space-3) * -1) 0;
+  font-size: var(--text-sm); color: var(--accent);
+}
 
-h2 { font-size: 18px; margin: 24px 0 8px; }
+/* ------------------------------------------------------------- typography -- */
 
-a { color: var(--accent); }
+h2 {
+  font: 600 var(--text-lg)/var(--lh-lg) var(--serif);
+  letter-spacing: -0.01em;
+  margin: var(--space-8) 0 var(--space-3);
+}
+/* The screen title. Section headings sit a step below it, or the trip name and
+   "People" compete and the page has no focal point. */
+h2.screen-title {
+  font-size: var(--text-2xl); line-height: var(--lh-2xl);
+  margin: 0 0 var(--space-1);
+}
+h2:first-child { margin-top: 0; }
+h3 { font: 600 var(--text-lg)/var(--lh-lg) var(--serif); margin: 0 0 var(--space-2); }
 
+a { color: var(--accent); text-underline-offset: 2px; }
+
+.muted { color: var(--ink-soft); font-size: var(--text-sm); line-height: var(--lh-sm); }
+.tiny { font-size: var(--text-xs); line-height: var(--lh-xs); }
+/* This app is mostly a column of times; they must not shift per digit. */
+.mono, .time, time { font-variant-numeric: tabular-nums; }
+
+.empty {
+  color: var(--ink-soft); text-align: center;
+  padding: var(--space-10) var(--space-4);
+  border: 1px dashed var(--rule); border-radius: var(--radius);
+}
+
+/* ----------------------------------------------------------------- cards -- */
+
+/* Depth is a rule and a surface shift, never a shadow. Shadows on warm paper
+   read as grubby and date fastest. */
 .card {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--rule);
   border-radius: var(--radius);
-  padding: var(--pad);
-  margin-bottom: 12px;
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
 }
-
 .card.link { display: block; text-decoration: none; color: inherit; }
 .card.link:hover { border-color: var(--accent); }
 
-.row { display: flex; gap: 12px; align-items: baseline; }
+.row { display: flex; gap: var(--space-3); align-items: baseline; }
 .row .grow { flex: 1; min-width: 0; }
 
-.muted { color: var(--text-dim); font-size: 14px; }
-.tiny { font-size: 12px; }
-.mono { font-variant-numeric: tabular-nums; }
+/* ----------------------------------------------------------------- forms -- */
 
-/* The control lives inside its label, so the label is a block container and the
-   caption is the span. */
-div.field { display: block; margin: 12px 0 0; }
-.field-label { display: block; margin-bottom: 4px; font-size: 14px; color: var(--text-dim); }
-div.field .muted.tiny { display: block; margin-top: 4px; }
-
-input, select, textarea, button {
-  font: inherit;
-  color: inherit;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  width: 100%;
+div.field, label.field { display: block; margin: var(--space-4) 0 0; }
+.field-label {
+  display: block; margin-bottom: var(--space-1);
+  font-size: var(--text-sm); line-height: var(--lh-sm);
+  color: var(--ink-soft);
 }
-textarea { min-height: 72px; resize: vertical; }
+div.field .muted.tiny, label.field .muted.tiny { display: block; margin-top: var(--space-1); }
 
-button {
-  background: var(--accent);
-  color: var(--accent-text);
-  border-color: transparent;
-  font-weight: 600;
-  cursor: pointer;
-  width: auto;
-  padding: 11px 16px;
-  /* 44px is the smallest target most people can hit reliably one-handed, which
-     is how this app gets used. */
+input, select, textarea {
+  font: var(--text-base)/var(--lh-base) var(--sans);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--field);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  width: 100%;
   min-height: 44px;
 }
-/* A link that looks like a button. Nesting a real <button> inside an <a> is
-   invalid and exposes two overlapping controls for one target, which assistive
-   tech announces inconsistently. The element matches the action: navigation is
-   a link, and it is styled to look like a button. */
-a.btn {
-  display: inline-block; text-decoration: none; text-align: center;
-  min-height: 44px; line-height: 22px;
-  background: var(--accent); color: var(--accent-text);
-  border: 1px solid transparent; border-radius: 8px;
-  padding: 10px 16px; font-weight: 600;
+/* Never below 16px on anything typed into — iOS zooms the viewport on focus
+   for smaller inputs, which feels like a bug. */
+input[type='checkbox'] { width: auto; min-height: 0; accent-color: var(--accent); }
+textarea { min-height: 88px; resize: vertical; }
+
+button, a.btn {
+  font: 600 var(--text-sm)/1.25rem var(--sans);
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+  min-height: 44px;
+  width: auto;
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  text-decoration: none;
 }
-a.btn.secondary, button.secondary { background: var(--surface-2); color: var(--text); border-color: var(--border); }
-button.danger { background: transparent; color: var(--danger); border-color: var(--border); }
-button:disabled { opacity: 0.6; cursor: not-allowed; }
+button.secondary, a.btn.secondary {
+  background: var(--surface); color: var(--ink); border-color: var(--field);
+}
+/* Destructive is never a filled block: a filled red button invites the
+   accidental press it exists to discourage. */
+button.danger {
+  background: transparent; color: var(--alert); border-color: var(--field);
+}
+/* Disabled must read as disabled, not as a paler shade of enabled. */
+button:disabled {
+  opacity: 1;
+  background: var(--surface-sunk); color: var(--ink-soft);
+  border-color: var(--rule); cursor: not-allowed;
+}
 
-.actions { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
+.actions { display: flex; gap: var(--space-2); margin-top: var(--space-5); flex-wrap: wrap; }
 
-.error { color: var(--danger); font-size: 14px; margin-top: 12px; }
+.error { color: var(--alert); font-size: var(--text-sm); margin-top: var(--space-3); }
 
 .banner {
   background: var(--warn-bg);
-  color: var(--warn-text);
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-size: 14px;
-  margin-bottom: 12px;
+  color: var(--warn);
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  font-size: var(--text-sm); line-height: var(--lh-sm);
+  margin-bottom: var(--space-4);
 }
 
-/* Timeline ---------------------------------------------------------------- */
+/* -------------------------------------------------------------- timeline -- */
 
-.day { margin-top: 20px; }
+.day { margin-top: var(--space-6); }
 .day > h3 {
-  font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em;
-  color: var(--text-dim); margin: 0 0 8px;
+  font: 600 var(--text-xs)/var(--lh-xs) var(--sans);
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--ink-soft);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: var(--space-3);
 }
 
-.event { display: flex; gap: 12px; }
-.event .when { width: 96px; flex: none; padding-top: 2px; }
-.event .when .time { font-weight: 600; font-variant-numeric: tabular-nums; }
+ul.events { list-style: none; margin: 0; padding: 0; }
+
+.event { display: flex; gap: var(--space-4); }
+.event .when { width: 96px; flex: none; }
+.event .when .time {
+  font: 600 var(--text-base)/var(--lh-base) var(--sans);
+  font-variant-numeric: tabular-nums;
+}
+.event .when .until {
+  font-size: var(--text-xs); line-height: var(--lh-xs);
+  color: var(--ink-soft); margin-top: 2px;
+}
 .event .body { flex: 1; min-width: 0; }
-.event .title { font-weight: 600; }
+.event .title {
+  font: 600 var(--text-base)/var(--lh-base) var(--serif);
+  letter-spacing: -0.01em;
+  display: flex; gap: var(--space-2); align-items: baseline;
+}
+.event .kind { flex: none; color: var(--ink-soft); font-family: var(--sans); font-size: var(--text-sm); }
+.endday { color: var(--ink-soft); }
 
+/* Metadata, never the accent — badges are not calls to action. */
 .zone {
-  display: inline-block; margin-top: 2px; padding: 1px 6px;
-  background: var(--surface-2); border-radius: 999px;
-  font-size: 11px; color: var(--text-dim);
-}
-.endday { color: var(--text-dim); }
-
-.kind {
-  display: inline-block; width: 22px; text-align: center;
+  display: inline-block; margin-top: var(--space-1);
+  padding: 1px var(--space-2);
+  background: var(--surface-sunk); color: var(--ink-soft);
+  border-radius: 999px;
+  font-size: var(--text-xs); line-height: 1.125rem;
 }
 
-.empty { color: var(--text-dim); text-align: center; padding: 40px 0; }
+/* --------------------------------------------------------------- imports -- */
 
-.suggestions {
-  list-style: none; margin: 4px 0 0; padding: 0;
-  border: 1px solid var(--border); border-radius: 8px;
-  background: var(--surface); overflow: hidden;
-}
-.suggestions li button {
-  width: 100%; text-align: left; background: none; color: inherit;
-  border: 0; border-radius: 0; padding: 8px 12px; font-weight: 400;
-}
-.suggestions li button:hover { background: var(--surface-2); }
+dl.extracted { margin: var(--space-3) 0; font-size: var(--text-sm); }
+dl.extracted > div { display: flex; gap: var(--space-3); padding: var(--space-1) 0; }
+dl.extracted dt { flex: none; width: 88px; color: var(--ink-soft); }
+dl.extracted dd { margin: 0; min-width: 0; word-break: break-word; }
 
-.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
-@media (max-width: 480px) { .grid2 { grid-template-columns: 1fr; } }
+.suggestions { list-style: none; margin: var(--space-1) 0 0; padding: 0; }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--space-3); }
+@media (max-width: 30rem) { .grid2 { grid-template-columns: 1fr; } }
+
+/* Card titles take the larger step only where there is room for it. At 390px a
+   serif --text-lg wraps a normal flight name onto two lines, which reads as a
+   layout fault rather than a long title. */
+@media (min-width: 30rem) {
+  .event .title { font-size: var(--text-lg); line-height: var(--lh-lg); }
+}

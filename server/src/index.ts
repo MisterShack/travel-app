@@ -49,7 +49,7 @@ const pusher =
 startSweep({ db, mailer, pusher }, env.SWEEP_INTERVAL_MS);
 
 serve({ fetch: app.fetch, port: env.PORT }, (info) => {
-  console.info(`Travel API listening on http://localhost:${info.port} (${env.NODE_ENV})`);
+  console.info(`Waypoint API listening on http://localhost:${info.port} (${env.NODE_ENV})`);
   if (env.RESEND_API_KEY === undefined) {
     console.info('No RESEND_API_KEY set — verification, invite and reset emails print here.');
   }
