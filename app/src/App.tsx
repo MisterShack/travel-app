@@ -13,6 +13,8 @@ import {
 } from '@/features/auth/AuthPages';
 import { TripDetailPage, TripFormPage, TripListPage } from '@/features/trips/TripPages';
 import { ImportsPage } from '@/features/imports/ImportsPage';
+import { AccountPage } from '@/features/account/AccountPage';
+import { TabBar } from '@/components/TabBar';
 import { EventFormPage } from '@/features/timeline/EventForm';
 
 /**
@@ -32,7 +34,7 @@ function RequireUser({ children }: { children: React.ReactNode }) {
 }
 
 export function App() {
-  const { user, signOut, offline } = useAuth();
+  const { user, offline } = useAuth();
   const location = useLocation();
   const main = useRef<HTMLElement>(null);
 
@@ -84,22 +86,13 @@ export function App() {
           </Link>
         </h1>
         {offline && <span className="muted tiny">offline</span>}
-        {user !== null && (
-          <>
-            <Link className="navlink" to="/imports">
-              Inbox
-              {/* Absent at zero: a zero badge is noise that trains people to
-                  stop looking at the badge. */}
-              {pending > 0 && (
-                <span className="count" aria-label={`${pending} awaiting review`}>
-                  {pending}
-                </span>
-              )}
-            </Link>
-            <button className="secondary" onClick={() => void signOut()}>
-              Sign out
-            </button>
-          </>
+        {/* Navigation lives in the tab bar. The header is a title bar and an
+            offline indicator, nothing else — two navigations competing is how a
+            web page looks. */}
+        {offline && (
+          <span className="offline-chip" role="status">
+            Offline
+          </span>
         )}
       </header>
 
@@ -152,9 +145,18 @@ export function App() {
               </RequireUser>
             }
           />
+          <Route
+            path="/account"
+            element={
+              <RequireUser>
+                <AccountPage />
+              </RequireUser>
+            }
+          />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+      {user !== null && <TabBar pending={pending} />}
     </div>
   );
 }

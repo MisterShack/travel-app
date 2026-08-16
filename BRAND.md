@@ -97,9 +97,12 @@ phone at an airport gate at 6am, and reads as paper rather than screen.
 
 A document, not a dashboard.
 
-- **Headings:** a transitional serif, falling back through the system serif stack. Serif headings
-  against a sans UI are what makes an interface read as *edited* rather than generated, and they
-  cost nothing offline when they resolve to a system face.
+- **Everything in the UI is the system sans.** The first version set headings in a serif, which
+  read *editorial* — and an interface that reads like a website is exactly what a consumer expects
+  not to find in an app. Familiarity in the interface is worth more than distinctiveness; be
+  different in what the product does, not in how its headings are set.
+- **The serif survives in one place: the wordmark.** That is enough to carry the identity, and it
+  appears once per screen where it cannot be mistaken for body copy.
 - **Body and UI:** the system sans stack. It is already on the device, renders natively, and adds
   no weight to a bundle that must work with no network.
 - **Times:** tabular figures, always. A column of times that shifts by a pixel per digit looks
@@ -151,6 +154,18 @@ constant at every breakpoint so the text column never shifts under the reader.
   it exists to discourage.
 - **Tappable rows say so** — a chevron at the trailing edge, and a surface shift on hover and
   focus. If a whole card is a link, the user should not have to guess.
+
+## 6a. Navigation
+
+**Primary destinations live in a bottom tab bar**, within thumb reach. This is the single change
+that stops a PWA feeling like a website, and it is the convention every consumer app has already
+taught people — differing here costs familiarity and buys nothing.
+
+- Three destinations: Trips, Inbox, Account. A tab bar with more than five is a menu wearing a
+  disguise.
+- The header is a title bar, not a second navigation. Two navigations competing is how a web page
+  looks.
+- Counts ride the tab icon, as they do everywhere else, and are absent at zero.
 
 ## 7. Components
 
