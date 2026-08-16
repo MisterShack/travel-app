@@ -152,7 +152,32 @@ export async function parseWithLlm(
   );
 
   if (!response.ok) {
-    return { ok: false, by: 'none', reason: `Gemini returned ${response.status}` };
+    /**
+     * Include the model name and the API's own message. A bare status is
+     * unactionable, and the two likely causes look identical without it: a 404
+     * is almost always a model id that does not exist for this key, not a
+     * missing endpoint, and the body says which.
+     */
+    const detail = await response.text().catch(() => '');
+    const message = (() => {
+      try {
+        const parsedBody = JSON.parse(detail) as { error?: { message?: string } };
+        return parsedBody.error?.message ?? detail;
+      } catch {
+        return detail;
+      }
+    })();
+    return {
+      ok: false,
+      by: 'none',
+      reason:
+        `Gemini returned ${response.status} for model "${model}"` +
+        (message ? `: ${message.slice(0, 300)}` : '') +
+        (response.status === 404
+          ? '. Set GEMINI_MODEL to a model your API key can use — list them with' +
+            ' curl -s "https://generativelanguage.googleapis.com/v1beta/models" -H "x-goog-api-key: $KEY"'
+          : ''),
+    };
   }
 
   const body = (await response.json()) as {
