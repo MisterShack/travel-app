@@ -1,5 +1,5 @@
 import { airportTimeZone } from '@travel/shared/airports';
-import type { ReceivedEmail } from './resendInbound';
+import type { Attachment, ReceivedEmail } from './resendInbound';
 
 /**
  * Turning a forwarded confirmation into structured fields (PLAN.md §6.5).
@@ -117,15 +117,35 @@ export async function parseWithLlm(
   email: ReceivedEmail,
   apiKey: string,
   model: string,
+  attachments: Attachment[] = [],
 ): Promise<ParseResult> {
   const text = plainText(email).slice(0, 20_000);
+
+  /**
+   * Attachments go to the model alongside the body.
+   *
+   * A forwarded airline confirmation is typically a covering note with the
+   * actual ticket in a PDF, so the body alone yields a subject line and little
+   * else. Gemini reads PDFs natively as inline data, which avoids taking on a
+   * PDF-extraction dependency for what is otherwise a solved problem.
+   *
+   * They are held in memory and discarded with the request — nothing is written
+   * to our database (PLAN.md §4). They are, however, sent to the model, which
+   * is the same disclosure the email body already makes and the reason §6.7
+   * puts this on the paid tier rather than the free one.
+   */
+  const parts: Record<string, unknown>[] = [
+    { text: `${SCHEMA_PROMPT}\n\nSubject: ${email.subject}\n\n${text}` },
+    ...attachments.map((a) => ({ inlineData: { mimeType: a.contentType, data: a.data } })),
+  ];
+
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: `${SCHEMA_PROMPT}\n\nSubject: ${email.subject}\n\n${text}` }] }],
+        contents: [{ parts }],
         generationConfig: { temperature: 0, responseMimeType: 'application/json' },
       }),
     },
@@ -173,9 +193,18 @@ export async function parseWithLlm(
 export async function parseBooking(
   email: ReceivedEmail,
   config: { apiKey: string | undefined; model: string },
+  attachments: Attachment[] = [],
 ): Promise<ParseResult> {
-  const heuristic = parseHeuristic(email);
-  if (heuristic) return heuristic;
+  /**
+   * Heuristics are skipped when there are attachments. They read only the body,
+   * and on a forwarded ticket the body is a covering note — matching a stray
+   * flight number there while the real itinerary sits unread in the PDF is
+   * worse than going straight to the model.
+   */
+  if (attachments.length === 0) {
+    const heuristic = parseHeuristic(email);
+    if (heuristic) return heuristic;
+  }
 
   /**
    * No key, or the call failed: the import still lands for review with nothing
@@ -184,11 +213,18 @@ export async function parseBooking(
    * couldn't read it, here is the source" (PLAN.md §6.7).
    */
   if (!config.apiKey) {
-    return { ok: false, by: 'none', reason: 'No parser could read this email' };
+    return {
+      ok: false,
+      by: 'none',
+      reason:
+        attachments.length > 0
+          ? 'The booking is in an attachment, which needs GEMINI_API_KEY to read'
+          : 'No parser could read this email',
+    };
   }
 
   try {
-    return await parseWithLlm(email, config.apiKey, config.model);
+    return await parseWithLlm(email, config.apiKey, config.model, attachments);
   } catch (error) {
     return { ok: false, by: 'none', reason: `Parser failed: ${(error as Error).message}` };
   }

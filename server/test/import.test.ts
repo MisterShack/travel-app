@@ -243,3 +243,44 @@ describe('signing-secret formats', () => {
     expect(verifyWebhook(plain, hdrs(sign(Buffer.from(plain, 'utf8'))), raw, NOW).ok).toBe(true);
   });
 });
+
+describe('attachments', () => {
+  const pdf = { filename: 'ticket.pdf', contentType: 'application/pdf', data: 'JVBERi0x' };
+
+  it('skips heuristics when there is an attachment', async () => {
+    // A forwarded ticket's body is a covering note. Matching a stray flight
+    // number there while the real itinerary sits unread in the PDF is worse
+    // than going straight to the model.
+    const { parseBooking } = await import('../src/import/parse');
+    const withSignals = email({ text: 'TP 1233 from LHR to LIS' });
+
+    // No key, so the LLM path cannot run — the result tells us which branch
+    // was taken.
+    const result = await parseBooking(withSignals, { apiKey: undefined, model: 'm' }, [pdf]);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toMatch(/attachment/);
+  });
+
+  it('still uses heuristics when there are none', async () => {
+    const { parseBooking } = await import('../src/import/parse');
+    const result = await parseBooking(email({ text: 'TP 1233 from LHR to LIS' }), {
+      apiKey: undefined,
+      model: 'm',
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.by).toBe('heuristic');
+  });
+
+  it('imports an attachment-only email as reviewable rather than dropping it', async () => {
+    // The real case: a covering note plus the ticket as a PDF, and no model
+    // key configured. It must still land with the source reachable.
+    h = await createHarness(ENV, { em_1: email({ text: 'Sent from my iPhone', subject: 'Fwd: Your itinerary' }) });
+    await signUp(h, 'a@example.com');
+    await h.app.request(signed({ data: { email_id: 'em_1' } }));
+
+    const rows = await h.db.select().from(bookingImports);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.status).toBe('failed');
+    expect(rows[0]?.errorMessage).toBeTruthy();
+  });
+});

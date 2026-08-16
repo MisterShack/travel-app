@@ -141,10 +141,20 @@ export function createImportRoutes(deps: ImportDeps) {
         return ignore(`daily cap of ${env.IMPORT_DAILY_CAP} reached for ${from}`);
       }
 
-      const parsed = await parseBooking(message, {
-        apiKey: env.GEMINI_API_KEY,
-        model: env.GEMINI_MODEL,
-      });
+      // Fetched after the sender gate, so an unknown sender never causes a
+      // download. Failure here is not fatal: the body may still be readable.
+      let attachments: Awaited<ReturnType<typeof inbound.fetchAttachments>> = [];
+      try {
+        attachments = await inbound.fetchAttachments(messageId);
+      } catch (error) {
+        console.warn(`Inbound webhook: could not fetch attachments for ${messageId}:`, error);
+      }
+
+      const parsed = await parseBooking(
+        message,
+        { apiKey: env.GEMINI_API_KEY, model: env.GEMINI_MODEL },
+        attachments,
+      );
 
       /**
        * Trip matching: pre-select only when there is exactly one candidate.
@@ -182,6 +192,7 @@ export function createImportRoutes(deps: ImportDeps) {
       console.info(
         `Inbound webhook: imported ${messageId} for ${from} — ` +
           `${parsed.ok ? `${parsed.draft.type} via ${parsed.by}` : `unreadable (${parsed.reason})`}` +
+          `${attachments.length > 0 ? `, ${attachments.length} attachment(s) read` : ''}` +
           `${tripId ? ', matched to a trip' : ', no trip matched'}`,
       );
       return c.json({ ok: true });

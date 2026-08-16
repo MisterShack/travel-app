@@ -280,9 +280,16 @@ Revisit only if maintaining two accounts becomes a real annoyance in practice �
    trivially forged, so this is a cost and noise control, **not** an authentication of the sender;
    the §4 human-review invariant is what actually contains the blast radius. Cap imports per user
    per day.
-5. The handler calls Resend's Received Emails / Attachments API to fetch the full message, parses
-   it in memory, writes a `bookingImports` row, and **writes nothing from the raw email to our
-   database** (§4).
+5. The handler calls Resend's Received Emails API for the message **and its Attachments API for
+   any PDF or text attachment**, parses them in memory, writes a `bookingImports` row, and
+   **writes nothing from the raw email or its attachments to our database** (§4).
+
+   The attachment half is not optional, as a real forwarded confirmation showed on 2026-08-15: an
+   airline itinerary arrives as a covering note with the ticket in a PDF, so a parser reading only
+   `text`/`html` sees a subject line and nothing else. Attachments go to the model as inline data —
+   Gemini reads PDFs natively, which avoids taking on a PDF-extraction dependency. Heuristics are
+   skipped entirely when attachments are present: matching a stray flight number in a covering note
+   while the real itinerary sits unread is worse than not guessing.
 6. **Trip matching:** if the resolved user belongs to exactly one in-progress or upcoming trip,
    pre-select it; otherwise `tripId` stays null and the review screen asks which trip it belongs
    to. Unmatched imports are reachable via `GET /imports` (the caller's own, scoped by `userId`)
