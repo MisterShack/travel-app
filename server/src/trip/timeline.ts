@@ -8,6 +8,7 @@ import {
   type LodgingInput,
   type TimelineItem,
 } from '@travel/shared';
+import { lookupAirport } from '@travel/shared/airports';
 import type { Db } from '../db/client';
 import { activities, flights, lodging } from '../db/schema';
 
@@ -167,9 +168,14 @@ export async function getTimeline(db: Db, tripId: string): Promise<TimelineItem[
       startAt: r.departureAt,
       startLocal: r.departureLocal,
       startTimezone: r.departureTimezone,
+      // The airport's own city. Its zone's namesake is a different place: YOW
+      // is Ottawa but sits in America/Toronto, and BOS is Boston in
+      // America/New_York.
+      startPlace: lookupAirport(r.departureAirport)?.city ?? null,
       endAt: r.arrivalAt,
       endLocal: r.arrivalLocal,
       endTimezone: r.arrivalTimezone,
+      endPlace: lookupAirport(r.arrivalAirport)?.city ?? null,
       confirmationCode: r.confirmationCode,
       notes: r.notes,
       source: r.source,
@@ -183,9 +189,13 @@ export async function getTimeline(db: Db, tripId: string): Promise<TimelineItem[
       startAt: r.checkInAt,
       startLocal: r.checkInLocal,
       startTimezone: r.checkInTimezone,
+      // The zone was chosen by hand on the form, so showing it back is
+      // faithful — there is no separate place recorded to show instead.
+      startPlace: null,
       endAt: r.checkOutAt,
       endLocal: r.checkOutLocal,
       endTimezone: r.checkOutTimezone,
+      endPlace: null,
       confirmationCode: r.confirmationCode,
       notes: r.notes,
       source: r.source,
@@ -199,9 +209,11 @@ export async function getTimeline(db: Db, tripId: string): Promise<TimelineItem[
       startAt: r.startAt,
       startLocal: r.startLocal,
       startTimezone: r.startTimezone,
+      startPlace: null,
       endAt: r.endAt,
       endLocal: r.endLocal,
       endTimezone: r.endTimezone,
+      endPlace: null,
       confirmationCode: r.confirmationCode,
       notes: r.notes,
       source: r.source,
@@ -231,6 +243,7 @@ export function reminderSubjectFor(kind: EntityKind, row: Record<string, unknown
       timezone: String(row['departureTimezone']),
       title: `${String(row['airline'])} ${String(row['flightNumber'])}`,
       detail: `${String(row['departureAirport'])} → ${String(row['arrivalAirport'])}`,
+      place: lookupAirport(String(row['departureAirport']))?.city ?? null,
     };
   }
   if (kind === 'lodging') {
@@ -242,6 +255,7 @@ export function reminderSubjectFor(kind: EntityKind, row: Record<string, unknown
       timezone: String(row['checkInTimezone']),
       title: String(row['name']),
       detail: row['address'] ? String(row['address']) : '',
+      place: null,
     };
   }
   return {
@@ -252,6 +266,7 @@ export function reminderSubjectFor(kind: EntityKind, row: Record<string, unknown
     timezone: String(row['startTimezone']),
     title: String(row['name']),
     detail: row['location'] ? String(row['location']) : '',
+    place: null,
   };
 }
 

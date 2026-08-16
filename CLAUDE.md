@@ -65,7 +65,7 @@ certificate, `/health` answering JSON, the client served at `/`, SPA deep links 
 `/api/*` returning JSON rather than being shadowed by the static fallback. Registration and email
 verification work against real Resend delivery.
 
-**All phases (0–5) are done.** 147 tests, typecheck and lint clean.
+**All phases (0–5) are done.** 151 tests, typecheck and lint clean.
 
 **Phase 4 (booking import) shipped and verified end to end against a real forwarded airline
 confirmation, 2026-08-15** — including two per-passenger PDF tickets, read correctly.
@@ -128,6 +128,12 @@ Findings from building that contradict a straight port from budget-app, all enco
   as a **pair the email itself joined** — an arrow, a dash, "to", or departure/arrival labels — and
   a flight number only where the email calls it one. Taking the first two recognised codes in
   document order imported an OpenTable reservation as a flight (2026-08-16).
+
+- **A timezone is not a place.** `zoneLabel` names the zone's namesake city, so an Ottawa arrival
+  (`America/Toronto`) was labelled "Toronto" in both the timeline badge and the reminder text —
+  reported from a real WestJet import, 2026-08-16, where the extraction was correct and only the
+  label was wrong. `TimelineItem` now carries `startPlace`/`endPlace`, filled from the airport table
+  for flights; lodging and activities keep the zone, because there the user chose the zone by hand.
 
 **The brand's mark was removed on 2026-08-16.** An amber outlined triangle with a dot at the
 centroid is how an aeronautical chart draws a named waypoint; it is also, at a glance, a hazard

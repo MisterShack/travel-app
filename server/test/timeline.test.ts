@@ -150,6 +150,41 @@ describe('the merged timeline', () => {
     expect(await read()).toEqual(await read());
   });
 
+  it('carries the airport\'s own city, not its zone\'s namesake', async () => {
+    /*
+     * YOW is Ottawa and sits in America/Toronto — as do Montreal, Detroit and
+     * Iqaluit. Labelling the arrival from the zone alone told a traveller their
+     * Winnipeg to Ottawa flight landed in Toronto. Reported from a real WestJet
+     * import, 2026-08-16: the extraction was right, the label was not.
+     */
+    const { cookie, tripId } = await setup();
+    await h.app.request(
+      jsonRequest(
+        `/trips/${tripId}/flights`,
+        'POST',
+        {
+          airline: 'WestJet',
+          flightNumber: 'WS3120',
+          departureAirport: 'YWG',
+          departure: { local: '2026-09-10T07:15', timezone: 'America/Winnipeg' },
+          arrivalAirport: 'YOW',
+          arrival: { local: '2026-09-10T10:40', timezone: 'America/Toronto' },
+        },
+        cookie,
+      ),
+    );
+
+    const res = await h.app.request(jsonRequest(`/trips/${tripId}/timeline`, 'GET', undefined, cookie));
+    const { items } = (await res.json()) as {
+      items: { startPlace: string | null; endPlace: string | null; endTimezone: string }[];
+    };
+    expect(items[0]).toMatchObject({
+      startPlace: 'Winnipeg',
+      endPlace: 'Ottawa',
+      endTimezone: 'America/Toronto',
+    });
+  });
+
   it('is empty for a new trip', async () => {
     const { cookie, tripId } = await setup();
     const res = await h.app.request(jsonRequest(`/trips/${tripId}/timeline`, 'GET', undefined, cookie));

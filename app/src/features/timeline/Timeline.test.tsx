@@ -14,9 +14,11 @@ function item(over: Partial<TimelineItem>): TimelineItem {
     startAt: '2026-09-10T12:00:00.000Z',
     startLocal: '2026-09-10T13:00',
     startTimezone: 'Europe/Lisbon',
+    startPlace: null,
     endAt: null,
     endLocal: null,
     endTimezone: null,
+    endPlace: null,
     confirmationCode: null,
     notes: null,
     source: 'manual',
@@ -54,6 +56,31 @@ describe('Timeline', () => {
 
     draw([item({ startTimezone: 'America/New_York' })], 'Europe/Lisbon');
     expect(screen.getByText('New York')).toBeInTheDocument();
+  });
+
+  it('names the place, not the zone, when the two differ', () => {
+    /*
+     * Ottawa's IANA zone is America/Toronto — as is Montreal's, Detroit's and
+     * Iqaluit's. Labelling a YOW arrival from its zone alone put "Toronto" on a
+     * flight to Ottawa, which reads as the wrong city rather than as a
+     * timezone. Reported from a real WestJet import, 2026-08-16.
+     */
+    draw(
+      [
+        item({
+          id: 'f1',
+          kind: 'flight',
+          startTimezone: 'America/Winnipeg',
+          startPlace: 'Winnipeg',
+          endAt: '2026-09-10T14:40:00.000Z',
+          endTimezone: 'America/Toronto',
+          endPlace: 'Ottawa',
+        }),
+      ],
+      'Europe/Lisbon',
+    );
+    expect(screen.getByText('Ottawa')).toBeInTheDocument();
+    expect(screen.queryByText('Toronto')).toBeNull();
   });
 
   it('labels the badge with the city, not a UTC offset', () => {

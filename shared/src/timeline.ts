@@ -85,10 +85,23 @@ export const timelineItemSchema = z.object({
   startAt: z.string(),
   startLocal: localDateTimeSchema,
   startTimezone: timeZoneSchema,
+  /**
+   * Where the event actually happens, when the app knows it independently of
+   * the zone — the airport's city, for a flight.
+   *
+   * A zone is not a place. `America/Toronto` is the zone for Ottawa, Montreal,
+   * Detroit and Iqaluit, so labelling an Ottawa arrival with its zone's
+   * namesake reads as a wrong city rather than as a timezone. It is null for
+   * lodging and activities, whose zone the user chose by hand: showing them
+   * back the zone they picked is faithful, and there is no separate place to
+   * show instead.
+   */
+  startPlace: z.string().nullable(),
   /** Present for flights (arrival), lodging (check-out) and timed activities. */
   endAt: z.string().nullable(),
   endLocal: localDateTimeSchema.nullable(),
   endTimezone: timeZoneSchema.nullable(),
+  endPlace: z.string().nullable(),
   confirmationCode: z.string().nullable(),
   notes: z.string().nullable(),
   source: z.enum(['manual', 'import']),

@@ -88,14 +88,18 @@ function Event({ item, homeTimezone }: { item: TimelineItem; homeTimezone: strin
       <div className="event">
         <div className="when">
           <div className="time">{start}</div>
-          {showStartZone && <div className="zone">{zoneLabel(item.startTimezone)}</div>}
+          {showStartZone && (
+            <div className="zone">{item.startPlace ?? zoneLabel(item.startTimezone)}</div>
+          )}
           {end !== null && (
             <div className="until mono">
               → {end}
               {endDate !== null && <span className="endday">{endDate}</span>}
             </div>
           )}
-          {end !== null && showEndZone && <div className="zone">{zoneLabel(item.endTimezone!)}</div>}
+          {end !== null && showEndZone && (
+            <div className="zone">{item.endPlace ?? zoneLabel(item.endTimezone!)}</div>
+          )}
         </div>
         <KindChip kind={item.kind} />
         <div className="body">

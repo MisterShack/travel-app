@@ -35,6 +35,12 @@ export type ReminderSubject = {
   startAt: string;
   /** The zone the event is in, for rendering the time in the message. */
   timezone: string;
+  /**
+   * Where it happens, when that is known independently of the zone. A zone is
+   * not a place: an Ottawa departure in `America/Toronto` used to read
+   * "departs at 07:15 (Toronto)", which names a city the traveller is not in.
+   */
+  place: string | null;
   title: string;
   detail: string;
 };
@@ -48,12 +54,12 @@ export type ReminderSubject = {
 function compose(subject: ReminderSubject): { title: string; body: string } {
   const local = instantToLocal(subject.startAt, subject.timezone);
   const time = local.slice(11);
-  const zone = zoneLabel(subject.timezone);
+  const where = subject.place ?? zoneLabel(subject.timezone);
   const noun =
     subject.relatedType === 'flight' ? 'departs' : subject.relatedType === 'lodging' ? 'check-in' : 'starts';
   return {
     title: subject.title,
-    body: `${noun} at ${time} (${zone})${subject.detail ? ` — ${subject.detail}` : ''}`,
+    body: `${noun} at ${time} (${where})${subject.detail ? ` — ${subject.detail}` : ''}`,
   };
 }
 

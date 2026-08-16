@@ -154,6 +154,15 @@ export function zoneAbbreviation(instant: string, timeZone: string): string {
  * stops carrying information — which is the whole reason it is there. The IANA
  * city is always distinct and reads better besides.
  */
+/**
+ * A short, human name for a timezone.
+ *
+ * **This names the zone, not the place.** `America/Toronto` is the zone for
+ * Ottawa, Montreal, Detroit and Iqaluit; `America/New_York` covers Boston and
+ * Atlanta. Where the caller knows where the event actually is — a flight knows
+ * its airport — show that instead and keep this as the fallback, or the label
+ * reads as a wrong city rather than as a timezone.
+ */
 export function zoneLabel(timeZone: string): string {
   const last = timeZone.split('/').at(-1) ?? timeZone;
   return last.replace(/_/g, ' ');

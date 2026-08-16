@@ -171,6 +171,29 @@ describe('the sweep', () => {
     expect(rows[0]?.sentAt).not.toBeNull();
   });
 
+  it('names the airport\'s city in the message, not its zone\'s', async () => {
+    /*
+     * "departs at 07:15 (Toronto)" for a flight out of Winnipeg to Ottawa. The
+     * zone is right — YOW is in America/Toronto — but a zone is not a place,
+     * and the reminder is read by someone standing in an airport.
+     */
+    h = await createHarness();
+    const cookie = await signUp(h, 'a@example.com');
+    const id = await trip(cookie);
+    await addFlight(cookie, id, {
+      airline: 'WestJet',
+      flightNumber: 'WS3120',
+      departureAirport: 'YWG',
+      departure: { local: '2026-09-10T07:15', timezone: 'America/Winnipeg' },
+      arrivalAirport: 'YOW',
+      arrival: { local: '2026-09-10T10:40', timezone: 'America/Toronto' },
+    });
+
+    const rows = await rowsFor(id);
+    expect(rows[0]?.body).toContain('(Winnipeg)');
+    expect(rows[0]?.body).not.toContain('Toronto');
+  });
+
   it('does not send anything before it is due', async () => {
     h = await createHarness();
     await dueFlight();
