@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { TripSummary } from '@travel/shared';
 import { api, ApiError } from '@/api/client';
 import { ErrorText, Skeleton } from '@/components/Bits';
+import { useInbox } from '@/data/useInbox';
 
 /**
  * The booking-import review queue (PLAN.md §4, §6.8).
@@ -72,18 +73,26 @@ function pretty(key: string, value: unknown): string {
 const DATE = { day: 'numeric', month: 'short', year: 'numeric' } as const;
 
 export function ImportsPage() {
+  const { report } = useInbox();
   const [rows, setRows] = useState<ImportRow[] | null>(null);
   const [trips, setTrips] = useState<TripSummary[]>([]);
   const [error, setError] = useState('');
 
-  const load = () => {
+  // `report` is a setState function and so is stable; the effect runs once.
+  const load = useCallback(() => {
     void api
       .get<{ imports: ImportRow[] }>('/imports')
-      .then((r) => setRows(r.imports))
+      .then((r) => {
+        setRows(r.imports);
+        // Reviewing an import does not navigate, so nothing else would tell the
+        // tab badge that this list just got shorter. The server uses the same
+        // "awaiting review" predicate for both, so the length is the count.
+        report(r.imports.length);
+      })
       .catch(() => setError('Could not load your imports.'));
     void api.get<{ trips: TripSummary[] }>('/trips').then((r) => setTrips(r.trips));
-  };
-  useEffect(load, []);
+  }, [report]);
+  useEffect(load, [load]);
 
   if (error) return <p className="error">{error}</p>;
   if (!rows) return <Skeleton rows={2} label="Loading your inbox" />;

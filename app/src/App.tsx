@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from '@/auth/useAuth';
-import { api } from '@/api/client';
 import { Skeleton } from '@/components/Bits';
+import { useInbox } from '@/data/useInbox';
 import {
   ForgotPage,
   InvitePage,
@@ -40,28 +40,9 @@ function RequireUser({ children }: { children: React.ReactNode }) {
 
 export function App() {
   const { user, offline } = useAuth();
+  const { pending } = useInbox();
   const location = useLocation();
   const main = useRef<HTMLElement>(null);
-
-  /**
-   * How many imports await review.
-   *
-   * Re-read on every navigation rather than polled on a timer: it changes when
-   * mail arrives, which is rare, and a timer would wake the app up for nothing
-   * on a device where battery and signal are scarce. Push tells you about
-   * arrivals while you are away; this keeps the badge honest while you are here.
-   */
-  const [pending, setPending] = useState(0);
-  const refreshCount = useCallback(() => {
-    if (!user) return setPending(0);
-    void api
-      .get<{ count: number }>('/imports/count')
-      .then((r) => setPending(r.count))
-      .catch(() => {
-        /* offline or signed out — leave the last known count alone */
-      });
-  }, [user]);
-  useEffect(refreshCount, [refreshCount, location.pathname]);
 
   /**
    * Move focus to the main region on every route change.

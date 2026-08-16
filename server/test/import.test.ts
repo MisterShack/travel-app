@@ -169,6 +169,39 @@ describe('the review queue', () => {
     await expect(res.json()).resolves.toEqual({ imports: [] });
   });
 
+  it('counts only what is still awaiting review', async () => {
+    /*
+     * The badge on the Inbox tab read "3 awaiting review" against one
+     * outstanding import and never went down, because this route counted every
+     * row the account had ever received while the list beside it filtered
+     * `applied` and `rejected` out. Both now use one predicate, so the two
+     * cannot drift apart again.
+     */
+    h = await createHarness(ENV, { em_1: email(), em_2: email({ id: 'em_2' }), em_3: email({ id: 'em_3' }) });
+    const cookie = await signUp(h, 'a@example.com');
+    for (const id of ['em_1', 'em_2', 'em_3']) {
+      await h.app.request(signed({ data: { email_id: id } }));
+    }
+
+    const count = async () => {
+      const res = await h.app.request(jsonRequest('/imports/count', 'GET', undefined, cookie));
+      return ((await res.json()) as { count: number }).count;
+    };
+    const listed = async () => {
+      const res = await h.app.request(jsonRequest('/imports', 'GET', undefined, cookie));
+      return ((await res.json()) as { imports: unknown[] }).imports.length;
+    };
+
+    expect(await count()).toBe(3);
+
+    const rows = await h.db.select().from(bookingImports);
+    await h.app.request(jsonRequest(`/imports/${rows[0]!.id}/reject`, 'POST', undefined, cookie));
+    await h.app.request(jsonRequest(`/imports/${rows[1]!.id}/apply`, 'POST', undefined, cookie));
+
+    expect(await count()).toBe(1);
+    expect(await listed()).toBe(1);
+  });
+
   it('refuses to assign an import to a trip the caller is not in', async () => {
     h = await createHarness(ENV, { em_1: email() });
     const owner = await signUp(h, 'a@example.com');

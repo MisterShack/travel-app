@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, desc, eq, gte, isNull } from 'drizzle-orm';
+import { and, desc, eq, gte, notInArray } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Db } from '../db/client';
@@ -238,25 +238,37 @@ export function createImportRoutes(deps: ImportDeps) {
 
   /** The caller's imports. Scoped by `userId`, never by trip alone — an
    *  unmatched import has no trip to be scoped by. */
+  /**
+   * "Awaiting review": everything a human has not yet resolved.
+   *
+   * Defined once because it was defined three times, differently. The list
+   * filtered `applied` and `rejected` out in application code; the count route
+   * counted **every** row the user had ever received, so the tab badge showed a
+   * lifetime total that never went down; and the per-trip route keyed off
+   * `processedAt`, which is stamped at ingest and is therefore never null.
+   * Status is the marker, and now only one expression says so.
+   */
+  const AWAITING = notInArray(bookingImports.status, ['applied', 'rejected']);
+
   app.get('/imports', auth, async (c) => {
     const rows = await db
       .select()
       .from(bookingImports)
-      .where(eq(bookingImports.userId, c.get('user').id))
+      .where(and(eq(bookingImports.userId, c.get('user').id), AWAITING))
       .orderBy(desc(bookingImports.createdAt));
-    return c.json({ imports: rows.filter((r) => r.status !== 'applied' && r.status !== 'rejected') });
+    return c.json({ imports: rows });
   });
 
   /**
    * How many imports await review. Its own route rather than a field on a
-   * bigger payload, because the header polls it on every navigation and should
+   * bigger payload, because the tab bar reads it on every navigation and should
    * not be shipping rows to render a numeral.
    */
   app.get('/imports/count', auth, async (c) => {
     const rows = await db
       .select({ id: bookingImports.id })
       .from(bookingImports)
-      .where(eq(bookingImports.userId, c.get('user').id));
+      .where(and(eq(bookingImports.userId, c.get('user').id), AWAITING));
     return c.json({ count: rows.length });
   });
 
@@ -266,7 +278,7 @@ export function createImportRoutes(deps: ImportDeps) {
     const rows = await db
       .select()
       .from(bookingImports)
-      .where(and(eq(bookingImports.tripId, tripId), isNull(bookingImports.processedAt)))
+      .where(and(eq(bookingImports.tripId, tripId), AWAITING))
       .orderBy(desc(bookingImports.createdAt));
     return c.json({ imports: rows });
   });
