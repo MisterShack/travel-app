@@ -103,14 +103,24 @@ Two things that are true and worth keeping in view:
 existing row to `mode = 'air'`, because every row that existed was a flight. Rehearsed against a
 database built at 0006 with a real booking, a pending reminder and an import in it.
 
+**Verified end to end against a real forwarded Via Rail confirmation, 2026-08-17**, which is the
+same bar Phase 4 was held to and is not the same thing as the unit tests passing: those stub the
+model, and the rail path is the one that cannot be checked without it. Rail never takes the
+heuristic path — that claims `air` only, on a labelled flight number *and* an IATA pair — so a
+successful rail import exercises the whole chain and settles three production settings at once.
+It proves the inbound MX delivers, that `RESEND_WEBHOOK_SECRET` is set (`verifyWebhook` returns
+`not_configured` and the route 401s without it), and that `GEMINI_API_KEY` is set and the model
+answers.
+
 **Phase 11 (conflict and gap detection) shipped 2026-08-15**, from PLAN-V3. Pure function in
 `shared/`, run on the client, so it works offline and costs nothing per use. It is the feature that
 falls out of the timezone work rather than being bolted on — "you land at 13:00 but dinner is
 booked for 12:30" is a comparison only because every event carries a correct instant across zones.
 
-Outstanding in production only, not in code: `RESEND_WEBHOOK_SECRET`, `GEMINI_API_KEY` and the
-inbound MX record (DEPLOY.md §11) for import; `VAPID_*` for push. Each degrades its own feature
-when absent and none breaks the app.
+Outstanding in production only, not in code: `VAPID_*` for push, which is the last of these left.
+It degrades only its own feature when absent and does not break the app. The import three —
+`RESEND_WEBHOOK_SECRET`, `GEMINI_API_KEY` and the inbound MX record (DEPLOY.md §11) — are set and
+proven, by the Via Rail import above rather than by reading the dashboard.
 
 Findings from building that contradict a straight port from budget-app, all encoded:
 
