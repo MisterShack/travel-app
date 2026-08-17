@@ -121,7 +121,10 @@ Findings from building that contradict a straight port from budget-app, all enco
   only symptom is a Railway healthcheck failure. DEPLOY.md §0 and §3.
 - **`STATIC_DIR` must be absolute** — `serveStatic` resolves against the process cwd.
 - **The native-binary pin is Rolldown, not Rollup** (Vite 8 replaced it), and npm/cli#4828 is
-  still live on npm 11.17 — measured. DEPLOY.md §9.
+  still live on npm 11.17 — measured. DEPLOY.md §9. It is not only a deploy problem: the same bug
+  left a Windows development machine with no Rolldown or LightningCSS binding, so `vitest` died at
+  startup before running a test. The `win32-x64` pair is declared alongside the Linux one, and the
+  `os` field keeps each out of everywhere it does not belong.
 - **Vite alias order matters**: `@travel/shared/airports` must precede `@travel/shared`.
 - **`.dockerignore` is load-bearing** — `npm ci` installs Linux binaries and `COPY . .` would put
   the host's macOS ones on top.

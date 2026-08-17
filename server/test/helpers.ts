@@ -54,7 +54,33 @@ export async function createHarness(
     setNow: (d) => {
       current = d;
     },
-    cleanup: () => rmSync(dir, { recursive: true, force: true }),
+    /**
+     * Close the connection, then remove the directory — **best effort**.
+     *
+     * Closing first is right on any platform: a hundred harnesses in a run
+     * otherwise leave a hundred connections open. But on Windows the libsql
+     * native binding does not release the file handle even after `close()`
+     * returns and `client.closed` is true — the `.db` file is still EBUSY and
+     * removing its directory fails EPERM. `force` only swallows ENOENT, and
+     * retries do not help; the handle is held until the process exits.
+     *
+     * Measured on 2026-08-17: without this guard every one of the 109 server
+     * specs failed on a Windows machine while passing on macOS, and each
+     * failure was the cleanup, never the assertion.
+     *
+     * Deleting the directory is hygiene, not correctness — each harness already
+     * gets its own `mkdtemp` directory, so a leftover cannot leak into another
+     * test. What the OS temp sweeper collects later is a fair trade for a suite
+     * that runs on both machines this project is developed from.
+     */
+    cleanup: () => {
+      db.$client.close();
+      try {
+        rmSync(dir, { recursive: true, force: true });
+      } catch {
+        /* see above: the platform is holding the file, not the test. */
+      }
+    },
   };
 }
 

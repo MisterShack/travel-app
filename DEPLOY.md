@@ -294,26 +294,36 @@ The data-survives-redeploy check has to wait for Phase 2, when there is somethin
 
 ---
 
-## 9. The Linux-binary lockfile trap
+## 9. The native-binary lockfile trap
 
 npm records only the *current* platform's optional native packages (npm/cli#4828), so a lockfile
-generated on macOS describes only macOS and `npm ci` inside the Linux image fails on a missing
-binary. Root `optionalDependencies` declares the Linux builds explicitly so they land in the
-lockfile. They are never installed locally — the `os` field excludes them — they exist purely to
-be *recorded*.
+generated on macOS describes only macOS and `npm ci` on any other platform fails on a missing
+binary. Root `optionalDependencies` declares the missing builds explicitly so they land in the
+lockfile. Each carries an `os` field, so declaring one never installs it anywhere it does not
+belong — a `linux` entry is inert on a developer machine and a `win32` entry is inert in the
+image. They are declared to be *recorded*.
 
 **This was measured on 2026-08-15, not assumed.** Regenerating `package-lock.json` with the
 `optionalDependencies` block removed drops the Linux entries from 22 to **zero**. The bug is
 still live on npm 11.17.0; it is not something budget-app worked around historically and has
 since been fixed.
 
+**It bites the deploy target and the developer machine alike (2026-08-17).** A fresh `npm ci` of
+this macOS-generated lockfile on a Windows desktop installed no Rolldown and no LightningCSS
+binding, and `vitest` died at startup on `Cannot find native binding` before running a single
+test. Same bug, opposite direction. Only these two packages are affected: `esbuild`, `@libsql`,
+`@node-rs/argon2` and `@rollup` all record every platform in the lockfile already, so they need
+nothing.
+
 Currently declared, at the versions this repo actually resolves:
 
 | Package | Version | Why |
 |---|---|---|
 | `@rolldown/binding-linux-x64-gnu` | 1.2.4 | Vite 8 bundles with **Rolldown**, not Rollup |
+| `@rolldown/binding-win32-x64-msvc` | 1.2.4 | The same, for the Windows development machine |
 | `@esbuild/linux-x64` | 0.28.2 | Vite's dependency-prebundling and TS transform |
 | `lightningcss-linux-x64-gnu` | 1.33.0 | Vite's CSS pipeline |
+| `lightningcss-win32-x64-msvc` | 1.33.0 | The same, for the Windows development machine |
 
 Note that budget-app pins `@rollup/rollup-linux-x64-gnu`, and that is **not** the right pin here:
 Vite 8 replaced Rollup with Rolldown, and `rollup` is not in this dependency tree at all. Copying
@@ -321,19 +331,24 @@ budget-app's list verbatim would leave the real binaries unpinned while pinning 
 
 Rules for keeping this correct:
 
-- **Versions are exact, not ranges** — each must match the package it backs. After any bump of
-  `vite`, re-read the resolved versions and update all three together:
+- **Versions are exact, not ranges** — each must match the package it backs, and a platform pair
+  must move together. After any bump of `vite`, re-read the resolved versions and update all five:
   ```sh
-  node -p "require('./node_modules/@rolldown/binding-darwin-arm64/package.json').version"
+  node -p "require('./node_modules/rolldown/package.json').version"
   node -p "require('./node_modules/esbuild/package.json').version"
   node -p "require('./node_modules/lightningcss/package.json').version"
   ```
-- **To verify the lockfile still describes the image**, check all three are present:
+- **To verify the lockfile still describes every platform**, check all five are present:
   ```sh
-  node -e "const p=require('./package-lock.json').packages; for (const n of ['@rolldown/binding-linux-x64-gnu','@esbuild/linux-x64','lightningcss-linux-x64-gnu']) console.log(('node_modules/'+n in p)?'OK  ':'MISS', n)"
+  node -e "const p=require('./package-lock.json').packages; for (const n of ['@rolldown/binding-linux-x64-gnu','@esbuild/linux-x64','lightningcss-linux-x64-gnu','@rolldown/binding-win32-x64-msvc','lightningcss-win32-x64-msvc']) console.log(('node_modules/'+n in p)?'OK  ':'MISS', n)"
   ```
-- **These cover linux-x64 only**, which is what Railway runs and what the Dockerfile's Litestream
-  download assumes. Building the image on an arm64 machine needs the `-arm64-` variants added.
+- **The Linux entries cover linux-x64 only**, which is what Railway runs and what the Dockerfile's
+  Litestream download assumes. Building the image on an arm64 machine needs the `-arm64-` variants
+  added.
+- **A new development machine may need its own pair added**, by the same rule: run `npm ci`, run
+  `npm test`, and if the bundler cannot find a native binding, declare that platform's Rolldown and
+  LightningCSS builds here rather than installing them by hand. A hand-installed binary disappears
+  at the next `npm ci` and the next person re-discovers this section.
 - **Phase 2 adds `@libsql/client` and `@node-rs/argon2`**, and their `linux-x64-gnu` builds must be
   added here at the same time. Only the bundler failure is loud: without the other two the image
   builds happily and the server crashes at runtime on database open and password hashing.
