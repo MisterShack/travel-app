@@ -24,8 +24,51 @@ type ImportRow = {
   extractedType: 'flight' | 'lodging' | 'activity' | null;
   extractedFields: string | null;
   parsedBy: 'heuristic' | 'llm' | 'none' | null;
+  /** JSON array of the leg indices already added, for a multi-leg booking. */
+  appliedSegments: string | null;
   errorMessage: string | null;
 };
+
+/** One leg of a flight booking, as the parser extracted it. */
+type Leg = Record<string, unknown>;
+
+/**
+ * The legs and the people, pulled out of the extraction.
+ *
+ * A flight booking carries a list of each. Everything else carries one flat
+ * object, which reads here as a single unnamed leg so the card has one shape to
+ * render rather than two.
+ */
+function legsOf(fields: Record<string, unknown> | null): Leg[] {
+  const flights = fields?.['flights'];
+  return Array.isArray(flights) ? (flights as Leg[]) : [];
+}
+
+const appliedOf = (row: ImportRow): number[] => {
+  try {
+    const parsed = JSON.parse(row.appliedSegments ?? '[]') as unknown;
+    return Array.isArray(parsed) ? parsed.filter((n): n is number => typeof n === 'number') : [];
+  } catch {
+    return [];
+  }
+};
+
+/** "YWG → YOW, 10 Sep 07:15" — enough to tell an outbound from a return. */
+function legLabel(leg: Leg, index: number): string {
+  const text = (key: string) => (typeof leg[key] === 'string' ? (leg[key] as string) : '');
+  const from = text('departureAirport');
+  const to = text('arrivalAirport');
+  // A leg with no route at all is still worth listing — the reviewer opens it
+  // and sees what the extraction did manage, rather than an unexplained gap.
+  if (from === '' && to === '') return `Leg ${index + 1}`;
+
+  const when = text('departureLocal');
+  const number = text('flightNumber');
+  return (
+    `${number === '' ? '' : `${number} `}${from || '?'} → ${to || '?'}` +
+    (when === '' ? '' : `, ${pretty('departureLocal', when)}`)
+  );
+}
 
 const PATH = { flight: 'flight', lodging: 'lodging', activity: 'activity' } as const;
 
@@ -44,7 +87,6 @@ const LABEL: Record<string, string> = {
   departureLocal: 'Departs',
   arrivalAirport: 'To',
   arrivalLocal: 'Arrives',
-  seat: 'Seat',
   name: 'Name',
   address: 'Address',
   location: 'Where',
@@ -135,6 +177,15 @@ function ImportCard({
   const fields = row.extractedFields
     ? (JSON.parse(row.extractedFields) as Record<string, unknown>)
     : null;
+  const legs = legsOf(fields);
+  const applied = appliedOf(row);
+  const people = Array.isArray(fields?.['passengers'])
+    ? (fields['passengers'] as Record<string, unknown>[])
+        .map((p) =>
+          [p['name'], p['seat']].filter((v) => typeof v === 'string' && v !== '').join(' · '),
+        )
+        .filter((label) => label !== '')
+    : [];
 
   const showSource = async () => {
     setSourceError('');
@@ -148,14 +199,30 @@ function ImportCard({
     }
   };
 
-  const review = async () => {
+  /**
+   * Hand one proposal to the normal create form.
+   *
+   * The import cannot write a row a human could not have typed, because it goes
+   * through the same validated route. A flight booking hands over **one leg at
+   * a time**, flattened with the booking-level passengers and reference — the
+   * form edits one flight, and a return trip is two of them.
+   */
+  const review = async (segment: number | null) => {
     if (tripId === '') return;
     if (tripId !== row.tripId) await api.post(`/imports/${row.id}/assign`, { tripId });
-    // Hand the draft to the normal create form. The import cannot write a row
-    // that a human could not have typed, because it goes through the same
-    // validated route.
+
+    const leg = segment === null ? null : legs[segment];
+    const draft =
+      leg === null || leg === undefined
+        ? fields
+        : {
+            ...leg,
+            passengers: fields?.['passengers'],
+            confirmationCode: fields?.['confirmationCode'],
+          };
+
     navigate(`/trips/${tripId}/${PATH[row.extractedType ?? 'activity']}/new`, {
-      state: { draft: fields, importId: row.id },
+      state: { draft, importId: row.id, segment },
     });
   };
 
@@ -182,6 +249,9 @@ function ImportCard({
       {fields && (
         <dl className="extracted">
           {Object.entries(fields)
+            // The two lists get their own treatment below; rendered here they
+            // would stringify into "[object Object]".
+            .filter(([k]) => k !== 'flights' && k !== 'passengers')
             .filter(([, v]) => v !== null && v !== '' && v !== undefined)
             .map(([k, v]) => (
               <div key={k}>
@@ -189,7 +259,40 @@ function ImportCard({
                 <dd>{pretty(k, v)}</dd>
               </div>
             ))}
+          {people.length > 0 && (
+            <div>
+              <dt>{people.length === 1 ? 'Passenger' : 'Passengers'}</dt>
+              <dd>{people.join(', ')}</dd>
+            </div>
+          )}
         </dl>
+      )}
+
+      {/*
+        A return trip is one email and two flights. Each leg is confirmed on its
+        own — the import stays in the queue until every one has been added,
+        because filing the email after the outbound would take the return with
+        it.
+      */}
+      {legs.length > 1 && (
+        <ul className="legs">
+          {legs.map((leg, i) => (
+            <li key={i}>
+              <span className="grow">{legLabel(leg, i)}</span>
+              {applied.includes(i) ? (
+                <span className="zone">Added</span>
+              ) : (
+                <button
+                  className="secondary"
+                  disabled={tripId === ''}
+                  onClick={() => void review(i)}
+                >
+                  Review and add
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
       )}
 
       {source !== null && (
@@ -220,9 +323,11 @@ function ImportCard({
         <p className="muted tiny">Choose a trip to continue.</p>
       )}
       <div className="actions">
-        <button disabled={tripId === ''} onClick={() => void review()}>
-          {row.status === 'failed' ? 'Add by hand' : 'Review and add'}
-        </button>
+        {legs.length <= 1 && (
+          <button disabled={tripId === ''} onClick={() => void review(legs.length === 1 ? 0 : null)}>
+            {row.status === 'failed' ? 'Add by hand' : 'Review and add'}
+          </button>
+        )}
         <button className="secondary" onClick={() => void showSource()}>
           Show original
         </button>

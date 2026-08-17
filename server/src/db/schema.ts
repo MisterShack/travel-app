@@ -177,7 +177,15 @@ export const flights = sqliteTable(
     arrivalTimezone: text('arrival_timezone').notNull(),
     arrivalAt: text('arrival_at').notNull(),
 
-    seat: text('seat'),
+    /**
+     * JSON `[{ "name": string, "seat": string }]` — everyone on this flight.
+     *
+     * Replaced a single `seat` column, which could hold a family booking only
+     * by discarding all but one of them. JSON rather than a join table: a
+     * passenger has no identity outside its flight, is never queried across
+     * flights, and a trip has tens of rows.
+     */
+    passengers: text('passengers'),
     notes: text('notes'),
     source: text('source', { enum: ['manual', 'import'] })
       .notNull()
@@ -374,6 +382,15 @@ export const bookingImports = sqliteTable(
     extractedFields: text('extracted_fields'),
     /** How it was read, so a bad parser run can be told from a bad email. */
     parsedBy: text('parsed_by', { enum: ['heuristic', 'llm', 'none'] }),
+    /**
+     * JSON array of the flight indices already added, for a booking with more
+     * than one leg.
+     *
+     * A return trip is one email and two timeline rows. Without this the import
+     * would either vanish from the queue after the first leg was added — losing
+     * the second — or stay forever with no way to tell which legs were done.
+     */
+    appliedSegments: text('applied_segments'),
     errorMessage: text('error_message'),
 
     processedAt: text('processed_at'),

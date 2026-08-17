@@ -626,6 +626,40 @@ li.event-item > .card {
 
 /* --------------------------------------------------------------- imports -- */
 
+/* Each leg of a multi-leg booking, confirmed on its own. A return trip is one
+   email and two flights, and the import stays until both are added. */
+ul.legs { list-style: none; margin: var(--space-3) 0; padding: 0; }
+ul.legs > li {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rule); border-radius: var(--radius-sm);
+  margin-bottom: var(--space-2);
+  font-size: var(--text-sm); line-height: var(--lh-sm);
+}
+ul.legs .grow { flex: 1; min-width: 0; }
+ul.legs button { min-height: 36px; padding: var(--space-2) var(--space-3); }
+
+/* Who is travelling, and where they are sitting. */
+fieldset.passengers {
+  margin: var(--space-4) 0 0; padding: var(--space-3);
+  border: 1px solid var(--rule); border-radius: var(--radius-sm);
+}
+fieldset.passengers legend {
+  padding: 0 var(--space-2);
+  font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--ink-soft);
+}
+.passenger { display: flex; gap: var(--space-2); align-items: flex-end; margin-bottom: var(--space-2); }
+.passenger .grow { flex: 1; min-width: 0; }
+.passenger .seat { width: 84px; flex: none; }
+.passenger .field-label { margin-bottom: var(--space-1); }
+/* Square, so it reads as an icon control beside two text fields rather than as
+   a third field. */
+.passenger button.remove {
+  flex: none; width: 44px; min-height: 44px; padding: 0;
+  font-size: var(--text-lg); line-height: 1;
+}
+fieldset.passengers .actions { margin-top: var(--space-3); }
+
 dl.extracted { margin: var(--space-3) 0; font-size: var(--text-sm); }
 dl.extracted > div { display: flex; gap: var(--space-3); padding: var(--space-1) 0; }
 dl.extracted dt { flex: none; width: 88px; color: var(--ink-soft); }

@@ -65,7 +65,7 @@ certificate, `/health` answering JSON, the client served at `/`, SPA deep links 
 `/api/*` returning JSON rather than being shadowed by the static fallback. Registration and email
 verification work against real Resend delivery.
 
-**All phases (0–5) are done.** 162 tests, typecheck and lint clean.
+**All phases (0–5) are done.** 170 tests, typecheck and lint clean.
 
 **Phase 4 (booking import) shipped and verified end to end against a real forwarded airline
 confirmation, 2026-08-15** — including two per-passenger PDF tickets, read correctly.
@@ -135,6 +135,11 @@ Findings from building that contradict a straight port from budget-app, all enco
   `processedAt`, which is stamped at ingest and so is never null. One `AWAITING` predicate now
   serves all three. The badge also lives in `InboxProvider` rather than `App`, because reviewing an
   import does not navigate and the count was only ever re-read on a route change.
+- **A booking is a list, not a row.** The flight import extracted one leg and one seat: a return
+  trip lost the flight home, and a family booking lost everyone but one seat. A booking now carries
+  `flights[]` and `passengers[]`; `flights.seat` became a `passengers` JSON column (migration 0005,
+  the first that rewrites existing rows — see DEPLOY.md); and an import stays in the review queue
+  until every leg has been added, tracked in `booking_imports.applied_segments`.
 - **`registerType: 'autoUpdate'` auto-updates the *worker*, not the page.** The generated
   `registerSW.js` is a single line that registers `/sw.js`; our worker calls `skipWaiting()` and
   `clients.claim()`, so a new build activates at once — and the page already running keeps the

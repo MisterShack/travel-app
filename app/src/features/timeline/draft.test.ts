@@ -8,7 +8,7 @@ const form = {
   departureLocal: '',
   arrivalAirport: '',
   arrivalLocal: '',
-  seat: '',
+  passengers: [{ name: '', seat: '' }],
   name: '',
   address: '',
   location: '',
@@ -57,7 +57,32 @@ describe('applyDraft', () => {
   });
 
   it('leaves anything the draft does not mention alone', () => {
-    const next = applyDraft({ ...form, seat: '14C' }, { name: 'X' });
-    expect(next.seat).toBe('14C');
+    const next = applyDraft({ ...form, airline: 'WestJet' }, { name: 'X' });
+    expect(next.airline).toBe('WestJet');
+  });
+
+  it('carries every passenger, not just a seat', () => {
+    /*
+     * The case this app exists for is a family travelling together. A single
+     * `seat` field could hold their booking only by discarding three of them.
+     */
+    const next = applyDraft(form, {
+      passengers: [
+        { name: 'David', seat: '14C' },
+        { name: 'Sam', seat: '14D' },
+      ],
+    });
+    expect(next.passengers).toEqual([
+      { name: 'David', seat: '14C' },
+      { name: 'Sam', seat: '14D' },
+    ]);
+  });
+
+  it('keeps the form\'s own blank row when the extraction named nobody', () => {
+    // Null, not an empty list: "said nothing about people" must leave the row
+    // the user types into alone.
+    expect(applyDraft(form, {}).passengers).toEqual([{ name: '', seat: '' }]);
+    expect(applyDraft(form, { passengers: [] }).passengers).toEqual([{ name: '', seat: '' }]);
+    expect(applyDraft(form, { passengers: 'nope' }).passengers).toEqual([{ name: '', seat: '' }]);
   });
 });

@@ -1,9 +1,12 @@
 import { useEffect, useId, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import type { Passenger } from '@travel/shared';
 import { api, ApiError } from '@/api/client';
 import { ErrorText, Field, Warnings } from '@/components/Bits';
 import { AirportField, TimezoneField } from './AirportField';
 import { ACTIVITY_KINDS, applyDraft, type ActivityKind } from './draft';
+import { PassengerFields } from './PassengerFields';
+import { storedPassengers } from './passengers';
 
 /**
  * Add/edit form for the three timeline entity types.
@@ -34,7 +37,7 @@ type State = {
   arrivalAirport: string;
   arrivalLocal: string;
   arrivalTimezone: string;
-  seat: string;
+  passengers: Passenger[];
   name: string;
   address: string;
   location: string;
@@ -56,7 +59,9 @@ const blank = (): State => ({
   arrivalAirport: '',
   arrivalLocal: '',
   arrivalTimezone: guessZone(),
-  seat: '',
+  // Always at least one row, so there is somewhere to type. Blank rows are
+  // dropped on save rather than stored.
+  passengers: [{ name: '', seat: '' }],
   name: '',
   address: '',
   location: '',
@@ -89,6 +94,8 @@ export function EventFormPage() {
   const handover = (useLocation().state ?? {}) as {
     draft?: Record<string, unknown>;
     importId?: string;
+    /** Which leg of a multi-leg booking this is, so the import knows what is left. */
+    segment?: number | null;
   };
   const [busy, setBusy] = useState(false);
   const set = (patch: Partial<State>) => setF((prev) => ({ ...prev, ...patch }));
@@ -143,7 +150,7 @@ export function EventFormPage() {
           arrivalAirport: item['arrivalAirport'] ?? '',
           arrivalLocal: item['arrivalLocal'] ?? '',
           arrivalTimezone: item['arrivalTimezone'] ?? guessZone(),
-          seat: item['seat'] ?? '',
+          passengers: storedPassengers(item['passengers']),
           name: item['name'] ?? '',
           address: item['address'] ?? '',
           location: item['location'] ?? '',
@@ -170,7 +177,7 @@ export function EventFormPage() {
         departure: { local: f.departureLocal, timezone: f.departureTimezone },
         arrivalAirport: f.arrivalAirport,
         arrival: { local: f.arrivalLocal, timezone: f.arrivalTimezone },
-        seat: opt(f.seat),
+        passengers: f.passengers,
       };
     }
     if (kind === 'lodging') {
@@ -223,7 +230,15 @@ export function EventFormPage() {
         }
         // Only now is the import considered applied — after a human saved a
         // real row from it.
-        if (handover.importId) await api.post(`/imports/${handover.importId}/apply`).catch(() => {});
+        if (handover.importId) {
+          // The leg index, so a return trip does not file its email after the
+          // outbound and take the return with it.
+          await api
+            .post(`/imports/${handover.importId}/apply`, {
+              ...(typeof handover.segment === 'number' ? { segment: handover.segment } : {}),
+            })
+            .catch(() => {});
+        }
         navigate(`/trips/${tripId}`, { replace: true });
       } catch (err) {
         setError(err instanceof ApiError ? err.message : 'Could not reach the server.');
@@ -284,9 +299,10 @@ export function EventFormPage() {
               required
             />
           </Field>
-          <Field label="Seat">
-            <input value={f.seat} onChange={(e) => set({ seat: e.target.value })} placeholder="Optional" />
-          </Field>
+          <PassengerFields
+            passengers={f.passengers}
+            onChange={(passengers) => set({ passengers })}
+          />
         </>
       )}
 

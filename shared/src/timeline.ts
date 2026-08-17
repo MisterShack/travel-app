@@ -26,6 +26,20 @@ const iataSchema = z
   .toUpperCase()
   .regex(/^[A-Z]{3}$/, 'Airport codes are three letters, e.g. LHR');
 
+/**
+ * One traveller on a booking.
+ *
+ * Seats belong to people, not to flights. A single `seat` column could hold a
+ * family's booking only by throwing three of them away, which is what it did.
+ * The name may be empty — an airline confirmation often states a seat and no
+ * name, and refusing the seat over the missing name would be the wrong trade.
+ */
+export const passengerSchema = z.object({
+  name: z.string().trim().max(80),
+  seat: z.string().trim().max(10),
+});
+export type Passenger = z.infer<typeof passengerSchema>;
+
 export const flightInputSchema = z
   .object({
     airline: z.string().trim().min(1).max(80),
@@ -35,7 +49,7 @@ export const flightInputSchema = z
     departure: eventTimeSchema,
     arrivalAirport: iataSchema,
     arrival: eventTimeSchema,
-    seat: z.string().trim().max(10).optional(),
+    passengers: z.array(passengerSchema).max(20).optional(),
     notes: z.string().trim().max(2000).optional(),
   })
   // Checked on the instants server-side too; this catches the obvious case

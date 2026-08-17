@@ -94,7 +94,13 @@ await page.locator('input[type=datetime-local]').first().fill('2026-09-10T10:00'
 await page.getByLabel('To').fill('LIS');
 await page.waitForTimeout(500);
 await page.locator('input[type=datetime-local]').nth(1).fill('2026-09-10T13:00');
-await page.getByLabel('Seat').fill('14C');
+// Two passengers, because a family booking is the case this app exists for and
+// a single seat field could only hold it by throwing the rest away.
+await page.getByLabel('Name', { exact: true }).first().fill('David');
+await page.getByLabel('Seat').first().fill('14C');
+await page.getByRole('button', { name: /add another passenger/i }).click();
+await page.getByLabel('Name', { exact: true }).nth(1).fill('Sam');
+await page.getByLabel('Seat').nth(1).fill('14D');
 await shot(page, '08-flight-form');
 await page.getByRole('button', { name: /^Add$/ }).click();
 await page.waitForURL(/\/trips\/trp_[^/]+$/);

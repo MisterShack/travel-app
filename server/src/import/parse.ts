@@ -115,10 +115,18 @@ export function parseHeuristic(email: ReceivedEmail): ParseResult | null {
       by: 'heuristic',
       draft: {
         type: 'flight',
+        // The same shape the model path produces, so the review screen has one
+        // case to handle rather than two. The heuristic only ever finds one leg
+        // and never finds passengers; it says so by returning a list of one.
         fields: {
-          flightNumber: `${carrier}${flight[2]}`,
-          departureAirport: route.from,
-          arrivalAirport: route.to,
+          flights: [
+            {
+              flightNumber: `${carrier}${flight[2]}`,
+              departureAirport: route.from,
+              arrivalAirport: route.to,
+            },
+          ],
+          passengers: [{ name: '', seat: '' }],
           ...(confirmation ? { confirmationCode: confirmation } : {}),
         },
       },
@@ -137,9 +145,10 @@ Return ONLY JSON matching this shape, with no prose and no markdown fence:
 {
   "type": "flight" | "lodging" | "activity" | "unknown",
   "confirmationCode": string | null,
-  "flight": { "airline": string, "flightNumber": string, "departureAirport": string,
-              "departureLocal": "YYYY-MM-DDTHH:mm", "arrivalAirport": string,
-              "arrivalLocal": "YYYY-MM-DDTHH:mm", "seat": string | null } | null,
+  "passengers": [ { "name": string, "seat": string | null } ] | null,
+  "flights": [ { "airline": string, "flightNumber": string, "departureAirport": string,
+                 "departureLocal": "YYYY-MM-DDTHH:mm", "arrivalAirport": string,
+                 "arrivalLocal": "YYYY-MM-DDTHH:mm" } ] | null,
   "lodging": { "name": string, "address": string | null,
                "checkInLocal": "YYYY-MM-DDTHH:mm", "checkOutLocal": "YYYY-MM-DDTHH:mm" } | null,
   "activity": { "kind": "restaurant"|"attraction"|"transport"|"other", "name": string,
@@ -150,10 +159,18 @@ Return ONLY JSON matching this shape, with no prose and no markdown fence:
 Rules:
 - Times are LOCAL wall-clock at the place they happen. Never convert to UTC and never add an offset.
 - Airports are three-letter IATA codes.
-- departureAirport is where the passenger boards and arrivalAirport is where they finally get off.
-  Take both from the itinerary itself. Airports named in fare rules, baggage terms, advertisements,
-  loyalty-programme text or the airline's own mailing address are not part of this booking.
-- If the booking covers several flights, extract only the first one.
+- departureAirport is where the passenger boards that flight and arrivalAirport is where they get
+  off it. Take both from the itinerary itself. Airports named in fare rules, baggage terms,
+  advertisements, loyalty-programme text or the airline's own mailing address are not part of this
+  booking.
+- "flights" is a LIST, in the order flown. A return trip has two entries; a journey with a
+  connection has one entry per leg, not one entry for the whole journey. Never merge an outbound
+  and a return into a single entry, and never drop the return because the outbound was found first.
+- "passengers" lists everyone on the booking, with each person's seat if the email states one. One
+  traveller is a list of one. Seats belong to people, not to the booking: if the email gives seats
+  per flight and they differ, use the seat for the FIRST flight and leave the rest to the reviewer.
+- Never invent a passenger name. If the email names no one, return one passenger with an empty name
+  and whatever seat is stated.
 - If a field is not stated in the email, use null. Do not infer, guess or invent.
 - A restaurant booking — OpenTable, Resy, Tock, or the restaurant writing directly — is an activity
   with kind "restaurant". The restaurant's name goes in name and its address in location. Leave
@@ -254,21 +271,58 @@ export async function parseWithLlm(
     return { ok: false, by: 'none', reason: 'Not recognised as a travel booking' };
   }
 
-  const detail = (parsed[type] ?? {}) as Record<string, unknown>;
   const confirmation = parsed['confirmationCode'];
-  return {
-    ok: true,
-    by: 'llm',
-    draft: {
-      type,
-      fields: {
-        ...detail,
-        ...(typeof confirmation === 'string' && confirmation !== ''
-          ? { confirmationCode: confirmation }
-          : {}),
-      },
-    },
-  };
+  const common =
+    typeof confirmation === 'string' && confirmation !== ''
+      ? { confirmationCode: confirmation }
+      : {};
+
+  /**
+   * A flight booking carries a *list* of legs and a *list* of passengers.
+   *
+   * It used to carry one of each, and the prompt told the model to extract only
+   * the first flight — so a return trip imported as a one-way and the second
+   * leg was silently lost. A family booking lost everyone but the seat.
+   */
+  if (type === 'flight') {
+    const flights = Array.isArray(parsed['flights'])
+      ? (parsed['flights'] as Record<string, unknown>[]).filter(
+          (f) => f !== null && typeof f === 'object',
+        )
+      : [];
+    if (flights.length === 0) {
+      return { ok: false, by: 'none', reason: 'Read as a flight booking with no flights in it' };
+    }
+    return {
+      ok: true,
+      by: 'llm',
+      draft: { type, fields: { ...common, flights, passengers: passengersFrom(parsed) } },
+    };
+  }
+
+  const detail = (parsed[type] ?? {}) as Record<string, unknown>;
+  return { ok: true, by: 'llm', draft: { type, fields: { ...detail, ...common } } };
+}
+
+/**
+ * Passengers, normalised and never trusted.
+ *
+ * The model is asked for a list; it may return null, a bare object, or entries
+ * with the wrong types. Anything unusable becomes a single anonymous passenger
+ * rather than an error — the reviewer can add names, and refusing an otherwise
+ * good itinerary over a missing name list would be the wrong trade.
+ */
+function passengersFrom(parsed: Record<string, unknown>): { name: string; seat: string }[] {
+  const raw = Array.isArray(parsed['passengers']) ? parsed['passengers'] : [];
+  const people = raw
+    .filter((p): p is Record<string, unknown> => p !== null && typeof p === 'object')
+    .map((p) => ({
+      name: typeof p['name'] === 'string' ? p['name'].trim().slice(0, 80) : '',
+      seat: typeof p['seat'] === 'string' ? p['seat'].trim().slice(0, 10) : '',
+    }))
+    .filter((p) => p.name !== '' || p.seat !== '');
+
+  return people.length > 0 ? people : [{ name: '', seat: '' }];
 }
 
 export async function parseBooking(

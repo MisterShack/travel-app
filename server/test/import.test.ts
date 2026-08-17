@@ -202,6 +202,55 @@ describe('the review queue', () => {
     expect(await listed()).toBe(1);
   });
 
+  it('keeps a two-leg booking in the queue until both legs are added', async () => {
+    /*
+     * A return trip is one email and two flights. Filing the import when the
+     * outbound was added would take the return with it — the email leaves the
+     * queue and the flight home is simply never entered.
+     */
+    h = await createHarness(ENV, { em_1: email() });
+    const cookie = await signUp(h, 'a@example.com');
+    await h.app.request(signed({ data: { email_id: 'em_1' } }));
+
+    const imp = (await h.db.select().from(bookingImports))[0]!;
+    await h.db
+      .update(bookingImports)
+      .set({
+        extractedType: 'flight',
+        extractedFields: JSON.stringify({
+          flights: [{ departureAirport: 'YWG' }, { departureAirport: 'YOW' }],
+        }),
+      })
+      .where(eq(bookingImports.id, imp.id));
+
+    const apply = async (segment: number) => {
+      const res = await h.app.request(
+        jsonRequest(`/imports/${imp.id}/apply`, 'POST', { segment }, cookie),
+      );
+      return ((await res.json()) as { remaining: number }).remaining;
+    };
+
+    expect(await apply(0)).toBe(1);
+    expect((await h.db.select().from(bookingImports))[0]?.status).not.toBe('applied');
+
+    // Adding the same leg twice must not count as finishing the booking.
+    expect(await apply(0)).toBe(1);
+    expect((await h.db.select().from(bookingImports))[0]?.status).not.toBe('applied');
+
+    expect(await apply(1)).toBe(0);
+    expect((await h.db.select().from(bookingImports))[0]?.status).toBe('applied');
+  });
+
+  it('files a single-leg import on the first apply, as before', async () => {
+    h = await createHarness(ENV, { em_1: email() });
+    const cookie = await signUp(h, 'a@example.com');
+    await h.app.request(signed({ data: { email_id: 'em_1' } }));
+    const imp = (await h.db.select().from(bookingImports))[0]!;
+
+    await h.app.request(jsonRequest(`/imports/${imp.id}/apply`, 'POST', { segment: 0 }, cookie));
+    expect((await h.db.select().from(bookingImports))[0]?.status).toBe('applied');
+  });
+
   it('refuses to assign an import to a trip the caller is not in', async () => {
     h = await createHarness(ENV, { em_1: email() });
     const owner = await signUp(h, 'a@example.com');
@@ -271,9 +320,7 @@ describe('heuristics', () => {
     const parsed = parseHeuristic(email({ text: westjet }));
     expect(parsed?.ok).toBe(true);
     expect(parsed?.ok === true && parsed.draft.fields).toMatchObject({
-      flightNumber: 'WS3120',
-      departureAirport: 'YWG',
-      arrivalAirport: 'YOW',
+      flights: [{ flightNumber: 'WS3120', departureAirport: 'YWG', arrivalAirport: 'YOW' }],
     });
   });
 
@@ -285,8 +332,7 @@ describe('heuristics', () => {
     ].join('\n');
     const parsed = parseHeuristic(email({ text }));
     expect(parsed?.ok === true && parsed.draft.fields).toMatchObject({
-      departureAirport: 'YWG',
-      arrivalAirport: 'YOW',
+      flights: [{ departureAirport: 'YWG', arrivalAirport: 'YOW' }],
     });
   });
 
@@ -455,6 +501,78 @@ describe('the model path', () => {
         confirmationCode: 'ABC12345',
       });
     }
+  });
+
+  it('reads a return trip as two flights, and everyone on it', async () => {
+    /*
+     * A round trip is one email and two timeline rows. The schema asked for a
+     * single flight and the prompt told the model to take only the first, so
+     * the return was extracted and then thrown away — and a family booking
+     * came back with one seat and nobody's name.
+     */
+    vi.stubGlobal(
+      'fetch',
+      geminiReplying({
+        type: 'flight',
+        confirmationCode: 'ABCDEF',
+        passengers: [
+          { name: 'David Shack', seat: '14C' },
+          { name: 'Sam Shack', seat: '14D' },
+        ],
+        flights: [
+          {
+            airline: 'WestJet',
+            flightNumber: 'WS3120',
+            departureAirport: 'YWG',
+            departureLocal: '2026-09-10T07:15',
+            arrivalAirport: 'YOW',
+            arrivalLocal: '2026-09-10T10:40',
+          },
+          {
+            airline: 'WestJet',
+            flightNumber: 'WS3121',
+            departureAirport: 'YOW',
+            departureLocal: '2026-09-14T18:00',
+            arrivalAirport: 'YWG',
+            arrivalLocal: '2026-09-14T20:25',
+          },
+        ],
+        lodging: null,
+        activity: null,
+      }),
+    );
+
+    const { parseBooking } = await import('../src/import/parse');
+    const result = await parseBooking(email({ text: 'Your WestJet itinerary' }), {
+      apiKey: 'k',
+      model: 'm',
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const fields = result.draft.fields as {
+      flights: { departureAirport: string; arrivalAirport: string }[];
+      passengers: { name: string; seat: string }[];
+    };
+    expect(fields.flights).toHaveLength(2);
+    expect(fields.flights.map((f) => `${f.departureAirport}-${f.arrivalAirport}`)).toEqual([
+      'YWG-YOW',
+      'YOW-YWG',
+    ]);
+    expect(fields.passengers).toEqual([
+      { name: 'David Shack', seat: '14C' },
+      { name: 'Sam Shack', seat: '14D' },
+    ]);
+  });
+
+  it('refuses a flight booking the model returned with no flights in it', async () => {
+    // Better an honest failure with the original attached than a row with no
+    // route, which the reviewer has to notice is empty.
+    vi.stubGlobal('fetch', geminiReplying({ type: 'flight', flights: [] }));
+    const { parseBooking } = await import('../src/import/parse');
+    const result = await parseBooking(email({ text: 'x' }), { apiKey: 'k', model: 'm' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toMatch(/no flights/i);
   });
 
   it('does not invent a booking out of an email that is not one', async () => {

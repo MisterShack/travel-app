@@ -337,18 +337,67 @@ export function createImportRoutes(deps: ImportDeps) {
   });
 
   /**
+   * How many separate timeline rows this import proposes.
+   *
+   * One, for everything except a flight booking; for a flight booking, one per
+   * leg — a return trip is a single email and two flights.
+   */
+  const segmentCount = (extractedFields: string | null): number => {
+    if (extractedFields === null) return 1;
+    try {
+      const parsed = JSON.parse(extractedFields) as { flights?: unknown };
+      return Array.isArray(parsed.flights) && parsed.flights.length > 0 ? parsed.flights.length : 1;
+    } catch {
+      return 1;
+    }
+  };
+
+  /**
    * Marking an import applied. The entity itself is created through the normal
    * validated create route, so an import can never write a row that a human
    * could not have typed.
+   *
+   * A body of `{ "segment": n }` records one leg of a multi-leg booking. The
+   * import only leaves the queue once every leg has been recorded — otherwise
+   * adding the outbound flight would file the email and take the return with
+   * it.
    */
   app.post('/imports/:id/apply', auth, async (c) => {
     const row = await ownImport(c.req.param('id'), c.get('user').id);
     if (!row) return c.json({ error: 'not_found' }, 404);
+
+    const body = (await c.req.json().catch(() => ({}))) as { segment?: unknown };
+    const total = segmentCount(row.extractedFields);
+    const stamp = now().toISOString();
+
+    if (typeof body.segment !== 'number' || total <= 1) {
+      await db
+        .update(bookingImports)
+        .set({ status: 'applied', processedAt: stamp })
+        .where(eq(bookingImports.id, row.id));
+      return c.json({ ok: true, remaining: 0 });
+    }
+
+    const already = (() => {
+      try {
+        const parsed = JSON.parse(row.appliedSegments ?? '[]') as unknown;
+        return Array.isArray(parsed) ? parsed.filter((n): n is number => typeof n === 'number') : [];
+      } catch {
+        return [];
+      }
+    })();
+    const done = [...new Set([...already, body.segment])].filter((n) => n >= 0 && n < total);
+    const complete = done.length >= total;
+
     await db
       .update(bookingImports)
-      .set({ status: 'applied', processedAt: now().toISOString() })
+      .set({
+        appliedSegments: JSON.stringify(done),
+        ...(complete ? { status: 'applied' as const, processedAt: stamp } : {}),
+      })
       .where(eq(bookingImports.id, row.id));
-    return c.json({ ok: true });
+
+    return c.json({ ok: true, remaining: total - done.length });
   });
 
   app.post('/imports/:id/reject', auth, async (c) => {

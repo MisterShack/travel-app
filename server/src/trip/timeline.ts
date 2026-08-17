@@ -6,6 +6,7 @@ import {
   type EventTime,
   type FlightInput,
   type LodgingInput,
+  type Passenger,
   type TimelineItem,
 } from '@travel/shared';
 import { lookupAirport } from '@travel/shared/airports';
@@ -72,7 +73,7 @@ export async function createFlight(db: Db, tripId: string, input: FlightInput, n
     arrivalLocal: arr.local,
     arrivalTimezone: arr.timezone,
     arrivalAt: arr.at,
-    seat: input.seat ?? null,
+    passengers: storedPassengers(input.passengers),
     notes: input.notes ?? null,
     source: 'manual',
     createdAt: at,
@@ -80,6 +81,38 @@ export async function createFlight(db: Db, tripId: string, input: FlightInput, n
   });
 
   return id;
+}
+
+/**
+ * Passengers as stored: JSON, or null when there are none worth keeping.
+ *
+ * Blank rows are dropped rather than persisted. The form always shows at least
+ * one passenger row so there is somewhere to type, and saving an untouched
+ * flight should not leave `[{"name":"","seat":""}]` behind for every reader to
+ * special-case.
+ */
+/** "14C, 14D" — the seats on a stored passenger list, or '' when there are none. */
+function seatSummary(stored: string | null): string {
+  if (stored === null) return '';
+  try {
+    const parsed = JSON.parse(stored) as unknown;
+    if (!Array.isArray(parsed)) return '';
+    return parsed
+      .map((p) =>
+        p !== null && typeof p === 'object' && typeof (p as Passenger).seat === 'string'
+          ? (p as Passenger).seat
+          : '',
+      )
+      .filter((seat) => seat !== '')
+      .join(', ');
+  } catch {
+    return '';
+  }
+}
+
+function storedPassengers(passengers: Passenger[] | undefined): string | null {
+  const kept = (passengers ?? []).filter((p) => p.name !== '' || p.seat !== '');
+  return kept.length === 0 ? null : JSON.stringify(kept);
 }
 
 export async function createLodging(db: Db, tripId: string, input: LodgingInput, now: Date) {
@@ -164,7 +197,11 @@ export async function getTimeline(db: Db, tripId: string): Promise<TimelineItem[
       id: r.id,
       tripId: r.tripId,
       title: `${r.airline} ${r.flightNumber}`,
-      subtitle: `${r.departureAirport} → ${r.arrivalAirport}`,
+      // Seats belong on the row: at the gate, "which seat am I in" is the
+      // question, and opening the flight to answer it is a tap too many.
+      subtitle: [`${r.departureAirport} → ${r.arrivalAirport}`, seatSummary(r.passengers)]
+        .filter((part) => part !== '')
+        .join(' · '),
       startAt: r.departureAt,
       startLocal: r.departureLocal,
       startTimezone: r.departureTimezone,
@@ -319,7 +356,7 @@ export async function updateFlight(db: Db, id: string, input: FlightInput, now: 
       arrivalLocal: arr.local,
       arrivalTimezone: arr.timezone,
       arrivalAt: arr.at,
-      seat: input.seat ?? null,
+      passengers: storedPassengers(input.passengers),
       notes: input.notes ?? null,
       updatedAt: now.toISOString(),
     })

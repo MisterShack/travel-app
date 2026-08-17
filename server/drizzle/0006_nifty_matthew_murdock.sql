@@ -1,0 +1,1 @@
+ALTER TABLE `booking_imports` ADD `applied_segments` text;

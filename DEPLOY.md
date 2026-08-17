@@ -428,6 +428,25 @@ instance and one database file, so there is never a window where two versions di
 schema — but it does mean a deploy is a brief restart, not a zero-downtime rollout. That is the
 intended trade for an application this size.
 
+### A migration that changes existing rows
+
+Migration `0005` is the first one that rewrites data rather than only adding to the schema: it
+copies every existing `flights.seat` into the new `passengers` JSON column and then drops `seat`.
+
+**Roll back is a redeploy of the old image, which does not undo a migration.** The old code would
+find no `seat` column and fail. With `LITESTREAM_BUCKET` unset (§5) the Railway volume is the only
+copy of the database, so there is nothing to restore from either.
+
+Before deploying a migration in this class, take a copy of the database first:
+
+```bash
+railway run cp /data/travel.db /data/travel-before-0005.db
+```
+
+That copy lives on the same volume, so it does not protect against losing the volume — it protects
+against the migration itself being wrong, which is the failure this step is for. Delete it once the
+deploy has been verified.
+
 **`numReplicas` stays 1.** Two processes would mean two writers on one SQLite file, two
 independent in-memory rate limiters, and — most importantly — two reminder sweeps racing to send
 the same notification. PLAN.md §4 and §7 both depend on there being exactly one.

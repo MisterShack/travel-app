@@ -10,6 +10,8 @@
  * is invisible until someone forwards the right email.
  */
 
+import type { Passenger } from '@travel/shared';
+
 export const ACTIVITY_KINDS = ['restaurant', 'attraction', 'transport', 'other'] as const;
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
 
@@ -22,7 +24,7 @@ type Prefillable = {
   departureLocal: string;
   arrivalAirport: string;
   arrivalLocal: string;
-  seat: string;
+  passengers: Passenger[];
   name: string;
   address: string;
   location: string;
@@ -35,6 +37,25 @@ type Prefillable = {
 const isActivityKind = (v: unknown): v is ActivityKind =>
   typeof v === 'string' && (ACTIVITY_KINDS as readonly string[]).includes(v);
 
+/**
+ * Passengers out of a draft, or null when the draft has nothing usable.
+ *
+ * Null rather than an empty list, so the caller can tell "the extraction said
+ * nothing about people" from "the extraction said there is nobody" — the first
+ * must leave the form's own row alone, and the second cannot happen.
+ */
+function draftPassengers(raw: unknown): Passenger[] | null {
+  if (!Array.isArray(raw)) return null;
+  const rows = raw
+    .filter((p): p is Record<string, unknown> => p !== null && typeof p === 'object')
+    .map((p) => ({
+      name: typeof p['name'] === 'string' ? p['name'] : '',
+      seat: typeof p['seat'] === 'string' ? p['seat'] : '',
+    }))
+    .filter((p) => p.name !== '' || p.seat !== '');
+  return rows.length > 0 ? rows : null;
+}
+
 export function applyDraft<T extends Prefillable>(prev: T, draft: DraftFields): T {
   const str = (k: string) => (typeof draft[k] === 'string' ? (draft[k] as string) : '');
 
@@ -46,7 +67,7 @@ export function applyDraft<T extends Prefillable>(prev: T, draft: DraftFields): 
     departureLocal: str('departureLocal') || prev.departureLocal,
     arrivalAirport: str('arrivalAirport') || prev.arrivalAirport,
     arrivalLocal: str('arrivalLocal') || prev.arrivalLocal,
-    seat: str('seat') || prev.seat,
+    passengers: draftPassengers(draft['passengers']) ?? prev.passengers,
     name: str('name') || prev.name,
     address: str('address') || prev.address,
     location: str('location') || prev.location,

@@ -185,6 +185,55 @@ describe('the merged timeline', () => {
     });
   });
 
+  it('keeps every passenger and seat on a family booking', async () => {
+    /*
+     * The case this app exists for. A single `seat` column could hold a family
+     * booking only by discarding all but one of them.
+     */
+    const { cookie, tripId } = await setup();
+    const created = await h.app.request(
+      jsonRequest(
+        `/trips/${tripId}/flights`,
+        'POST',
+        {
+          ...FLIGHT,
+          passengers: [
+            { name: 'David', seat: '14C' },
+            { name: 'Sam', seat: '14D' },
+            // Blank rows exist so the form has somewhere to type; they are not
+            // stored.
+            { name: '', seat: '' },
+          ],
+        },
+        cookie,
+      ),
+    );
+    const { id } = (await created.json()) as { id: string };
+
+    const res = await h.app.request(jsonRequest(`/flights/${id}`, 'GET', undefined, cookie));
+    const { item } = (await res.json()) as { item: { passengers: string | null } };
+    expect(JSON.parse(item.passengers ?? '[]')).toEqual([
+      { name: 'David', seat: '14C' },
+      { name: 'Sam', seat: '14D' },
+    ]);
+  });
+
+  it('stores nothing for a flight nobody was named on', async () => {
+    const { cookie, tripId } = await setup();
+    const created = await h.app.request(
+      jsonRequest(
+        `/trips/${tripId}/flights`,
+        'POST',
+        { ...FLIGHT, passengers: [{ name: '', seat: '' }] },
+        cookie,
+      ),
+    );
+    const { id } = (await created.json()) as { id: string };
+    const res = await h.app.request(jsonRequest(`/flights/${id}`, 'GET', undefined, cookie));
+    const { item } = (await res.json()) as { item: { passengers: string | null } };
+    expect(item.passengers).toBeNull();
+  });
+
   it('is empty for a new trip', async () => {
     const { cookie, tripId } = await setup();
     const res = await h.app.request(jsonRequest(`/trips/${tripId}/timeline`, 'GET', undefined, cookie));
