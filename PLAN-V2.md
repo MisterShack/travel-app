@@ -1,13 +1,24 @@
 # Waypoint — Plan V2: infrastructure as code, and browser testing
 
-> **Status: draft, not started.** Authored by Opus on 2026-08-15 from a scoping request by David.
-> Provider capabilities in §2 were checked against the registries and repositories on that date
-> rather than assumed — see §2a for what that check found, because it changes the plan's shape.
+> **Status: reviewed 2026-08-17, partly built.** Authored by Opus on 2026-08-15 from a scoping
+> request by David. Provider capabilities in §2 were checked against the registries and
+> repositories on that date rather than assumed — see §2a for what that check found, because it
+> changes the plan's shape.
 >
-> **Run `/review-kit:plan-review PLAN-V2.md` against this before building any of it.** That skill
-> exists in this project's own history for a reason: the last plan it reviewed had three
-> load-bearing problems, and this one rests on third-party provider coverage, which is exactly the
-> class of claim it is written to attack.
+> **`plan-review` was run on 2026-08-17 and returned REVISE**, before any HCL was written and after
+> Phase 6 step 3 had shipped. Ten findings; the four that changed this document most:
+>
+> 1. §3 forbade secrets in state while §4 step 2 imported the variables — which is exactly how
+>    secrets get into state. §3 wins; variables are no longer imported.
+> 2. Terraform managing variables plus an R2 bucket made the DEPLOY.md §5 catastrophe a one-line
+>    diff. It is now forbidden outright while a custom Start Command exists.
+> 3. "`apply` must not be capable of destroying the service" was a procedure, not a mechanism.
+>    `prevent_destroy` is now required.
+> 4. Clearing the Start Command was assigned to step 3, which only observes it. Nobody owned the
+>    one task actually blocking backups. It is **step 0** now.
+>
+> Findings are resolved **into this document**; the sections below are the revised text, not the
+> originals. Phase 7 was not reviewed in this pass and is unchanged.
 
 PLAN.md §11 phases 0–5 are shipped and live. This covers two follow-on phases that were
 deliberately deferred: putting the infrastructure under version control, and turning the ad-hoc
@@ -80,19 +91,46 @@ riskiest single action in this plan and it is not reversible in seconds.
 
 ## 3. Non-negotiables
 
-- **Terraform never holds a secret.** No API keys, no VAPID private key, no Litestream
-  credentials in `.tfvars` or in state. Secrets are set out of band and referenced, or the
-  variable is declared without a value and populated in the provider's own UI. State files leak;
-  a repo that is public leaks faster.
-- **State is remote and locked from the first commit**, not "later". A personal project with local
-  state is one lost laptop away from an unmanageable deployment, and importing a live service into
-  fresh state by hand is worse than never having used Terraform.
+- **Terraform never holds a secret — and therefore never manages a secret variable.** No API keys,
+  no VAPID private key, no Litestream credentials in `.tfvars` or in state. State files leak; a
+  repo that is public leaks faster.
+
+  **This rules out importing the service's variables, which an earlier draft of §4 step 2 asked
+  for.** `terraform import` records the remote object's attributes in state — that is what import
+  *is* — so importing `railway_variable` for this service would write `RESEND_API_KEY`,
+  `GEMINI_API_KEY` and the VAPID private key into state in plaintext. The two rules were in direct
+  contradiction and this one wins. Secret variables stay manual, named in a comment per the rule
+  below. Only variables that are not secrets may ever be managed.
+- **State is remote and locked before the first resource**, not "later" and not "from the first
+  commit" — the skeleton may be committed before the backend exists, but nothing is imported into
+  local state. A personal project with local state is one lost laptop away from an unmanageable
+  deployment, and importing a live service into fresh state by hand is worse than never having
+  used Terraform.
+- **The state bucket is not the Litestream bucket.** They share a provider and nothing else. Making
+  them one item coupled remote state to a backup decision that is now deferred indefinitely (§4
+  step 4), which would have forced either local state or an indefinite wait. The state bucket is
+  created at step 1 and treated as a secret store: private, encrypted, and never referenced from a
+  public artifact.
 - **Terraform describes what it can and says what it cannot.** Any resource that must stay manual
   gets a comment in the code naming it and pointing at the DEPLOY.md section that covers it. A
   `main.tf` that silently omits the volume teaches the next reader that there isn't one.
-- **The existing deployment is imported, never recreated.** `terraform apply` must not be capable
-  of destroying and rebuilding the service that holds real trips. Every resource starts as an
-  `import` block with a plan that shows **no changes** before anything else happens.
+- **The existing deployment is imported, never recreated — and the guarantee is a mechanism, not a
+  procedure.** Every resource starts as an `import` block with a plan that shows **no changes**
+  before anything else happens. That protects the *first* apply. What protects the twentieth is
+  `lifecycle { prevent_destroy = true }` on the service and on anything whose replacement would
+  interrupt the running deployment: a community provider marking one attribute `RequiresReplace` is
+  otherwise all it takes for a routine plan to propose destroying the service that holds every
+  trip. A plan proposing replacement is a stop-and-read, never an `-auto-approve`.
+- **Terraform may not turn on backups.** `LITESTREAM_BUCKET` is never Terraform-managed while a
+  custom Start Command exists on the service. Setting it under that condition produces the exact
+  state DEPLOY.md §5 calls the worst kind of failure — every variable present, the dashboard
+  configured, the app healthy, nothing replicating — and Terraform would make that a one-line diff,
+  which is easier to do by accident than the dashboard is. `npm run check-drift` already computes
+  this precise condition; it is the one rule it grades rather than asserts.
+- **`apply` runs from a developer machine, not from CI**, until there is a reason otherwise. The
+  token that can apply can also delete the project, and state holds the R2 credentials that reach
+  every backup. Neither belongs in a CI secret store for a one-service personal project. Each
+  provider gets the narrowest token scope that works, recorded in `infra/README.md`.
 - **Playwright tests must not need a human to seed them.** A suite that depends on scraping a
   verification token out of a log file is a suite that breaks the first time logging changes.
 - **A flaky test is deleted or fixed the day it flakes.** A suite people have learned to re-run is
@@ -102,12 +140,39 @@ riskiest single action in this plan and it is not reversible in seconds.
 
 Ordered so that the least reversible step comes last, and each step leaves the system working.
 
+0. **Clear the Start Command, or find out why it cannot be cleared.** Not originally a step at all
+   — it was a parenthetical in step 4 that assigned the work to step 3, which only ever observed it.
+   Step 3 has now shipped and detects the override; nothing clears it, and nothing else in either
+   plan owns it. It is the long pole for backups, not a footnote to them: clearing it crashed the
+   deploy on 2026-08-15 and the cause is still unknown, so its size is genuinely unknown too.
+   Cheapest first move is local: build the image and run it with `LITESTREAM_BUCKET` unset and the
+   `ENTRYPOINT` active — the configuration that crashed. If it serves `/health` locally the cause is
+   Railway-specific, which narrows it a long way; if it fails locally it is found without touching
+   production. Capture the crash logs on any retry rather than guessing (DEPLOY.md §5).
+
 1. **Skeleton and remote state.** `infra/` with the Railway and Cloudflare providers pinned to
-   exact versions. Remote state in Cloudflare R2 via the S3 backend, with locking. No resources
-   yet.
-2. **Import the Railway project, service and variables.** `import` blocks only. The phase is done
-   when `terraform plan` reports no changes against the live deployment — the point is to describe
-   what exists, not to change it.
+   exact versions. Remote state in an R2 bucket created *for state* — not the Litestream bucket,
+   see §3. No resources yet.
+
+   **Prove the locking before building on it.** "R2 via the S3 backend, with locking" was asserted
+   flatly in an earlier draft and is not obvious: the S3 backend's traditional lock used DynamoDB,
+   which R2 does not have, so locking depends on Terraform's newer lockfile mechanism and on R2
+   supporting conditional writes. It likely works, and the backend also needs several `skip_*`
+   flags and has known checksum friction. Half an hour: stand it up, run two concurrent plans,
+   confirm the second blocks. That belongs *in* this step rather than being discovered inside it.
+
+2. **Import the Railway project and service. Not the variables.** `import` blocks only, with
+   `prevent_destroy` set from the outset. The step is done when `terraform plan` reports no changes
+   against the live deployment — the point is to describe what exists, not to change it. Secret
+   variables stay manual and get a comment naming them (§3).
+
+   **Decide `railway.json`'s standing first.** It already declares `healthcheckPath`,
+   `restartPolicyType`, `restartPolicyMaxRetries` and `numReplicas`, and the drift check asserts
+   `numReplicas` independently. If the provider's service resource also models any of those, one
+   value has three declarations in the repo with no stated winner. Pick an owner per setting and
+   write it down. Worth confirming whether `railway.json` also supports `watchPatterns` — if it
+   does, one of §2a's three unownable settings is already ownable in-repo today, which sharpens
+   §2a's point rather than blunting it.
 3. **The drift check — done 2026-08-17**, and built *first* rather than third. Queries the Railway
    API and asserts the things Terraform cannot own: volume mount path is `/data`, Start Command is
    empty so the image's `ENTRYPOINT` runs, Watch Paths are empty, `numReplicas` is 1. Exits
@@ -133,20 +198,30 @@ Ordered so that the least reversible step comes last, and each step leaves the s
    The rules are pure functions in `infra/drift.mjs` with the network in `infra/check-drift.mjs`,
    so they are tested against fixtures with no token and no network — the same split the Svix
    webhook uses. 20 tests, run by `npm test`.
-4. **R2 bucket for Litestream**, in Terraform. Backups are currently off by decision; this makes
-   turning them on a variable change rather than a dashboard session. Ordering note: enabling
-   backups requires clearing the Start Command first (DEPLOY.md §5), which is step 3's business.
+4. **R2 bucket for Litestream**, in Terraform — **gated on the greenlight**, since backups are
+   deferred until the app stops being dev. Creating the bucket is safe at any time; what is not
+   safe is Terraform setting `LITESTREAM_BUCKET` while step 0 is unresolved (§3). The bucket and
+   the variable are separate decisions and only the first one belongs to Terraform.
 5. **DNS to Cloudflare.** Zone and records in Terraform, then the nameserver cutover. Records are
    created and verified against the Cloudflare zone *before* the nameservers move, so the cutover
    is a switch rather than a rebuild. Rollback is switching the nameservers back, which is minutes
    of propagation, not seconds — plan a low-traffic window and have the old record set written
-   down.
+   down. **Nothing above depends on this**, and R2 does not require Cloudflare to host the DNS, so
+   the honest default is to leave it undone until something actually needs it.
 6. **GitHub repo settings**, if the rest has proved itself. The lowest value and the lowest risk;
    a reasonable place to stop.
 
-**Exit:** if the community Railway provider proves unmaintained or wrong, the exit is deleting
-`infra/railway.tf` and keeping the drift check, which is the part carrying the weight. Nothing in
-the running deployment depends on Terraform existing.
+**Exit, per step, because it is not uniform.** An earlier draft claimed "nothing in the running
+deployment depends on Terraform existing", which is true of steps 1–2 and false after that.
+
+- **Steps 1–2 are a clean exit.** If the community Railway provider proves unmaintained or wrong,
+  delete `infra/railway.tf` and keep the drift check, which is the part carrying the weight.
+  Nothing in the running deployment depends on them.
+- **Step 4 is nearly clean** — an orphaned empty bucket costs nothing.
+- **Step 5 is a one-way door.** Once `waypoint.myze.ca`, budget-app's `ledger.myze.ca`, the Resend
+  DKIM and the inbound MX are Cloudflare zone records created by Terraform, abandoning Terraform
+  orphans live, load-bearing records into an unmanaged state. Recoverable, but it is not deleting a
+  file, and it should not be entered on the assumption that the phase's exit applies to it.
 
 ## 5. Phase 7 — Playwright
 
@@ -190,9 +265,25 @@ both.
 - **Does the DNS migration earn its risk?** It is the only genuinely dangerous step here, and its
   payoff is DNS-as-code plus a free R2 bucket. Doing step 4 without step 5 is possible — R2 does
   not require Cloudflare to host the DNS.
-- **Where does remote state live before R2 exists?** Chicken and egg: step 1 wants remote state,
-  step 4 creates the bucket. Either bootstrap the bucket by hand and import it, or start with local
-  state and migrate once — both are defensible, neither should be discovered mid-phase.
-- **Is Phase 6 worth it at all, given §2a?** A defensible reading of this document is: build the
-  drift check, skip the rest, and spend the time on Phase 7 instead. That reading should be
-  considered honestly rather than dismissed because Terraform is the more interesting technology.
+- ~~**Where does remote state live before R2 exists?**~~ **Settled 2026-08-17.** The chicken-and-egg
+  only existed because one item created both buckets. They are separate now (§3): a state bucket at
+  step 1, the Litestream bucket at step 4 behind the greenlight. Neither waits on the other.
+- ~~**Is Phase 6 worth it at all, given §2a?**~~ **Decided 2026-08-17, by David, on a different
+  argument than this document evaluated.** §2a weighed Terraform against *today's* infrastructure —
+  one service, one domain — where it can only describe the parts that have never broken. The
+  decision rests instead on a forward-looking case: future integrations will make
+  infrastructure-as-code pay off, and adopting it before the surface grows is cheaper than
+  retrofitting it after. That is a reasonable bet and this document never weighed it.
+
+  **It is recorded as a bet rather than as a reason, because the plan cannot check it.** No future
+  integration is named, and §2's own table holds the counter-example: Resend — this app's most
+  configuration-heavy dependency, with a verified domain, DKIM, inbound MX, webhook endpoints and
+  signing secrets — **has no provider at all**. If the integrations that arrive look like Resend,
+  Terraform covers none of them and the bet does not pay. If they look like Cloudflare, GitHub or
+  object storage, it pays well. Worth revisiting once two or three of them are actually named.
+
+- **Is Terraform still the right tool once `railway.json` is counted?** Raised by the 2026-08-17
+  review and not yet answered. Railway's config-as-code file is already in the repo, already
+  version-controlled, already reviewed as a diff — which is most of what §1 claims Terraform buys.
+  It is not a reason to abandon Phase 6, but "what does Terraform add over `railway.json`" deserves
+  a real answer before step 2 rather than after it.
