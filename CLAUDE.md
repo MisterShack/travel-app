@@ -94,9 +94,19 @@ Two things that are true and worth keeping in view:
   `entrypoint.sh` — and therefore Litestream — never runs. Harmless while no bucket is set;
   actively dangerous the moment one is, because everything would look configured and nothing would
   replicate. Clearing it crashed the deploy once, cause unknown. See the boxed warning in
-  DEPLOY.md §5 before turning backups on.
+  DEPLOY.md §5 before turning backups on. **`npm run check-drift` now asserts this** and turns it
+  from a warning into a failure the moment `LITESTREAM_BUCKET` is set (DEPLOY.md §8a).
 - **Registration is open.** The app is publicly reachable, so anyone with the URL can create an
   account and consume the Resend quota. There is no invite gate.
+
+**The Railway drift check shipped 2026-08-17**, from PLAN-V2 §4 step 3 — built first and alone,
+because Terraform cannot own the volume mount path, the Start Command or the Watch Paths (PLAN-V2
+§2a), which are the three settings on this deployment that have actually gone wrong. `infra/` holds
+no Terraform and the README says why. The rules are pure functions tested against fixtures with no
+network; `2` means *could not check* and is never reported as clean, because a checker that says
+"OK" about something it never looked at is worse than none. **It has not yet been run against
+Railway with a real token** — the queries validate against the live schema, but the response shapes
+do not, so the first real run is still the one that proves it.
 
 **Phase 12 (rail, coach and ferry as first-class segments) shipped 2026-08-16**, from PLAN-V3 §3a.
 `flights` became `segments`; migration 0007 renames the table and its columns and defaults every
@@ -203,9 +213,14 @@ root, and the phase's own acceptance criterion in PLAN.md §11 is met.
 |---|---|
 | Any UI change, and before showing the app to anyone | `web-accessibility-reviewer` agent |
 | Wanting to see the app rather than its test output | `node app/e2e/drive.mjs` (see its header) |
+| Touching the Railway dashboard, and before turning backups on | `npm run check-drift` (DEPLOY.md §8a) |
 
-Both exist because the unit suites were green and the app was still wrong: a browser drive found
-six defects in one pass, including new events defaulting to the browser's timezone instead of the
-trip's. Tests prove the code does what it says; they cannot tell you the app is wrong. Commit once per phase with
+The first two exist because the unit suites were green and the app was still wrong: a browser drive
+found six defects in one pass, including new events defaulting to the browser's timezone instead of
+the trip's. The third exists because the suites cannot see the deployment at all — the volume mount
+path, the Start Command and the Watch Paths are dashboard state, they are the three settings that
+have really gone wrong here, and Terraform cannot own any of them (PLAN-V2 §2a). Tests prove the
+code does what it says; they cannot tell you the app is wrong, and they cannot tell you the volume
+is mounted somewhere that throws every trip away on the next deploy. Commit once per phase with
 a clear message. Phase 1 additionally is **not** done until a Litestream restore has actually been
 rehearsed — configured is not the same as working (DEPLOY.md §4).

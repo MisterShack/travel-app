@@ -108,11 +108,31 @@ Ordered so that the least reversible step comes last, and each step leaves the s
 2. **Import the Railway project, service and variables.** `import` blocks only. The phase is done
    when `terraform plan` reports no changes against the live deployment — the point is to describe
    what exists, not to change it.
-3. **The drift check** (`infra/check-drift.sh`). Queries the Railway API and asserts the things
-   Terraform cannot own: volume mount path is `/data`, Start Command is empty so the image's
-   `ENTRYPOINT` runs, Watch Paths are empty, `numReplicas` is 1. Exits non-zero with the specific
-   discrepancy. **This is the part that covers the failures we have actually had**, and it should
-   be built even if the rest of the phase is abandoned.
+3. **The drift check — done 2026-08-17**, and built *first* rather than third. Queries the Railway
+   API and asserts the things Terraform cannot own: volume mount path is `/data`, Start Command is
+   empty so the image's `ENTRYPOINT` runs, Watch Paths are empty, `numReplicas` is 1. Exits
+   non-zero with the specific discrepancy. **This is the part that covers the failures we have
+   actually had**, and it should be built even if the rest of the phase is abandoned — so it was,
+   before anything committed this project to Terraform. Steps 1, 2 and 4–6 remain open, and §7's
+   question about whether they are worth it is now answerable without having spent anything.
+
+   Three things came out differently from this plan's sketch, each for a reason worth keeping:
+
+   - **`.mjs`, not `.sh`.** A shell script needs `curl` and `jq`; this repo is now developed from a
+     Windows desktop as well as a macOS laptop, and a check that will not run on one of the two
+     machines is a check that will not be run. Node ships `fetch` and JSON, so it needs neither.
+   - **A third exit code.** `0` clean, `1` drift, and `2` **could not check** — no token, no
+     network, or the API schema moved. Collapsing `2` into either of the others is how a checker
+     starts saying "OK" about something it never looked at, which is worse than not having one.
+   - **The Start Command assertion could not be flat.** The deployment violates it deliberately
+     today (§5's boxed warning), so a flat assertion would fail from its first run and be ignored
+     by its third. It is a warning while `LITESTREAM_BUCKET` is unset and a failure once a bucket
+     is set — which is exactly when it stops being harmless. This is the same "false positives are
+     the design constraint" reasoning PLAN-V3 §4 records for conflict detection.
+
+   The rules are pure functions in `infra/drift.mjs` with the network in `infra/check-drift.mjs`,
+   so they are tested against fixtures with no token and no network — the same split the Svix
+   webhook uses. 20 tests, run by `npm test`.
 4. **R2 bucket for Litestream**, in Terraform. Backups are currently off by decision; this makes
    turning them on a variable change rather than a dashboard session. Ordering note: enabling
    backups requires clearing the Start Command first (DEPLOY.md §5), which is step 3's business.

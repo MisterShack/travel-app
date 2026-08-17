@@ -292,6 +292,27 @@ The data-survives-redeploy check has to wait for Phase 2, when there is somethin
   `npm prune --omit=dev` and the server executes TypeScript directly. Moving `tsx` to
   `devDependencies` makes the container delete its own loader and fail to boot.
 
+### 8a. The drift check
+
+Four of this runbook's settings are dashboard state that no file in this repo can pin, and each
+fails quietly: the volume mount path (§2), the Start Command (§5), the Watch Paths, and
+`numReplicas`. `railway.json` declares `numReplicas` but the live service can still differ.
+
+```sh
+RAILWAY_API_TOKEN=... RAILWAY_PROJECT_ID=... npm run check-drift
+```
+
+Exits `0` for clean, `1` for drift naming the specific setting, and `2` for **could not check** —
+which is never reported as clean. See `infra/README.md`. Worth running before and after any change
+in the Railway dashboard, and before turning backups on.
+
+It is the part of PLAN-V2's Terraform phase that carries the weight, and it was built first
+deliberately: Terraform cannot own any of these three, so the check covers the failures that have
+actually happened while the question of whether to adopt Terraform at all stays open.
+
+**Expect one warning today** — the custom Start Command of §5. The check grades that rather than
+failing on it, and turns it into a failure the moment `LITESTREAM_BUCKET` is set.
+
 ---
 
 ## 9. The native-binary lockfile trap

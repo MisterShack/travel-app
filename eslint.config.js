@@ -32,6 +32,27 @@ export default tseslint.config(
     languageOptions: { globals: globals.node },
   },
   {
+    // Plain-JS tooling: the drift check and the browser drivers. Without this
+    // block `eslint .` matched only .ts/.tsx and skipped them entirely, so
+    // `npm run lint` passed while never opening them.
+    extends: [js.configs.recommended],
+    files: ['**/*.mjs'],
+    languageOptions: { ecmaVersion: 2022, sourceType: 'module', globals: globals.node },
+    rules: {
+      'no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', ignoreRestSiblings: true },
+      ],
+    },
+  },
+  {
+    // The browser drivers pass callbacks to page.evaluate(), whose bodies run
+    // in the page rather than in Node. `document` and `CSS` there are real, so
+    // these files legitimately span both global sets.
+    files: ['app/e2e/**/*.mjs'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
+  {
     // PLAN.md §4: no `any` in the layers that own correctness. The timezone
     // triple and the membership check are the two things most expensive to get
     // wrong, so their layers are typed strictly.

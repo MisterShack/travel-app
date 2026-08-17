@@ -1,0 +1,201 @@
+/**
+ * The drift rules, against fixtures.
+ *
+ * Run by `node --test infra/`, with no dependency and no network — the rules
+ * are pure functions precisely so the machine that cannot reach Railway can
+ * still prove they are right. What these cannot prove is that the GraphQL
+ * queries name real fields; only a run with a token does that, and the runner
+ * exits 2 rather than 0 if they do not.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  checkDrift,
+  hasFailure,
+  selectTarget,
+  backupsEnabled,
+  nodes,
+  FAIL,
+  WARN,
+} from './drift.mjs';
+
+/** The deployment as it is meant to look, with backups still off. */
+const healthy = {
+  mountPaths: ['/data'],
+  startCommand: null,
+  watchPatterns: [],
+  numReplicas: 1,
+  backups: false,
+};
+
+const ids = (findings) => findings.map((f) => f.id);
+
+test('a correct deployment produces no findings at all', () => {
+  assert.deepEqual(checkDrift(healthy), []);
+  assert.equal(hasFailure(checkDrift(healthy)), false);
+});
+
+test('an empty string Start Command counts as no Start Command', () => {
+  // Railway returns "" rather than null when a command has been cleared, and
+  // reporting drift on a setting the operator has already fixed is how a check
+  // loses its credibility.
+  assert.deepEqual(checkDrift({ ...healthy, startCommand: '   ' }), []);
+});
+
+test('a volume mounted anywhere but /data fails', () => {
+  const findings = checkDrift({ ...healthy, mountPaths: ['/app/data'] });
+  assert.deepEqual(ids(findings), ['volume-mount-path']);
+  assert.equal(findings[0].level, FAIL);
+  assert.match(findings[0].title, /\/app\/data/);
+});
+
+test('no volume at all fails, and says the database is on ephemeral storage', () => {
+  const findings = checkDrift({ ...healthy, mountPaths: [] });
+  assert.deepEqual(ids(findings), ['volume-missing']);
+  assert.equal(findings[0].level, FAIL);
+});
+
+test('Watch Paths being set fails and names them', () => {
+  const findings = checkDrift({ ...healthy, watchPatterns: ['server/**'] });
+  assert.deepEqual(ids(findings), ['watch-paths-set']);
+  assert.match(findings[0].title, /server\/\*\*/);
+});
+
+test('an empty-string watch pattern is not a watch path', () => {
+  assert.deepEqual(checkDrift({ ...healthy, watchPatterns: [''] }), []);
+});
+
+test('more than one replica fails', () => {
+  const findings = checkDrift({ ...healthy, numReplicas: 2 });
+  assert.deepEqual(ids(findings), ['num-replicas']);
+  assert.match(findings[0].detail, /two reminder sweeps/);
+});
+
+test('a missing numReplicas fails rather than being assumed to be 1', () => {
+  const findings = checkDrift({ ...healthy, numReplicas: null });
+  assert.deepEqual(ids(findings), ['num-replicas']);
+  assert.match(findings[0].title, /unset/);
+});
+
+/**
+ * The Start Command grading — the reason this file is not a flat list of
+ * assertions. The deployment violates the rule deliberately today, so a flat
+ * assertion would fail from its first run and be ignored by its third.
+ */
+test('a custom Start Command with backups off warns but does not fail', () => {
+  const findings = checkDrift({ ...healthy, startCommand: 'npm run start' });
+  assert.deepEqual(ids(findings), ['start-command-waived']);
+  assert.equal(findings[0].level, WARN);
+  assert.equal(hasFailure(findings), false, 'a known, harmless deviation must not fail the run');
+});
+
+test('the same Start Command becomes a failure once a bucket is set', () => {
+  const findings = checkDrift({ ...healthy, startCommand: 'npm run start', backups: true });
+  assert.deepEqual(ids(findings), ['start-command-overrides-entrypoint']);
+  assert.equal(findings[0].level, FAIL);
+  assert.equal(hasFailure(findings), true);
+  assert.match(findings[0].detail, /replicating nothing/);
+});
+
+test('unreadable variables downgrade the Start Command finding rather than guessing', () => {
+  const findings = checkDrift({ ...healthy, startCommand: 'npm run start', backups: null });
+  assert.deepEqual(ids(findings), ['start-command-unknown-backups']);
+  assert.equal(findings[0].level, WARN);
+});
+
+test('no Start Command means backups being on is not a finding', () => {
+  assert.deepEqual(checkDrift({ ...healthy, backups: true }), []);
+});
+
+test('several wrong settings are all reported, not just the first', () => {
+  const findings = checkDrift({
+    mountPaths: [],
+    startCommand: 'npm run start',
+    watchPatterns: ['app/**'],
+    numReplicas: 3,
+    backups: true,
+  });
+  assert.deepEqual(ids(findings), [
+    'volume-missing',
+    'start-command-overrides-entrypoint',
+    'watch-paths-set',
+    'num-replicas',
+  ]);
+});
+
+test('every finding carries a pointer to the document that explains it', () => {
+  const findings = checkDrift({
+    mountPaths: ['/mnt'],
+    startCommand: 'x',
+    watchPatterns: ['y'],
+    numReplicas: 0,
+    backups: true,
+  });
+  for (const finding of findings) {
+    assert.ok(finding.doc, `${finding.id} has no doc pointer`);
+    assert.ok(finding.detail.length > 40, `${finding.id} explains nothing`);
+  }
+});
+
+test('backupsEnabled reads only presence, and reports null when it cannot read', () => {
+  assert.equal(backupsEnabled({ LITESTREAM_BUCKET: 'waypoint-backups' }), true);
+  assert.equal(backupsEnabled({ LITESTREAM_BUCKET: '' }), false);
+  assert.equal(backupsEnabled({ RESEND_API_KEY: 'secret' }), false);
+  assert.equal(backupsEnabled(null), null);
+  assert.equal(backupsEnabled(undefined), null);
+});
+
+test('nodes unwraps a connection and tolerates an absent one', () => {
+  assert.deepEqual(nodes({ edges: [{ node: { id: 'a' } }, { node: null }] }), [{ id: 'a' }]);
+  assert.deepEqual(nodes(null), []);
+  assert.deepEqual(nodes({}), []);
+});
+
+/** A project shaped the way the API returns one. */
+const project = {
+  id: 'p1',
+  name: 'waypoint',
+  environments: { edges: [{ node: { id: 'e1', name: 'production' } }] },
+  services: { edges: [{ node: { id: 's1', name: 'travel-app' } }] },
+  volumes: {
+    edges: [
+      {
+        node: {
+          id: 'v1',
+          name: 'data',
+          volumeInstances: {
+            edges: [{ node: { id: 'vi1', mountPath: '/data', serviceId: 's1', environmentId: 'e1' } }],
+          },
+        },
+      },
+    ],
+  },
+};
+
+test('selectTarget resolves the environment, service and its mount paths', () => {
+  const { environment, service, mountPaths } = selectTarget(project, 'production', 'travel-app');
+  assert.equal(environment.id, 'e1');
+  assert.equal(service.id, 's1');
+  assert.deepEqual(mountPaths, ['/data']);
+});
+
+test('a volume on another service or environment is not counted as this one', () => {
+  const shared = structuredClone(project);
+  shared.volumes.edges[0].node.volumeInstances.edges = [
+    { node: { id: 'vi1', mountPath: '/data', serviceId: 'other', environmentId: 'e1' } },
+    { node: { id: 'vi2', mountPath: '/data', serviceId: 's1', environmentId: 'staging' } },
+  ];
+  // Both look like a correctly mounted volume and neither belongs to this
+  // deployment. Counting either would report a volume that is not there.
+  assert.deepEqual(selectTarget(shared, 'production', 'travel-app').mountPaths, []);
+});
+
+test('an unknown environment or service throws rather than checking nothing', () => {
+  assert.throws(() => selectTarget(project, 'staging', 'travel-app'), /No environment named/);
+  assert.throws(() => selectTarget(project, 'production', 'api'), /No service named/);
+  assert.throws(() => selectTarget(null, 'production', 'travel-app'), /no project/);
+});
+
+test('the error for a wrong name lists the names that do exist', () => {
+  assert.throws(() => selectTarget(project, 'prod', 'travel-app'), /Found: production/);
+});

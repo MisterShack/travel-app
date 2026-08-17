@@ -18,7 +18,9 @@
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
-    "test": "npm run test --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present && npm run test:infra",
+    "test:infra": "node --test \"infra/*.test.mjs\"",
+    "check-drift": "node infra/check-drift.mjs",
     "coverage": "npm run coverage --workspaces --if-present"
   },
   "devDependencies": {

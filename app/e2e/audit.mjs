@@ -19,7 +19,7 @@ const EMAIL = `rev+${Date.now()}@example.com`;
 const shot = async (p,n)=>{ await p.screenshot({path:`/tmp/rev/shots/${n}.png`,fullPage:true}); console.log('  shot:',n); };
 
 // Push a signed inbound webhook so the Inbox has something in it.
-async function injectImport(messageId, from) {
+async function injectImport(messageId, _from) {
   const body = JSON.stringify({ data: { email_id: messageId } });
   const id='msg_'+messageId, ts=String(Math.floor(Date.now()/1000));
   const key=Buffer.from(SECRET.replace(/^whsec_/,''),'base64');
