@@ -11,6 +11,7 @@ function item(over: Partial<TimelineItem>): TimelineItem {
     tripId: 't1',
     title: 'Thing',
     subtitle: null,
+    address: null,
     startAt: '2026-09-10T12:00:00.000Z',
     startLocal: '2026-09-10T13:00',
     startTimezone: 'Europe/Lisbon',
@@ -159,5 +160,73 @@ describe('journeys', () => {
     );
     expect(screen.getByText('Ottawa')).toBeInTheDocument();
     expect(screen.queryByText('Toronto Union')).toBeNull();
+  });
+});
+
+describe('Directions (PLAN-V3 §2, Phase 8)', () => {
+  it('offers directions for a lodging with an address', () => {
+    draw([item({ kind: 'lodging', title: 'Hotel Lutetia', address: '45 Bd Raspail, Paris' })]);
+    // jsdom reports a desktop user-agent, so this is the web fallback.
+    expect(screen.getByRole('link', { name: /Directions to Hotel Lutetia/ })).toHaveAttribute(
+      'href',
+      'https://www.google.com/maps/dir/?api=1&destination=45%20Bd%20Raspail%2C%20Paris',
+    );
+  });
+
+  it('offers nothing when no address was recorded', () => {
+    draw([item({ kind: 'activity', title: 'Wander about', address: null })]);
+    expect(screen.queryByRole('link', { name: /Directions/ })).toBeNull();
+  });
+
+  it('offers nothing for a journey, whose endpoints are codes and station names', () => {
+    // "YOW" is not an address and "Ottawa" is a city rather than the station in
+    // it. Sending someone confidently to the wrong place is worse than nothing.
+    draw([
+      item({ kind: 'segment', mode: 'rail', title: 'VIA 55', origin: 'Ottawa', address: null }),
+    ]);
+    expect(screen.queryByRole('link', { name: /Directions/ })).toBeNull();
+  });
+
+  it('survives a cached item saved before the field existed', () => {
+    /*
+     * The offline cache stores raw JSON and never re-validates it, so an entry
+     * written by an older build comes back with `address` absent rather than
+     * null. That must render as "no directions", not as a link to an empty map.
+     */
+    const stale = item({ kind: 'lodging', title: 'Old Cache Hotel' });
+    delete (stale as Partial<TimelineItem>).address;
+    draw([stale]);
+    expect(screen.queryByRole('link', { name: /Directions/ })).toBeNull();
+    expect(screen.getByText('Old Cache Hotel')).toBeInTheDocument();
+  });
+
+  it('names each directions link by its place, so a list of links is usable', () => {
+    draw([
+      item({ id: 'l1', kind: 'lodging', title: 'Hotel One', address: 'One Street' }),
+      item({ id: 'l2', kind: 'lodging', title: 'Hotel Two', address: 'Two Street' }),
+    ]);
+    expect(screen.getByRole('link', { name: /Directions to Hotel One/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Directions to Hotel Two/ })).toBeInTheDocument();
+  });
+
+  it('never nests the directions link inside the link that opens the event', () => {
+    /*
+     * The structural guarantee, asserted rather than trusted. The card used to
+     * be one big <Link>; an anchor inside an anchor is invalid HTML and breaks
+     * tab order and activation differently in every browser. This is the test
+     * that fails if someone puts the card back the way it was.
+     */
+    const { container } = draw([
+      item({ kind: 'lodging', title: 'Hotel Lutetia', address: '45 Bd Raspail, Paris' }),
+    ]);
+    expect(container.querySelector('a a')).toBeNull();
+    expect(container.querySelectorAll('a')).toHaveLength(2);
+  });
+
+  it('opens a web map in a new tab so the itinerary is not navigated away from', () => {
+    draw([item({ kind: 'lodging', title: 'Hotel Lutetia', address: '45 Bd Raspail, Paris' })]);
+    const link = screen.getByRole('link', { name: /Directions to/ });
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
   });
 });

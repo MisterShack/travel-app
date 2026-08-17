@@ -2,6 +2,13 @@ import { instantToLocal, zoneLabel, type TimelineItem } from '@travel/shared';
 import { Link } from 'react-router-dom';
 import { KindChip } from '@/components/Icons';
 import { KIND_LABEL } from '@/components/kinds';
+import { directionsUrl, mapsPlatform } from './directions';
+
+/**
+ * Resolved once. The user-agent does not change while the app is open, and this
+ * only chooses a URL scheme.
+ */
+const PLATFORM = mapsPlatform(typeof navigator === 'undefined' ? '' : navigator.userAgent);
 
 /**
  * Groups by the **local calendar day of each event's own zone**, not the trip's.
@@ -92,8 +99,19 @@ function Event({ item, homeTimezone }: { item: TimelineItem; homeTimezone: strin
         })
       : null;
 
+  const directions = directionsUrl(item.address, PLATFORM);
+
+  /**
+   * The card used to be one big `<Link>`. A second action inside it would have
+   * been an anchor inside an anchor — invalid, and it breaks tab order and
+   * activation in ways that vary by browser.
+   *
+   * So the title carries the link and stretches its hit area over the whole
+   * card with a pseudo-element, and Directions sits above that. Two sibling
+   * links, one card, nothing nested.
+   */
   return (
-    <Link className="card link" to={`/trips/${item.tripId}/${item.kind}/${item.id}`}>
+    <div className="card event-card">
       <div className="event">
         <div className="when">
           <div className="time">{start}</div>
@@ -113,18 +131,47 @@ function Event({ item, homeTimezone }: { item: TimelineItem; homeTimezone: strin
         <KindChip kind={item.kind} mode={item.mode} />
         <div className="body">
           <div className="title">
-            {/* The chip is decorative to assistive tech, so the kind is said
-                here. It used to be a bare `✈` character, which a screen reader
-                announces inconsistently and sometimes not at all. */}
-            <span className="visually-hidden">{KIND_LABEL[item.kind]}: </span>
-            {item.title}
+            <Link className="event-open" to={`/trips/${item.tripId}/${item.kind}/${item.id}`}>
+              {/* The chip is decorative to assistive tech, so the kind is said
+                  here. It used to be a bare `✈` character, which a screen reader
+                  announces inconsistently and sometimes not at all. */}
+              <span className="visually-hidden">{KIND_LABEL[item.kind]}: </span>
+              {item.title}
+            </Link>
           </div>
           {item.subtitle !== null && item.subtitle !== '' && <div className="muted">{item.subtitle}</div>}
           {item.confirmationCode !== null && (
             <div className="muted tiny mono">Ref {item.confirmationCode}</div>
           )}
+          {directions !== null && <Directions href={directions} title={item.title} />}
         </div>
       </div>
-    </Link>
+    </div>
+  );
+}
+
+function Directions({ href, title }: { href: string; title: string }) {
+  /**
+   * A new tab for a web map, so the itinerary is not navigated away from — but
+   * never for `geo:`, where the browser hands off to an app and `_blank` leaves
+   * a dead tab behind on the way.
+   */
+  const external = href.startsWith('http');
+
+  return (
+    <a
+      className="directions"
+      href={href}
+      /* Every card would otherwise offer a link named exactly "Directions",
+         which is no help to anyone listing the links on a screen.
+         An `aria-label` rather than a visually-hidden suffix: name computation
+         collapses the leading space, so " to Hotel X" appended to the visible
+         text announced as "Directionsto Hotel X". The visible word is still
+         contained in the accessible name, which is what WCAG 2.5.3 asks. */
+      aria-label={`Directions to ${title}`}
+      {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+    >
+      Directions
+    </a>
   );
 }

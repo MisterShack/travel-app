@@ -135,6 +135,82 @@ describe('the merged timeline', () => {
     expect([...instants].sort()).toEqual(instants);
   });
 
+  it('carries somewhere you could go as a field, not only inside the subtitle', async () => {
+    /*
+     * PLAN-V3 §2, Phase 8. The subtitle already displays these, and that is
+     * exactly why they are also structured: the conflict rule once read its
+     * endpoints by splitting the subtitle and broke the first time seats were
+     * appended to it. A display string is not an interface, and handing one to
+     * a maps app would fail the same way.
+     *
+     * A segment carries null on purpose — its endpoints are an IATA code or a
+     * station name, and neither is safe to hand to a maps app.
+     */
+    const { cookie, tripId } = await setup();
+
+    await h.app.request(jsonRequest(`/trips/${tripId}/segments`, 'POST', FLIGHT, cookie));
+    await h.app.request(
+      jsonRequest(
+        `/trips/${tripId}/lodging`,
+        'POST',
+        {
+          name: 'Hotel Bairro',
+          address: 'Rua da Rosa 200, Lisboa',
+          checkIn: { local: '2026-09-10T15:00', timezone: 'Europe/Lisbon' },
+          checkOut: { local: '2026-09-18T11:00', timezone: 'Europe/Lisbon' },
+        },
+        cookie,
+      ),
+    );
+    await h.app.request(
+      jsonRequest(
+        `/trips/${tripId}/activities`,
+        'POST',
+        {
+          kind: 'restaurant',
+          name: 'Dinner',
+          location: 'Cervejaria Ramiro',
+          start: { local: '2026-09-10T20:00', timezone: 'Europe/Lisbon' },
+        },
+        cookie,
+      ),
+    );
+
+    const res = await h.app.request(
+      jsonRequest(`/trips/${tripId}/timeline`, 'GET', undefined, cookie),
+    );
+    const { items } = (await res.json()) as { items: { kind: string; address: string | null }[] };
+    const addressOf = (kind: string) => items.find((i) => i.kind === kind)?.address;
+
+    expect(addressOf('lodging')).toBe('Rua da Rosa 200, Lisboa');
+    // An activity's `location` is the same slot: whatever was written down for
+    // where this happens, often a venue name rather than a street address.
+    expect(addressOf('activity')).toBe('Cervejaria Ramiro');
+    expect(addressOf('segment')).toBeNull();
+  });
+
+  it('leaves the address null when none was given', async () => {
+    const { cookie, tripId } = await setup();
+    await h.app.request(
+      jsonRequest(
+        `/trips/${tripId}/activities`,
+        'POST',
+        {
+          kind: 'other',
+          name: 'Wander about',
+          start: { local: '2026-09-11T10:00', timezone: 'Europe/Lisbon' },
+        },
+        cookie,
+      ),
+    );
+
+    const res = await h.app.request(
+      jsonRequest(`/trips/${tripId}/timeline`, 'GET', undefined, cookie),
+    );
+    const { items } = (await res.json()) as { items: { address: string | null }[] };
+    expect(items[0]!.address).toBeNull();
+  });
+
   it('is stable across reloads when two items share an instant', async () => {
     const { cookie, tripId } = await setup();
     const at = { local: '2026-09-11T09:00', timezone: 'Europe/Lisbon' };

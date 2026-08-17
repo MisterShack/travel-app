@@ -121,7 +121,29 @@ zone can most likely be derived from the trip or asked for, as lodging already d
 
 ## 4. Phases
 
-- **Phase 8 — Directions hand-off.** §2 step 1. Small, offline-safe, free. A day.
+- **Phase 8 — Directions hand-off: done 2026-08-17.** §2 step 1. Small, offline-safe, free — and
+  the offline claim is the one that was actually verified: the browser drive's *offline* screenshot
+  shows the Directions action still on the cards, because a URL needs no network to exist. That is
+  the whole argument for handing off rather than embedding, made visible.
+
+  Lodging and activities only. A segment gets nothing, deliberately: its endpoints are an IATA code
+  for air and a station name for everything else, and neither is safe to hand to a maps app — "YOW"
+  is not an address and "Ottawa" is a city rather than the station in it. Sending someone
+  confidently to the wrong place is worse than offering nothing, and it is the same
+  false-positives-are-the-design-constraint reasoning as Phase 11.
+
+  **`TimelineItem` gained an `address` field rather than the action reading `subtitle`**, which
+  already displays exactly this for both kinds. That duplication is the point: the conflict rule
+  once read its endpoints by splitting the subtitle and broke the first time seats were appended to
+  it. A display string is not an interface.
+
+  Two things the unit tests could not have told us, both found while building. The card was a
+  single `<Link>` wrapping everything, so a second action inside it would have been an anchor
+  inside an anchor — invalid, and inconsistently operable by keyboard. The title now carries the
+  link and stretches its hit area over the card, with Directions above it: two sibling links, one
+  card, and a test that fails if anyone puts it back. And the accessible name from a
+  visually-hidden `" to {title}"` suffix computed as "Directionsto Hotel Lutetia", because name
+  computation collapses the leading space; it is an `aria-label` now.
 - **Phase 9 — Geocode on import.** §2 step 2. Needs a geocoding provider and a cost check; store
   coordinates only.
 - **Phase 10 — Suggestions, if wanted.** §3, gated on the question in §3 having a real answer.

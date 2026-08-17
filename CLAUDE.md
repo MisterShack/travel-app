@@ -122,6 +122,16 @@ It proves the inbound MX delivers, that `RESEND_WEBHOOK_SECRET` is set (`verifyW
 `not_configured` and the route 401s without it), and that `GEMINI_API_KEY` is set and the model
 answers.
 
+**Phase 8 (directions hand-off) shipped 2026-08-17**, from PLAN-V3 §2 step 1. Lodging and
+activities with an address get a Directions action that opens the device's own map app — Apple Maps,
+`geo:` on Android, Google Maps on the web. No embedded map, no API key, no tile provider, nothing
+added to the bundle. Verified in the browser drive's **offline** screenshot, which is the case that
+matters: a URL needs no network to exist, so the hand-off survives exactly where an embedded map
+would have shown a grey box.
+
+Segments get nothing on purpose — an IATA code is not an address and a station's city is not the
+station. `TimelineItem` gained a structured `address` rather than the action reading `subtitle`.
+
 **Phase 11 (conflict and gap detection) shipped 2026-08-15**, from PLAN-V3. Pure function in
 `shared/`, run on the client, so it works offline and costs nothing per use. It is the feature that
 falls out of the timezone work rather than being bolted on — "you land at 13:00 but dinner is
@@ -192,6 +202,16 @@ Findings from building that contradict a straight port from budget-app, all enco
   mapping now lives in `app/src/features/timeline/draft.ts` — out of the component so it can be
   tested, because a field silently missing from it is invisible until someone forwards the right
   email.
+- **A whole-card link has room for exactly one link.** The timeline card was a single `<Link>`
+  wrapping everything, so Phase 8's Directions action would have been an anchor inside an anchor —
+  invalid HTML, and tab order and activation differ by browser. The title carries the link now and
+  stretches its hit area across the card with a pseudo-element; Directions sits above it with
+  `z-index`. Two sibling links, one card, and `expect(container.querySelector('a a')).toBeNull()`
+  so it stays that way. Any future per-row action lands in the same place.
+- **A visually-hidden suffix does not reliably add a space.** `Directions<span
+  class="visually-hidden"> to {title}</span>` computes as "Directionsto Hotel Lutetia" — name
+  computation collapses the leading space. Use `aria-label` for the whole phrase and keep the
+  visible word inside it, which is what WCAG 2.5.3 asks anyway.
 - **A timezone is not a place.** `zoneLabel` names the zone's namesake city, so an Ottawa arrival
   (`America/Toronto`) was labelled "Toronto" in both the timeline badge and the reminder text —
   reported from a real WestJet import, 2026-08-16, where the extraction was correct and only the

@@ -10,6 +10,7 @@ function item(over: Partial<TimelineItem> & { id: string }): TimelineItem {
     tripId: 't1',
     title: 'Thing',
     subtitle: null,
+    address: null,
     startAt: '2026-09-10T12:00:00.000Z',
     startLocal: '2026-09-10T13:00',
     startTimezone: 'Europe/Lisbon',

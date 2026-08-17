@@ -133,6 +133,17 @@ export const timelineItemSchema = z.object({
   tripId: z.string(),
   title: z.string(),
   subtitle: z.string().nullable(),
+  /**
+   * Somewhere you could actually go: a lodging's address, or an activity's
+   * location. Null for segments, and null whenever the field was left blank.
+   *
+   * It duplicates what `subtitle` displays for those two kinds, and that is the
+   * point. The conflict rule once read its endpoints by splitting the subtitle,
+   * which held only until seats were appended to it; a display string is not an
+   * interface, and handing one to a maps app would fail the same way the first
+   * time anything else is appended.
+   */
+  address: z.string().nullable(),
   /** UTC instant — what the timeline sorts on. */
   startAt: z.string(),
   startLocal: localDateTimeSchema,

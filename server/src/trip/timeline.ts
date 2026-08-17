@@ -215,6 +215,12 @@ export async function getTimeline(db: Db, tripId: string): Promise<TimelineItem[
       subtitle: [`${r.origin} → ${r.destination}`, seatSummary(r.passengers)]
         .filter((part) => part !== '')
         .join(' · '),
+      // No address on a segment, deliberately. The endpoint is an IATA code for
+      // air and a station name for everything else, and neither is safe to hand
+      // to a maps app: "YOW" is not an address, and "Ottawa" is a city rather
+      // than the station in it. Sending someone confidently to the wrong place
+      // is worse than offering nothing.
+      address: null,
       startAt: r.departureAt,
       startLocal: r.departureLocal,
       startTimezone: r.departureTimezone,
@@ -239,6 +245,7 @@ export async function getTimeline(db: Db, tripId: string): Promise<TimelineItem[
       tripId: r.tripId,
       title: r.name,
       subtitle: r.address,
+      address: r.address,
       startAt: r.checkInAt,
       startLocal: r.checkInLocal,
       startTimezone: r.checkInTimezone,
@@ -262,6 +269,11 @@ export async function getTimeline(db: Db, tripId: string): Promise<TimelineItem[
       tripId: r.tripId,
       title: r.name,
       subtitle: r.location,
+      // An activity's `location` is the same slot as a lodging's `address`: it
+      // is whatever the user or the import wrote down for where this happens.
+      // Often a venue name rather than a street address, which maps apps
+      // resolve at least as well.
+      address: r.location,
       startAt: r.startAt,
       startLocal: r.startLocal,
       startTimezone: r.startTimezone,
