@@ -90,7 +90,7 @@ agree. Change one, change the other.
 | `MAIL_FROM` | `Trips <no-reply@mail.myze.ca>` | Must be a domain verified in Resend |
 | `RESEND_WEBHOOK_SECRET` | `whsec_…` | From Resend's webhook settings. **Without it the inbound route rejects everything** — see below |
 | `GEMINI_API_KEY` | from Google AI Studio | Paid tier (PLAN.md §6.7). Absent means heuristics only |
-| `INBOUND_ADDRESS` | `trips@mail.myze.ca` | Only mail to this address is imported |
+| `INBOUND_ADDRESS` | `waypoint@mail.myze.ca,trips@mail.myze.ca` | Comma-separated. Only mail to one of these is imported; everything else at the domain is discarded |
 | `VAPID_PUBLIC_KEY` | see below | Optional. Without a pair, reminders go by email only |
 | `VAPID_PRIVATE_KEY` | see below | Must be set together with the public key, or boot fails |
 | `VAPID_SUBJECT` | `mailto:no-reply@mail.myze.ca` | Contact URI for the push service |
@@ -403,7 +403,8 @@ record, so there is nothing to collide with.
 > **Adding this MX makes `mail.myze.ca` receive mail at every address**, including
 > `no-reply@mail.myze.ca`, which is the From address on every email the app sends. Replies to a
 > reminder will therefore arrive at the webhook. That is handled in code — the webhook processes
-> only mail addressed to `trips@mail.myze.ca` and discards the rest (PLAN.md §6.1) — but it is the
+> only mail addressed to one of the `INBOUND_ADDRESS` entries and discards the rest (PLAN.md
+> §6.1) — but it is the
 > reason that filter exists, so do not remove it.
 
 Verify the domain's inbound setup in Resend's dashboard before pointing the webhook at it. PLAN.md

@@ -120,10 +120,12 @@ export function createImportRoutes(deps: ImportDeps) {
         return c.json({ ok: false, error: (error as Error).message }, 502);
       }
 
-      const wanted = env.INBOUND_ADDRESS.toLowerCase();
-      if (!message.to.map(addressOf).includes(wanted)) {
+      const recipients = message.to.map(addressOf);
+      if (!recipients.some((to) => env.INBOUND_ADDRESS.includes(to))) {
         // A reply to a reminder is not a booking confirmation.
-        return ignore(`addressed to ${message.to.join(', ')}, not ${wanted}`);
+        return ignore(
+          `addressed to ${message.to.join(', ')}, not ${env.INBOUND_ADDRESS.join(' or ')}`,
+        );
       }
 
       const from = addressOf(message.from);

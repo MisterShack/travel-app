@@ -122,7 +122,24 @@ export const envSchema = z.object({
    * reminder would otherwise land in the import pipeline. Mail to anything else
    * is discarded (PLAN.md §6.1).
    */
-  INBOUND_ADDRESS: z.string().min(1).default('trips@mail.myze.ca'),
+  /*
+   * Comma-separated, so a rename can keep the old address working alongside the
+   * new one. Renaming the app to Waypoint moved the address from `trips@` to
+   * `waypoint@`, and mail to the old one was silently discarded — correctly,
+   * but a forwarding rule saved in someone's mail client does not update
+   * itself, and neither does a family member's habit.
+   */
+  INBOUND_ADDRESS: z
+    .string()
+    .min(1)
+    .default('waypoint@mail.myze.ca,trips@mail.myze.ca')
+    .transform((value) =>
+      value
+        .split(',')
+        .map((address) => address.trim().toLowerCase())
+        .filter((address) => address !== ''),
+    )
+    .refine((addresses) => addresses.length > 0, 'At least one inbound address is required'),
 
   /** Paid tier, deliberately — see PLAN.md §6.7. Absent means heuristics only. */
   GEMINI_API_KEY: z.string().min(1).optional(),

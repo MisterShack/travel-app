@@ -141,6 +141,33 @@ describe('the inbound webhook', () => {
     expect(rows[0]?.errorMessage).toBeTruthy();
   });
 
+  it('accepts any of several inbound addresses', async () => {
+    /*
+     * Renaming the app moved the import address from `trips@` to `waypoint@`,
+     * and mail to the old one was discarded — correctly, but a forwarding rule
+     * saved in someone's mail client does not update itself. Both work while a
+     * rename settles.
+     */
+    h = await createHarness(
+      { ...ENV, INBOUND_ADDRESS: 'waypoint@mail.myze.ca, trips@mail.myze.ca' },
+      { em_1: email({ to: ['waypoint@mail.myze.ca'] }), em_2: email({ id: 'em_2' }) },
+    );
+    await signUp(h, 'a@example.com');
+
+    await h.app.request(signed({ data: { email_id: 'em_1' } }));
+    await h.app.request(signed({ data: { email_id: 'em_2' } }));
+    expect(await h.db.select().from(bookingImports)).toHaveLength(2);
+  });
+
+  it('still discards mail sent anywhere else', async () => {
+    // The gate exists because an MX on the sending domain makes every address
+    // there deliver here, including the no-reply the app sends from.
+    h = await setup({ em_1: email({ to: ['no-reply@mail.myze.ca'] }) });
+    await signUp(h, 'a@example.com');
+    await h.app.request(signed({ data: { email_id: 'em_1' } }));
+    expect(await h.db.select().from(bookingImports)).toHaveLength(0);
+  });
+
   it('pre-selects a trip only when there is exactly one candidate', async () => {
     h = await setup({ em_1: email(), em_2: email({ id: 'em_2' }) });
     const cookie = await signUp(h, 'a@example.com');

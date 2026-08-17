@@ -65,7 +65,7 @@ certificate, `/health` answering JSON, the client served at `/`, SPA deep links 
 `/api/*` returning JSON rather than being shadowed by the static fallback. Registration and email
 verification work against real Resend delivery.
 
-**All phases (0–5) are done.** 170 tests, typecheck and lint clean.
+**All phases (0–5) are done.** 172 tests, typecheck and lint clean.
 
 **Phase 4 (booking import) shipped and verified end to end against a real forwarded airline
 confirmation, 2026-08-15** — including two per-passenger PDF tickets, read correctly.
