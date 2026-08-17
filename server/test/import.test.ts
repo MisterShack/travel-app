@@ -102,7 +102,7 @@ describe('the inbound webhook', () => {
     expect(rows).toHaveLength(1);
     // Never applied: a human confirms before anything reaches the timeline.
     expect(rows[0]?.status).toBe('needs_review');
-    expect(rows[0]?.extractedType).toBe('flight');
+    expect(rows[0]?.extractedType).toBe('segment');
     expect(rows[0]?.parsedBy).toBe('heuristic');
   });
 
@@ -243,9 +243,9 @@ describe('the review queue', () => {
     await h.db
       .update(bookingImports)
       .set({
-        extractedType: 'flight',
+        extractedType: 'segment',
         extractedFields: JSON.stringify({
-          flights: [{ departureAirport: 'YWG' }, { departureAirport: 'YOW' }],
+          segments: [{ origin: 'YWG' }, { origin: 'YOW' }],
         }),
       })
       .where(eq(bookingImports.id, imp.id));
@@ -347,7 +347,7 @@ describe('heuristics', () => {
     const parsed = parseHeuristic(email({ text: westjet }));
     expect(parsed?.ok).toBe(true);
     expect(parsed?.ok === true && parsed.draft.fields).toMatchObject({
-      flights: [{ flightNumber: 'WS3120', departureAirport: 'YWG', arrivalAirport: 'YOW' }],
+      segments: [{ service: 'WS3120', origin: 'YWG', destination: 'YOW' }],
     });
   });
 
@@ -359,7 +359,7 @@ describe('heuristics', () => {
     ].join('\n');
     const parsed = parseHeuristic(email({ text }));
     expect(parsed?.ok === true && parsed.draft.fields).toMatchObject({
-      flights: [{ departureAirport: 'YWG', arrivalAirport: 'YOW' }],
+      segments: [{ origin: 'YWG', destination: 'YOW' }],
     });
   });
 
@@ -540,27 +540,27 @@ describe('the model path', () => {
     vi.stubGlobal(
       'fetch',
       geminiReplying({
-        type: 'flight',
+        type: 'segment',
         confirmationCode: 'ABCDEF',
         passengers: [
           { name: 'David Shack', seat: '14C' },
           { name: 'Sam Shack', seat: '14D' },
         ],
-        flights: [
+        segments: [
           {
-            airline: 'WestJet',
-            flightNumber: 'WS3120',
-            departureAirport: 'YWG',
+            carrier: 'WestJet',
+            service: 'WS3120',
+            origin: 'YWG',
             departureLocal: '2026-09-10T07:15',
-            arrivalAirport: 'YOW',
+            destination: 'YOW',
             arrivalLocal: '2026-09-10T10:40',
           },
           {
-            airline: 'WestJet',
-            flightNumber: 'WS3121',
-            departureAirport: 'YOW',
+            carrier: 'WestJet',
+            service: 'WS3121',
+            origin: 'YOW',
             departureLocal: '2026-09-14T18:00',
-            arrivalAirport: 'YWG',
+            destination: 'YWG',
             arrivalLocal: '2026-09-14T20:25',
           },
         ],
@@ -578,11 +578,11 @@ describe('the model path', () => {
     if (!result.ok) return;
 
     const fields = result.draft.fields as {
-      flights: { departureAirport: string; arrivalAirport: string }[];
+      segments: { origin: string; destination: string }[];
       passengers: { name: string; seat: string }[];
     };
-    expect(fields.flights).toHaveLength(2);
-    expect(fields.flights.map((f) => `${f.departureAirport}-${f.arrivalAirport}`)).toEqual([
+    expect(fields.segments).toHaveLength(2);
+    expect(fields.segments.map((f) => `${f.origin}-${f.destination}`)).toEqual([
       'YWG-YOW',
       'YOW-YWG',
     ]);
@@ -592,14 +592,66 @@ describe('the model path', () => {
     ]);
   });
 
-  it('refuses a flight booking the model returned with no flights in it', async () => {
+  it('refuses a journey the model returned with no legs in it', async () => {
     // Better an honest failure with the original attached than a row with no
     // route, which the reviewer has to notice is empty.
-    vi.stubGlobal('fetch', geminiReplying({ type: 'flight', flights: [] }));
+    vi.stubGlobal('fetch', geminiReplying({ type: 'segment', segments: [] }));
     const { parseBooking } = await import('../src/import/parse');
     const result = await parseBooking(email({ text: 'x' }), { apiKey: 'k', model: 'm' });
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.reason).toMatch(/no flights/i);
+    if (!result.ok) expect(result.reason).toMatch(/no legs/i);
+  });
+
+  it('reads a Via Rail booking as a journey, not as an activity', async () => {
+    /*
+     * PLAN-V3 §3a: a train has everything a flight has, and landing it as a
+     * generic activity threw the destination away — which is exactly the data a
+     * conflict needs. Station names, because there is no IATA for stations.
+     */
+    vi.stubGlobal(
+      'fetch',
+      geminiReplying({
+        type: 'segment',
+        confirmationCode: 'VIA123',
+        passengers: [{ name: 'David', seat: '11A' }],
+        segments: [
+          {
+            mode: 'rail',
+            carrier: 'Via Rail',
+            service: '55',
+            origin: 'Ottawa',
+            departureLocal: '2026-09-10T08:30',
+            destination: 'Toronto Union',
+            arrivalLocal: '2026-09-10T13:00',
+          },
+          {
+            mode: 'rail',
+            carrier: 'Via Rail',
+            service: '48',
+            origin: 'Toronto Union',
+            departureLocal: '2026-09-14T17:00',
+            destination: 'Ottawa',
+            arrivalLocal: '2026-09-14T21:30',
+          },
+        ],
+      }),
+    );
+
+    const { parseBooking } = await import('../src/import/parse');
+    const result = await parseBooking(email({ text: 'Via Rail itinerary' }), {
+      apiKey: 'k',
+      model: 'm',
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.draft.type).toBe('segment');
+    const fields = result.draft.fields as {
+      segments: { mode: string; destination: string }[];
+      passengers: { seat: string }[];
+    };
+    expect(fields.segments).toHaveLength(2);
+    expect(fields.segments[0]).toMatchObject({ mode: 'rail', destination: 'Toronto Union' });
+    expect(fields.passengers[0]?.seat).toBe('11A');
   });
 
   it('does not invent a booking out of an email that is not one', async () => {
@@ -614,16 +666,14 @@ describe('the model path', () => {
   });
 });
 
-describe('non-flight journeys', () => {
-  it('asks the model for an activity end time', async () => {
-    // A train booked as an activity loses its arrival entirely if the schema
-    // never requests one, which makes an arrival-based conflict undetectable.
-    const parse = await import('../src/import/parse');
-    const source = parse.parseWithLlm.toString();
-    expect(source).toBeTruthy();
+describe('non-air journeys', () => {
+  it('tells the model that rail is a segment and not an activity', async () => {
+    // The mitigation this replaces put the route in an activity's name. It kept
+    // the arrival; it never made the destination structured, so "you arrive in
+    // Toronto but your hotel is in Montreal" stayed undetectable.
     const { readFileSync } = await import('node:fs');
     const file = readFileSync(new URL('../src/import/parse.ts', import.meta.url), 'utf8');
-    expect(file).toMatch(/"endLocal"/);
-    expect(file).toMatch(/kind "transport"/);
+    expect(file).toMatch(/rail, coach or ferry booking is a "segment", NOT an activity/);
+    expect(file).toMatch(/there is no IATA for stations/);
   });
 });

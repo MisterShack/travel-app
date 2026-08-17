@@ -30,7 +30,11 @@
   --warn-bg: #fdf3e6;
   --alert: #a4232c;
   --focus: #b45309;
-  --kind-flight: #2c5c8a;
+  /* One hue for every journey; the mode is carried by the icon's shape. Hue
+     encodes kind (BRAND.md §3), and a journey is one kind whether it flies or
+     runs on rails — four hues for four modes would spend the palette on a
+     distinction the icon already makes. */
+  --kind-segment: #2c5c8a;
   --kind-lodging: #2f6b4f;
   --kind-activity: #6b4a8a;
 
@@ -71,7 +75,7 @@
     --warn-bg: #2a1f10;
     --alert: #ff8a8a;
     --focus: #f0a03c;
-    --kind-flight: #7fb3e0;
+    --kind-segment: #7fb3e0;
     --kind-lodging: #7fc9a3;
     --kind-activity: #bda1e0;
   }
@@ -579,7 +583,7 @@ li.event-item { position: relative; }
 li.event-item > .card {
   border-left: 3px solid var(--kind, var(--rule));
 }
-.kind-flight { --kind: var(--kind-flight); }
+.kind-segment { --kind: var(--kind-segment); }
 .kind-lodging { --kind: var(--kind-lodging); }
 .kind-activity { --kind: var(--kind-activity); }
 .endday { color: var(--ink-soft); }

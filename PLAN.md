@@ -256,7 +256,7 @@ Revisit only if maintaining two accounts becomes a real annoyance in practice �
    itself currently holds no MX, CNAME or A record, so an inbound MX has nothing to collide with.
    The MX must have the **lowest priority value** present or mail will not route to Resend.
 
-   It cannot go on `trips.myze.ca`: that name is a CNAME to Railway, and DNS forbids a CNAME
+   It cannot go on `waypoint.myze.ca`: that name is a CNAME to Railway, and DNS forbids a CNAME
    coexisting with any other record type.
 
    **Consequence to handle in the webhook.** An MX on `mail.myze.ca` makes *every* address at that
@@ -470,11 +470,11 @@ verified Resend domain.
 - **Phase 0 — Workspace scaffold:** npm workspaces (`shared`/`app`/`server`), TS config, ESLint,
   Vitest, `railway.json`, Dockerfile, and a Hono server that answers `/health`. (The structural
   package.json files already exist; Phase 0 fills them in for real.)
-- **Phase 1 — Deploy skeleton:** Railway service at `trips.myze.ca`, volume at `/data`, Litestream
+- **Phase 1 — Deploy skeleton:** Railway service at `waypoint.myze.ca`, volume at `/data`, Litestream
   configured **and a restore drill actually run**, Resend domain verified and `MAIL_FROM` set.
   Nothing real is stored yet, which is the point — this is the cheapest moment to get the
   infrastructure wrong.
-  **Done 2026-08-15** — live at <https://trips.myze.ca>, valid certificate, `/health` answering,
+  **Done 2026-08-15** — live at <https://waypoint.myze.ca>, valid certificate, `/health` answering,
   the client served, SPA deep links resolving, and `/api/*` still returning JSON rather than being
   shadowed by the static fallback. Registration and email verification work against real Resend
   delivery.

@@ -20,18 +20,19 @@ async function setup() {
 }
 
 const FLIGHT = {
-  airline: 'TAP',
-  flightNumber: 'TP1233',
-  departureAirport: 'LHR',
+  mode: 'air' as const,
+  carrier: 'TAP',
+  service: 'TP1233',
+  origin: 'LHR',
   departure: { local: '2026-09-10T10:00', timezone: 'Europe/London' },
-  arrivalAirport: 'LIS',
+  destination: 'LIS',
   arrival: { local: '2026-09-10T13:00', timezone: 'Europe/Lisbon' },
 };
 
 describe('creating timeline entities', () => {
   it('derives the UTC instant from local time and zone', async () => {
     const { cookie, tripId } = await setup();
-    await h.app.request(jsonRequest(`/trips/${tripId}/flights`, 'POST', FLIGHT, cookie));
+    await h.app.request(jsonRequest(`/trips/${tripId}/segments`, 'POST', FLIGHT, cookie));
 
     const res = await h.app.request(jsonRequest(`/trips/${tripId}/timeline`, 'GET', undefined, cookie));
     const { items } = (await res.json()) as { items: Record<string, string>[] };
@@ -48,7 +49,7 @@ describe('creating timeline entities', () => {
     const { cookie, tripId } = await setup();
     await h.app.request(
       jsonRequest(
-        `/trips/${tripId}/flights`,
+        `/trips/${tripId}/segments`,
         'POST',
         { ...FLIGHT, departureAt: '1999-01-01T00:00:00.000Z', startAt: '1999-01-01T00:00:00.000Z' },
         cookie,
@@ -64,7 +65,7 @@ describe('creating timeline entities', () => {
     const { cookie, tripId } = await setup();
     const res = await h.app.request(
       jsonRequest(
-        `/trips/${tripId}/flights`,
+        `/trips/${tripId}/segments`,
         'POST',
         { ...FLIGHT, departure: { local: '2026-09-10T10:00', timezone: 'Europe/Nowhere' } },
         cookie,
@@ -100,7 +101,7 @@ describe('the merged timeline', () => {
     // the departure zone.
     const { cookie, tripId } = await setup();
 
-    await h.app.request(jsonRequest(`/trips/${tripId}/flights`, 'POST', FLIGHT, cookie));
+    await h.app.request(jsonRequest(`/trips/${tripId}/segments`, 'POST', FLIGHT, cookie));
     await h.app.request(
       jsonRequest(
         `/trips/${tripId}/activities`,
@@ -129,7 +130,7 @@ describe('the merged timeline', () => {
     const res = await h.app.request(jsonRequest(`/trips/${tripId}/timeline`, 'GET', undefined, cookie));
     const { items } = (await res.json()) as { items: { kind: string; startAt: string }[] };
 
-    expect(items.map((i) => i.kind)).toEqual(['flight', 'lodging', 'activity']);
+    expect(items.map((i) => i.kind)).toEqual(['segment', 'lodging', 'activity']);
     const instants = items.map((i) => i.startAt);
     expect([...instants].sort()).toEqual(instants);
   });
@@ -160,14 +161,15 @@ describe('the merged timeline', () => {
     const { cookie, tripId } = await setup();
     await h.app.request(
       jsonRequest(
-        `/trips/${tripId}/flights`,
+        `/trips/${tripId}/segments`,
         'POST',
         {
-          airline: 'WestJet',
-          flightNumber: 'WS3120',
-          departureAirport: 'YWG',
+          mode: 'air',
+          carrier: 'WestJet',
+          service: 'WS3120',
+          origin: 'YWG',
           departure: { local: '2026-09-10T07:15', timezone: 'America/Winnipeg' },
-          arrivalAirport: 'YOW',
+          destination: 'YOW',
           arrival: { local: '2026-09-10T10:40', timezone: 'America/Toronto' },
         },
         cookie,
@@ -193,7 +195,7 @@ describe('the merged timeline', () => {
     const { cookie, tripId } = await setup();
     const created = await h.app.request(
       jsonRequest(
-        `/trips/${tripId}/flights`,
+        `/trips/${tripId}/segments`,
         'POST',
         {
           ...FLIGHT,
@@ -210,7 +212,7 @@ describe('the merged timeline', () => {
     );
     const { id } = (await created.json()) as { id: string };
 
-    const res = await h.app.request(jsonRequest(`/flights/${id}`, 'GET', undefined, cookie));
+    const res = await h.app.request(jsonRequest(`/segments/${id}`, 'GET', undefined, cookie));
     const { item } = (await res.json()) as { item: { passengers: string | null } };
     expect(JSON.parse(item.passengers ?? '[]')).toEqual([
       { name: 'David', seat: '14C' },
@@ -222,14 +224,14 @@ describe('the merged timeline', () => {
     const { cookie, tripId } = await setup();
     const created = await h.app.request(
       jsonRequest(
-        `/trips/${tripId}/flights`,
+        `/trips/${tripId}/segments`,
         'POST',
         { ...FLIGHT, passengers: [{ name: '', seat: '' }] },
         cookie,
       ),
     );
     const { id } = (await created.json()) as { id: string };
-    const res = await h.app.request(jsonRequest(`/flights/${id}`, 'GET', undefined, cookie));
+    const res = await h.app.request(jsonRequest(`/segments/${id}`, 'GET', undefined, cookie));
     const { item } = (await res.json()) as { item: { passengers: string | null } };
     expect(item.passengers).toBeNull();
   });
@@ -243,14 +245,14 @@ describe('the merged timeline', () => {
 
 describe('authorisation on flat entity routes', () => {
   it('refuses a non-member editing an entity by id', async () => {
-    // /flights/:id names no trip, so the check has to resolve entity -> trip.
+    // /segments/:id names no trip, so the check has to resolve entity -> trip.
     const { cookie, tripId } = await setup();
-    const created = await h.app.request(jsonRequest(`/trips/${tripId}/flights`, 'POST', FLIGHT, cookie));
+    const created = await h.app.request(jsonRequest(`/trips/${tripId}/segments`, 'POST', FLIGHT, cookie));
     const { id } = (await created.json()) as { id: string };
 
     const stranger = await signUp(h, 'b@example.com');
-    expect((await h.app.request(jsonRequest(`/flights/${id}`, 'PATCH', FLIGHT, stranger))).status).toBe(404);
-    expect((await h.app.request(jsonRequest(`/flights/${id}`, 'DELETE', undefined, stranger))).status).toBe(404);
+    expect((await h.app.request(jsonRequest(`/segments/${id}`, 'PATCH', FLIGHT, stranger))).status).toBe(404);
+    expect((await h.app.request(jsonRequest(`/segments/${id}`, 'DELETE', undefined, stranger))).status).toBe(404);
   });
 
   it('lets a plain member add and edit, not just the owner', async () => {
@@ -262,23 +264,23 @@ describe('authorisation on flat entity routes', () => {
       jsonRequest(`/invites/${tokenFromMail(h.mailer, 'b@example.com')}/accept`, 'POST', undefined, member),
     );
 
-    const created = await h.app.request(jsonRequest(`/trips/${tripId}/flights`, 'POST', FLIGHT, member));
+    const created = await h.app.request(jsonRequest(`/trips/${tripId}/segments`, 'POST', FLIGHT, member));
     expect(created.status).toBe(201);
     const { id } = (await created.json()) as { id: string };
     const edited = await h.app.request(
-      jsonRequest(`/flights/${id}`, 'PATCH', { ...FLIGHT, seat: '14C' }, member),
+      jsonRequest(`/segments/${id}`, 'PATCH', { ...FLIGHT, seat: '14C' }, member),
     );
     expect(edited.status).toBe(200);
   });
 
   it('recomputes the instant on edit', async () => {
     const { cookie, tripId } = await setup();
-    const created = await h.app.request(jsonRequest(`/trips/${tripId}/flights`, 'POST', FLIGHT, cookie));
+    const created = await h.app.request(jsonRequest(`/trips/${tripId}/segments`, 'POST', FLIGHT, cookie));
     const { id } = (await created.json()) as { id: string };
 
     await h.app.request(
       jsonRequest(
-        `/flights/${id}`,
+        `/segments/${id}`,
         'PATCH',
         { ...FLIGHT, departure: { local: '2026-09-10T10:00', timezone: 'America/New_York' } },
         cookie,
@@ -295,7 +297,7 @@ describe('authorisation on flat entity routes', () => {
 describe('deleting a trip', () => {
   it('takes its timeline with it', async () => {
     const { cookie, tripId } = await setup();
-    await h.app.request(jsonRequest(`/trips/${tripId}/flights`, 'POST', FLIGHT, cookie));
+    await h.app.request(jsonRequest(`/trips/${tripId}/segments`, 'POST', FLIGHT, cookie));
     await h.app.request(jsonRequest(`/trips/${tripId}`, 'DELETE', undefined, cookie));
 
     const res = await h.app.request(jsonRequest(`/trips/${tripId}/timeline`, 'GET', undefined, cookie));

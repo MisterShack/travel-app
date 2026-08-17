@@ -10,7 +10,9 @@
  * is invisible until someone forwards the right email.
  */
 
-import type { Passenger } from '@travel/shared';
+import type { Passenger, SegmentMode } from '@travel/shared';
+
+const MODES: readonly string[] = ['air', 'rail', 'coach', 'ferry'];
 
 export const ACTIVITY_KINDS = ['restaurant', 'attraction', 'transport', 'other'] as const;
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
@@ -18,11 +20,12 @@ export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
 export type DraftFields = Record<string, unknown>;
 
 type Prefillable = {
-  airline: string;
-  flightNumber: string;
-  departureAirport: string;
+  mode: SegmentMode;
+  carrier: string;
+  service: string;
+  origin: string;
   departureLocal: string;
-  arrivalAirport: string;
+  destination: string;
   arrivalLocal: string;
   passengers: Passenger[];
   name: string;
@@ -61,11 +64,14 @@ export function applyDraft<T extends Prefillable>(prev: T, draft: DraftFields): 
 
   return {
     ...prev,
-    airline: str('airline') || prev.airline,
-    flightNumber: str('flightNumber') || prev.flightNumber,
-    departureAirport: str('departureAirport') || prev.departureAirport,
+    // Checked against the known modes rather than cast: it comes from a model,
+    // and an unrecognised value would leave the mode select showing nothing.
+    mode: MODES.includes(str('mode')) ? (str('mode') as SegmentMode) : prev.mode,
+    carrier: str('carrier') || prev.carrier,
+    service: str('service') || prev.service,
+    origin: str('origin') || prev.origin,
     departureLocal: str('departureLocal') || prev.departureLocal,
-    arrivalAirport: str('arrivalAirport') || prev.arrivalAirport,
+    destination: str('destination') || prev.destination,
     arrivalLocal: str('arrivalLocal') || prev.arrivalLocal,
     passengers: draftPassengers(draft['passengers']) ?? prev.passengers,
     name: str('name') || prev.name,

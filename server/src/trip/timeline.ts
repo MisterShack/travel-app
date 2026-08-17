@@ -4,14 +4,14 @@ import {
   localToInstant,
   type ActivityInput,
   type EventTime,
-  type FlightInput,
+  type SegmentInput,
   type LodgingInput,
   type Passenger,
   type TimelineItem,
 } from '@travel/shared';
 import { lookupAirport } from '@travel/shared/airports';
 import type { Db } from '../db/client';
-import { activities, flights, lodging } from '../db/schema';
+import { activities, lodging, segments } from '../db/schema';
 
 /**
  * Timeline entities and the merged view (PLAN.md §3, §8).
@@ -53,23 +53,24 @@ export function timeAnomalies(times: Record<string, EventTime | undefined>): str
   return out;
 }
 
-export async function createFlight(db: Db, tripId: string, input: FlightInput, now: Date) {
+export async function createSegment(db: Db, tripId: string, input: SegmentInput, now: Date) {
   const id = `flt_${randomUUID()}`;
   const dep = derive(input.departure);
   const arr = derive(input.arrival);
   const at = now.toISOString();
 
-  await db.insert(flights).values({
+  await db.insert(segments).values({
     id,
     tripId,
-    airline: input.airline,
-    flightNumber: input.flightNumber,
+    mode: input.mode,
+    carrier: input.carrier,
+    service: input.service,
     confirmationCode: input.confirmationCode ?? null,
-    departureAirport: input.departureAirport,
+    origin: input.origin,
     departureLocal: dep.local,
     departureTimezone: dep.timezone,
     departureAt: dep.at,
-    arrivalAirport: input.arrivalAirport,
+    destination: input.destination,
     arrivalLocal: arr.local,
     arrivalTimezone: arr.timezone,
     arrivalAt: arr.at,
@@ -91,6 +92,18 @@ export async function createFlight(db: Db, tripId: string, input: FlightInput, n
  * flight should not leave `[{"name":"","seat":""}]` behind for every reader to
  * special-case.
  */
+/**
+ * The human place an endpoint names, for the zone badge and the reminder text.
+ *
+ * For air the endpoint is an IATA code, and the airport's city is what a
+ * traveller recognises — its *zone's* namesake is a different place (YOW is
+ * Ottawa in America/Toronto). For everything else the endpoint is already the
+ * place: a station is called Ottawa, not YOW.
+ */
+function placeOf(mode: string, endpoint: string): string | null {
+  return mode === 'air' ? (lookupAirport(endpoint)?.city ?? null) : endpoint;
+}
+
 /** "14C, 14D" — the seats on a stored passenger list, or '' when there are none. */
 function seatSummary(stored: string | null): string {
   if (stored === null) return '';
@@ -186,20 +199,20 @@ export async function createActivity(db: Db, tripId: string, input: ActivityInpu
  */
 export async function getTimeline(db: Db, tripId: string): Promise<TimelineItem[]> {
   const [f, l, a] = await Promise.all([
-    db.select().from(flights).where(eq(flights.tripId, tripId)),
+    db.select().from(segments).where(eq(segments.tripId, tripId)),
     db.select().from(lodging).where(eq(lodging.tripId, tripId)),
     db.select().from(activities).where(eq(activities.tripId, tripId)),
   ]);
 
   const items: TimelineItem[] = [
     ...f.map((r) => ({
-      kind: 'flight' as const,
+      kind: 'segment' as const,
       id: r.id,
       tripId: r.tripId,
-      title: `${r.airline} ${r.flightNumber}`,
+      title: `${r.carrier} ${r.service}`,
       // Seats belong on the row: at the gate, "which seat am I in" is the
       // question, and opening the flight to answer it is a tap too many.
-      subtitle: [`${r.departureAirport} → ${r.arrivalAirport}`, seatSummary(r.passengers)]
+      subtitle: [`${r.origin} → ${r.destination}`, seatSummary(r.passengers)]
         .filter((part) => part !== '')
         .join(' · '),
       startAt: r.departureAt,
@@ -208,11 +221,14 @@ export async function getTimeline(db: Db, tripId: string): Promise<TimelineItem[
       // The airport's own city. Its zone's namesake is a different place: YOW
       // is Ottawa but sits in America/Toronto, and BOS is Boston in
       // America/New_York.
-      startPlace: lookupAirport(r.departureAirport)?.city ?? null,
+      mode: r.mode,
+      origin: r.origin,
+      destination: r.destination,
+      startPlace: placeOf(r.mode, r.origin),
       endAt: r.arrivalAt,
       endLocal: r.arrivalLocal,
       endTimezone: r.arrivalTimezone,
-      endPlace: lookupAirport(r.arrivalAirport)?.city ?? null,
+      endPlace: placeOf(r.mode, r.destination),
       confirmationCode: r.confirmationCode,
       notes: r.notes,
       source: r.source,
@@ -226,6 +242,9 @@ export async function getTimeline(db: Db, tripId: string): Promise<TimelineItem[
       startAt: r.checkInAt,
       startLocal: r.checkInLocal,
       startTimezone: r.checkInTimezone,
+      mode: null,
+      origin: null,
+      destination: null,
       // The zone was chosen by hand on the form, so showing it back is
       // faithful — there is no separate place recorded to show instead.
       startPlace: null,
@@ -246,6 +265,9 @@ export async function getTimeline(db: Db, tripId: string): Promise<TimelineItem[
       startAt: r.startAt,
       startLocal: r.startLocal,
       startTimezone: r.startTimezone,
+      mode: null,
+      origin: null,
+      destination: null,
       startPlace: null,
       endAt: r.endAt,
       endLocal: r.endLocal,
@@ -271,16 +293,16 @@ export async function getTimeline(db: Db, tripId: string): Promise<TimelineItem[
  * reflects what was actually saved — including the derived instant.
  */
 export function reminderSubjectFor(kind: EntityKind, row: Record<string, unknown>) {
-  if (kind === 'flight') {
+  if (kind === 'segment') {
     return {
       tripId: String(row['tripId']),
-      relatedType: 'flight' as const,
+      relatedType: 'segment' as const,
       relatedId: String(row['id']),
       startAt: String(row['departureAt']),
       timezone: String(row['departureTimezone']),
-      title: `${String(row['airline'])} ${String(row['flightNumber'])}`,
-      detail: `${String(row['departureAirport'])} → ${String(row['arrivalAirport'])}`,
-      place: lookupAirport(String(row['departureAirport']))?.city ?? null,
+      title: `${String(row['carrier'])} ${String(row['service'])}`,
+      detail: `${String(row['origin'])} → ${String(row['destination'])}`,
+      place: placeOf(String(row['mode']), String(row['origin'])),
     };
   }
   if (kind === 'lodging') {
@@ -307,7 +329,7 @@ export function reminderSubjectFor(kind: EntityKind, row: Record<string, unknown
   };
 }
 
-const TABLES = { flight: flights, lodging, activity: activities } as const;
+const TABLES = { segment: segments, lodging, activity: activities } as const;
 export type EntityKind = keyof typeof TABLES;
 
 /** Resolves an entity to its trip, so authorisation can be checked (PLAN.md §10). */
@@ -339,20 +361,21 @@ export async function deleteEntity(db: Db, kind: EntityKind, id: string, tripId:
  * that is what PLAN.md §10 sketched; the semantics are stated here rather than
  * inferred from the method.
  */
-export async function updateFlight(db: Db, id: string, input: FlightInput, now: Date) {
+export async function updateSegment(db: Db, id: string, input: SegmentInput, now: Date) {
   const dep = derive(input.departure);
   const arr = derive(input.arrival);
   await db
-    .update(flights)
+    .update(segments)
     .set({
-      airline: input.airline,
-      flightNumber: input.flightNumber,
+      mode: input.mode,
+      carrier: input.carrier,
+      service: input.service,
       confirmationCode: input.confirmationCode ?? null,
-      departureAirport: input.departureAirport,
+      origin: input.origin,
       departureLocal: dep.local,
       departureTimezone: dep.timezone,
       departureAt: dep.at,
-      arrivalAirport: input.arrivalAirport,
+      destination: input.destination,
       arrivalLocal: arr.local,
       arrivalTimezone: arr.timezone,
       arrivalAt: arr.at,
@@ -360,7 +383,7 @@ export async function updateFlight(db: Db, id: string, input: FlightInput, now: 
       notes: input.notes ?? null,
       updatedAt: now.toISOString(),
     })
-    .where(eq(flights.id, id));
+    .where(eq(segments.id, id));
 }
 
 export async function updateLodging(db: Db, id: string, input: LodgingInput, now: Date) {

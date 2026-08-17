@@ -56,8 +56,8 @@ describe('STATIC_DIR', () => {
 describe('production guards', () => {
   const base = {
     NODE_ENV: 'production',
-    APP_ORIGIN: 'https://trips.myze.ca',
-    PUBLIC_URL: 'https://trips.myze.ca',
+    APP_ORIGIN: 'https://waypoint.myze.ca',
+    PUBLIC_URL: 'https://waypoint.myze.ca',
   };
 
   it('refuses to start without a mail key', () => {

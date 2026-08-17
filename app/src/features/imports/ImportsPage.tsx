@@ -21,7 +21,7 @@ type ImportRow = {
   subject: string;
   receivedAt: string;
   status: 'pending' | 'needs_review' | 'applied' | 'rejected' | 'failed';
-  extractedType: 'flight' | 'lodging' | 'activity' | null;
+  extractedType: 'segment' | 'lodging' | 'activity' | null;
   extractedFields: string | null;
   parsedBy: 'heuristic' | 'llm' | 'none' | null;
   /** JSON array of the leg indices already added, for a multi-leg booking. */
@@ -40,8 +40,8 @@ type Leg = Record<string, unknown>;
  * render rather than two.
  */
 function legsOf(fields: Record<string, unknown> | null): Leg[] {
-  const flights = fields?.['flights'];
-  return Array.isArray(flights) ? (flights as Leg[]) : [];
+  const legs = fields?.['segments'];
+  return Array.isArray(legs) ? (legs as Leg[]) : [];
 }
 
 const appliedOf = (row: ImportRow): number[] => {
@@ -56,21 +56,21 @@ const appliedOf = (row: ImportRow): number[] => {
 /** "YWG → YOW, 10 Sep 07:15" — enough to tell an outbound from a return. */
 function legLabel(leg: Leg, index: number): string {
   const text = (key: string) => (typeof leg[key] === 'string' ? (leg[key] as string) : '');
-  const from = text('departureAirport');
-  const to = text('arrivalAirport');
+  const from = text('origin');
+  const to = text('destination');
   // A leg with no route at all is still worth listing — the reviewer opens it
   // and sees what the extraction did manage, rather than an unexplained gap.
   if (from === '' && to === '') return `Leg ${index + 1}`;
 
   const when = text('departureLocal');
-  const number = text('flightNumber');
+  const number = text('service');
   return (
     `${number === '' ? '' : `${number} `}${from || '?'} → ${to || '?'}` +
     (when === '' ? '' : `, ${pretty('departureLocal', when)}`)
   );
 }
 
-const PATH = { flight: 'flight', lodging: 'lodging', activity: 'activity' } as const;
+const PATH = { segment: 'segment', lodging: 'lodging', activity: 'activity' } as const;
 
 /**
  * Human labels for the extracted fields.
@@ -81,11 +81,12 @@ const PATH = { flight: 'flight', lodging: 'lodging', activity: 'activity' } as c
  * reader first has to decode the field names.
  */
 const LABEL: Record<string, string> = {
-  airline: 'Airline',
-  flightNumber: 'Flight',
-  departureAirport: 'From',
+  mode: 'Mode',
+  carrier: 'Operator',
+  service: 'Service',
+  origin: 'From',
   departureLocal: 'Departs',
-  arrivalAirport: 'To',
+  destination: 'To',
   arrivalLocal: 'Arrives',
   name: 'Name',
   address: 'Address',
@@ -251,7 +252,7 @@ function ImportCard({
           {Object.entries(fields)
             // The two lists get their own treatment below; rendered here they
             // would stringify into "[object Object]".
-            .filter(([k]) => k !== 'flights' && k !== 'passengers')
+            .filter(([k]) => k !== 'segments' && k !== 'passengers')
             .filter(([, v]) => v !== null && v !== '' && v !== undefined)
             .map(([k, v]) => (
               <div key={k}>

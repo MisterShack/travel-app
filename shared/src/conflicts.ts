@@ -56,7 +56,7 @@ function overlaps(items: TimelineItem[]): Issue[] {
     for (let b = a + 1; b < timed.length; b++) {
       const first = timed[a]!;
       const second = timed[b]!;
-      // Touching is not overlapping: a flight landing exactly as something
+      // Touching is not overlapping: a train arriving exactly as something
       // starts is tight, not impossible, and the connection rule covers it.
       if (at(second) >= end(first) || at(first) >= end(second)) continue;
       issues.push({
@@ -70,32 +70,37 @@ function overlaps(items: TimelineItem[]): Issue[] {
   return issues;
 }
 
-/** Consecutive flights: too little time, or a different airport entirely. */
+/** Consecutive journeys: too little time between them, or a different place entirely. */
 function connections(items: TimelineItem[]): Issue[] {
-  const flights = items.filter((i) => i.kind === 'flight').sort((x, y) => at(x) - at(y));
+  const legs = items.filter((i) => i.kind === 'segment').sort((x, y) => at(x) - at(y));
   const issues: Issue[] = [];
 
-  for (let i = 0; i < flights.length - 1; i++) {
-    const arriving = flights[i]!;
-    const departing = flights[i + 1]!;
+  for (let i = 0; i < legs.length - 1; i++) {
+    const arriving = legs[i]!;
+    const departing = legs[i + 1]!;
     if (!arriving.endAt) continue;
 
     const gapMinutes = Math.round((at(departing) - Date.parse(arriving.endAt)) / 60_000);
     if (gapMinutes < 0) continue; // a genuine overlap; already reported
 
     /**
-     * The subtitle carries "LHR → LIS". Comparing where you land against where
-     * you next leave from catches the classic trap — landing at one airport and
-     * departing from another — which no amount of spare time fixes on its own.
+     * Comparing where you arrive against where you next leave from catches the
+     * classic trap — landing at one airport and departing from another — which
+     * no amount of spare time fixes on its own.
+     *
+     * Read from the structured endpoints, not from the subtitle. Parsing the
+     * subtitle worked only while it was exactly "LHR → LIS"; adding seats to it
+     * made every connection compare "LIS · 14C" against "LIS" and report a
+     * change of airport that was not one.
      */
-    const landsAt = arriving.subtitle?.split('→').at(-1)?.trim();
-    const leavesFrom = departing.subtitle?.split('→')[0]?.trim();
+    const landsAt = arriving.destination;
+    const leavesFrom = departing.origin;
 
     if (landsAt && leavesFrom && landsAt !== leavesFrom) {
       issues.push({
         kind: 'airport-change',
         severity: 'warning',
-        message: `You land at ${landsAt} but the next flight leaves from ${leavesFrom}.`,
+        message: `You arrive at ${landsAt} but the next journey leaves from ${leavesFrom}.`,
         itemIds: [arriving.id, departing.id],
       });
       continue;
@@ -126,7 +131,7 @@ function unbookedNights(
   items: TimelineItem[],
   trip: { startDate: string; endDate: string; homeTimezone: string },
 ): Issue[] {
-  const shelters = items.filter((i) => (i.kind === 'lodging' || i.kind === 'flight') && i.endAt);
+  const shelters = items.filter((i) => (i.kind === 'lodging' || i.kind === 'segment') && i.endAt);
   const issues: Issue[] = [];
 
   const start = new Date(`${trip.startDate}T00:00:00Z`);

@@ -7,7 +7,7 @@ trip, with reminders and (later) restaurant/attraction suggestions.
 - **CLAUDE.md** — project guide and non-negotiables for anyone (human or model) working here.
 - **DEPLOY.md** — the Railway/Litestream runbook.
 
-**Live at <https://trips.myze.ca>**
+**Live at <https://waypoint.myze.ca>**
 
 ## Status
 

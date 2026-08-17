@@ -116,6 +116,25 @@ await page.locator('input[type=datetime-local]').nth(1).fill('2026-09-18T11:00')
 await page.getByRole('button', { name: /^Add$/ }).click();
 await page.waitForURL(/\/trips\/trp_[^/]+$/);
 
+// --- a Via Rail journey: the case Phase 12 exists for ---
+// Station names, not IATA codes, and a zone asked for rather than derived.
+await addFrom('Train');
+await page.getByLabel('Operator').fill('Via Rail');
+await page.getByLabel('Train number').fill('55');
+await page.getByLabel('From station').fill('Ottawa');
+// The departure zone; setting it carries the arrival zone with it, which is
+// what stops an Ottawa-to-Toronto train being recorded five hours out.
+await page.getByLabel('Departure timezone').selectOption('America/Toronto');
+await page.locator('input[type=datetime-local]').first().fill('2026-09-12T08:30');
+await page.getByLabel('To station').fill('Toronto Union');
+await page.locator('input[type=datetime-local]').nth(1).fill('2026-09-12T13:00');
+if ((await page.getByLabel('Arrival timezone').inputValue()) !== 'America/Toronto') {
+  throw new Error('Arrival zone did not follow the departure zone');
+}
+await shot(page, '08b-rail-form');
+await page.getByRole('button', { name: /^Add$/ }).click();
+await page.waitForURL(/\/trips\/trp_[^/]+$/);
+
 await addFrom('Activity');
 await page.locator('select').first().selectOption('restaurant');
 await page.getByLabel('Name', { exact: true }).fill('Cervejaria Ramiro');

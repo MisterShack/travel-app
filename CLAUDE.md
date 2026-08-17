@@ -7,9 +7,10 @@ built against yet; if you're about to start Phase 0, confirm PLAN.md has been th
 `.claude/skills/plan-review` first (§ of PLAN.md's header note).
 
 **The product is called Waypoint** (BRAND.md). The repo directory, the npm workspaces
-(`@travel/*`) and the domain (`trips.myze.ca`) still say *travel* — those are identifiers rather
-than the product name, and renaming them buys nothing but churn and a broken deploy. Change them
-only if the domain moves.
+(`@travel/*`) still say *travel* — those are identifiers rather than the product name, and renaming
+them buys nothing but churn and a broken deploy. **The domain did move** to `waypoint.myze.ca` on
+2026-08-16, and the workspaces were deliberately left alone: they are not user-visible, and the
+Dockerfile, the Vite aliases and every import would have to move with them.
 
 ## Layout (npm workspaces)
 
@@ -60,12 +61,12 @@ re-discovering them the hard way.
 
 ## Status
 
-**Live at <https://trips.myze.ca>** (Railway, deployed 2026-08-15). Verified from outside: valid
+**Live at <https://waypoint.myze.ca>** (Railway, deployed 2026-08-15). Verified from outside: valid
 certificate, `/health` answering JSON, the client served at `/`, SPA deep links resolving, and
 `/api/*` returning JSON rather than being shadowed by the static fallback. Registration and email
 verification work against real Resend delivery.
 
-**All phases (0–5) are done.** 172 tests, typecheck and lint clean.
+**All phases (0–5) are done.** 176 tests, typecheck and lint clean.
 
 **Phase 4 (booking import) shipped and verified end to end against a real forwarded airline
 confirmation, 2026-08-15** — including two per-passenger PDF tickets, read correctly.
@@ -96,6 +97,11 @@ Two things that are true and worth keeping in view:
   DEPLOY.md §5 before turning backups on.
 - **Registration is open.** The app is publicly reachable, so anyone with the URL can create an
   account and consume the Resend quota. There is no invite gate.
+
+**Phase 12 (rail, coach and ferry as first-class segments) shipped 2026-08-16**, from PLAN-V3 §3a.
+`flights` became `segments`; migration 0007 renames the table and its columns and defaults every
+existing row to `mode = 'air'`, because every row that existed was a flight. Rehearsed against a
+database built at 0006 with a real booking, a pending reminder and an import in it.
 
 **Phase 11 (conflict and gap detection) shipped 2026-08-15**, from PLAN-V3. Pure function in
 `shared/`, run on the client, so it works offline and costs nothing per use. It is the feature that
@@ -135,6 +141,15 @@ Findings from building that contradict a straight port from budget-app, all enco
   `processedAt`, which is stamped at ingest and so is never null. One `AWAITING` predicate now
   serves all three. The badge also lives in `InboxProvider` rather than `App`, because reviewing an
   import does not navigate and the count was only ever re-read on a route change.
+- **A journey is not a flight.** `flights` became `segments` with a `mode` of air/rail/coach/ferry
+  (PLAN-V3 §3a, migration 0007). A train has everything a flight has — origin, destination,
+  departure, arrival — and landing it as a generic activity threw the destination away, which is
+  exactly the data a conflict needs. The endpoint is an IATA code for air and a station *name* for
+  everything else; there is no IATA for stations, so the zone is asked for rather than derived. Hue
+  encodes the kind and the icon's shape encodes the mode.
+- **The conflict rule was parsing the subtitle.** Putting seats in it made every connection compare
+  `LIS · 14C` against `LIS` and report a change of airport that was not one. Endpoints are now
+  structured fields on the timeline item. A display string is not an interface.
 - **A booking is a list, not a row.** The flight import extracted one leg and one seat: a return
   trip lost the flight home, and a family booking lost everyone but one seat. A booking now carries
   `flights[]` and `passengers[]`; `flights.seat` became a `passengers` JSON column (migration 0005,

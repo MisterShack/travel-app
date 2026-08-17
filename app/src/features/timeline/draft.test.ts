@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { applyDraft } from './draft';
 
 const form = {
-  airline: '',
-  flightNumber: '',
-  departureAirport: '',
+  mode: 'air' as const,
+  carrier: '',
+  service: '',
+  origin: '',
   departureLocal: '',
-  arrivalAirport: '',
+  destination: '',
   arrivalLocal: '',
   passengers: [{ name: '', seat: '' }],
   name: '',
@@ -57,8 +58,8 @@ describe('applyDraft', () => {
   });
 
   it('leaves anything the draft does not mention alone', () => {
-    const next = applyDraft({ ...form, airline: 'WestJet' }, { name: 'X' });
-    expect(next.airline).toBe('WestJet');
+    const next = applyDraft({ ...form, carrier: 'WestJet' }, { name: 'X' });
+    expect(next.carrier).toBe('WestJet');
   });
 
   it('carries every passenger, not just a seat', () => {
@@ -84,5 +85,32 @@ describe('applyDraft', () => {
     expect(applyDraft(form, {}).passengers).toEqual([{ name: '', seat: '' }]);
     expect(applyDraft(form, { passengers: [] }).passengers).toEqual([{ name: '', seat: '' }]);
     expect(applyDraft(form, { passengers: 'nope' }).passengers).toEqual([{ name: '', seat: '' }]);
+  });
+});
+
+describe('applyDraft on a journey', () => {
+  it('carries the mode, so a train does not arrive as a flight', () => {
+    // PLAN-V3 §3a: rail is first-class, not an activity with the route in its
+    // name. The form's wording follows the mode, so getting it wrong labels a
+    // Via Rail booking's operator "Airline".
+    const next = applyDraft(form, {
+      mode: 'rail',
+      carrier: 'Via Rail',
+      service: '55',
+      origin: 'Ottawa',
+      destination: 'Toronto Union',
+    });
+    expect(next).toMatchObject({
+      mode: 'rail',
+      carrier: 'Via Rail',
+      service: '55',
+      origin: 'Ottawa',
+      destination: 'Toronto Union',
+    });
+  });
+
+  it('falls back to air when the model names a mode nobody has', () => {
+    expect(applyDraft(form, { mode: 'teleport' }).mode).toBe('air');
+    expect(applyDraft(form, {}).mode).toBe('air');
   });
 });

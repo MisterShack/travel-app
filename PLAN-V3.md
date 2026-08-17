@@ -140,9 +140,26 @@ zone can most likely be derived from the trip or asked for, as lodging already d
   overlap checks entirely, because a hotel spans the whole stay and would otherwise conflict with
   every dinner; and an overnight flight counts as covering a night, because telling someone to book
   a hotel they are flying through would be wrong.
-- **Phase 12 — Segments.** §3a. Rail, coach and ferry as first-class journeys. Sequenced after
-  Phase 11 so the conflict rules exist before the data model widens under them, and because it is
-  the first migration to touch live bookings.
+- **Phase 12 — Segments: done 2026-08-16.** §3a. `flights` became `segments` with a `mode`;
+  `airline`/`flight_number`/`departure_airport`/`arrival_airport` became
+  `carrier`/`service`/`origin`/`destination`. Migration 0007 is hand-written, because drizzle-kit
+  cannot tell a rename from a drop-and-add and on live data the difference is every existing
+  booking; SQLite's RENAME is a catalogue edit, so there is no table copy and no partial move.
+  `mode` defaults to `'air'` — every row that existed was a flight, so the default is the backfill.
+
+  **Sequencing it after Phase 11 was right, and for a reason the plan did not anticipate.** The
+  connection rule read its endpoints by splitting the subtitle on "→". That held only while the
+  subtitle was exactly `LHR → LIS`; adding seats to it made every connection compare `LIS · 14C`
+  against `LIS` and report a change of airport that was not one. The endpoints are now structured
+  fields on the timeline item. A display string is not an interface, and the rule that depended on
+  one was already broken before the data model widened under it.
+
+  **The open question is answered: no rail equivalent of the airport table.** There is no IATA for
+  stations, and bundling a station list would be a large table serving one lookup. The endpoint is
+  the station *name* as the ticket writes it, and the zone is asked for on the form — exactly as
+  lodging already does. Setting the departure zone carries the arrival zone with it, because most
+  rail journeys do not cross one and a mismatched pair records an instant hours out while both
+  fields look filled in.
 
 ## 5. Open questions
 

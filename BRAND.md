@@ -77,7 +77,7 @@ Ink on warm paper, with a single amber accent.
 | `--warn` | `#a8500a` | `#f5b25e` | DST anomalies, stale data |
 | `--alert` | `#a4232c` | `#ff8a8a` | Errors, destructive actions |
 | `--focus` | `#b45309` | `#f0a03c` | Focus ring |
-| `--kind-flight` | `#2c5c8a` | `#7fb3e0` | Flights |
+| `--kind-segment` | `#2c5c8a` | `#7fb3e0` | Journeys — flight, train, coach, ferry |
 | `--kind-lodging` | `#2f6b4f` | `#7fc9a3` | Stays |
 | `--kind-activity` | `#6b4a8a` | `#bda1e0` | Activities |
 
@@ -215,7 +215,9 @@ administer it live behind a control rather than below the fold.**
   metadata; they never take the accent.
 - **The timeline row** is the one component worth getting exactly right: a fixed-width time column
   with tabular figures, a hairline separating days, and a **round kind chip** — the kind's hue at
-  12% on a tinted disc, holding a stroked icon. It replaced a bare text glyph (`✈ ⌂ ◆`), which was
+  12% on a tinted disc, holding a stroked icon. **Hue is the kind, shape is the mode**: every
+  journey takes one blue, and a train is told from a flight by its icon. Four hues for four modes
+  would spend the palette on a distinction the icon already makes. It replaced a bare text glyph (`✈ ⌂ ◆`), which was
   the other clearest tell of a to-do list: a character where an icon should be.
 
 ## 8. Voice

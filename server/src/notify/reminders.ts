@@ -8,13 +8,13 @@ import { pushSubscriptions, reminders, tripMembers } from '../db/schema';
  * Reminder generation and fan-out (PLAN.md §7).
  */
 
-export type RelatedType = 'flight' | 'lodging' | 'activity';
+export type RelatedType = 'segment' | 'lodging' | 'activity';
 
 /**
  * How long before an event its reminder fires.
  *
  * Settles the open question in PLAN.md §13. The numbers are the lead time each
- * event type actually needs to be useful: a flight is the one you must leave
+ * event type actually needs to be useful: a journey is the one you must leave
  * for, so three hours covers travel to the airport and bag drop; a hotel
  * check-in only needs enough warning to plan the afternoon; a dinner
  * reservation needs an hour. Not user-configurable yet — a per-event override
@@ -22,7 +22,7 @@ export type RelatedType = 'flight' | 'lodging' | 'activity';
  * exposing a setting nobody will open.
  */
 export const DEFAULT_LEAD_MINUTES: Record<RelatedType, number> = {
-  flight: 180,
+  segment: 180,
   lodging: 120,
   activity: 60,
 };
@@ -56,7 +56,7 @@ function compose(subject: ReminderSubject): { title: string; body: string } {
   const time = local.slice(11);
   const where = subject.place ?? zoneLabel(subject.timezone);
   const noun =
-    subject.relatedType === 'flight' ? 'departs' : subject.relatedType === 'lodging' ? 'check-in' : 'starts';
+    subject.relatedType === 'segment' ? 'departs' : subject.relatedType === 'lodging' ? 'check-in' : 'starts';
   return {
     title: subject.title,
     body: `${noun} at ${time} (${where})${subject.detail ? ` — ${subject.detail}` : ''}`,

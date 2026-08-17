@@ -1,5 +1,5 @@
 import type { SVGProps } from 'react';
-import type { TimelineItem } from '@travel/shared';
+import type { SegmentMode, TimelineItem } from '@travel/shared';
 
 /**
  * Every icon in the app, in one file.
@@ -108,6 +108,33 @@ function FlightIcon() {
   );
 }
 
+/** A train, seen head-on: the shape a station board uses. */
+function RailIcon() {
+  return (
+    <svg {...filled}>
+      <path d="M12 2.2c-3.1 0-6.2.4-6.2 3.3v8.9a3.4 3.4 0 0 0 3.4 3.4l-1.6 1.6v.6h8.8v-.6l-1.6-1.6a3.4 3.4 0 0 0 3.4-3.4V5.5c0-2.9-3.1-3.3-6.2-3.3Zm-4.2 4h8.4v3.9H7.8V6.2Zm1.6 9.1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm5.2 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Z" />
+    </svg>
+  );
+}
+
+/** A coach in profile — longer than a car, windows along the side. */
+function CoachIcon() {
+  return (
+    <svg {...filled}>
+      <path d="M3.4 6.4A2.2 2.2 0 0 1 5.6 4.2h12.8a2.2 2.2 0 0 1 2.2 2.2v8.3a2.2 2.2 0 0 1-2.2 2.2v1.3a1.1 1.1 0 0 1-2.2 0v-1.3H7.8v1.3a1.1 1.1 0 0 1-2.2 0v-1.3a2.2 2.2 0 0 1-2.2-2.2V6.4Zm2.2.5v4.2h12.8V6.9H5.6Zm1.7 7.4a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6Zm9.4 0a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6Z" />
+    </svg>
+  );
+}
+
+/** A hull on water. */
+function FerryIcon() {
+  return (
+    <svg {...filled}>
+      <path d="M11 2.4h2v1.7h3.1a1 1 0 0 1 1 1v3.3l2.3.8a1 1 0 0 1 .6 1.3l-1.9 5a3.4 3.4 0 0 1-1.4-.8 2.4 2.4 0 0 0-3.3 0 2.4 2.4 0 0 1-3.2 0 2.4 2.4 0 0 0-3.3 0 3.4 3.4 0 0 1-1.4.8l-1.9-5a1 1 0 0 1 .6-1.3l2.3-.8V5.1a1 1 0 0 1 1-1H11V2.4Zm-2 3.7v2.6l3-1.1 3 1.1V6.1H9ZM3.2 18.1a3 3 0 0 0 2.2-.9 1.2 1.2 0 0 1 1.7 0 3.6 3.6 0 0 0 4.9 0 1.2 1.2 0 0 1 1.7 0 3.6 3.6 0 0 0 4.9 0 1.2 1.2 0 0 1 1.7 0 3 3 0 0 0 2.2.9v2.1a5 5 0 0 1-3.1-1 5.6 5.6 0 0 1-6.6 0 5.6 5.6 0 0 1-6.6 0 5 5 0 0 1-3 1v-2.1Z" />
+    </svg>
+  );
+}
+
 function LodgingIcon() {
   return (
     <svg {...filled}>
@@ -129,10 +156,18 @@ function ActivityIcon() {
 }
 
 const KIND_ICON = {
-  flight: FlightIcon,
+  segment: FlightIcon,
   lodging: LodgingIcon,
   activity: ActivityIcon,
 } as const;
+
+/** A journey's icon comes from how it carries you, not from the fact it is one. */
+const MODE_ICON: Record<SegmentMode, () => React.JSX.Element> = {
+  air: FlightIcon,
+  rail: RailIcon,
+  coach: CoachIcon,
+  ferry: FerryIcon,
+};
 
 /**
  * The kind's icon on its own tinted disc.
@@ -143,12 +178,14 @@ const KIND_ICON = {
  */
 export function KindChip({
   kind,
+  mode,
   size = '',
 }: {
   kind: TimelineItem['kind'];
+  mode?: SegmentMode | null;
   size?: '' | 'sm' | 'lg';
 }) {
-  const Icon = KIND_ICON[kind];
+  const Icon = kind === 'segment' && mode ? MODE_ICON[mode] : KIND_ICON[kind];
   return (
     <span className={`kind-chip kind-${kind}${size === '' ? '' : ` ${size}`}`}>
       <Icon />

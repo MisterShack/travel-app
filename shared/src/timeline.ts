@@ -16,15 +16,31 @@ export const eventTimeSchema = z.object({
 });
 export type EventTime = z.infer<typeof eventTimeSchema>;
 
-export const timelineKinds = ['flight', 'lodging', 'activity'] as const;
+export const timelineKinds = ['segment', 'lodging', 'activity'] as const;
 export const timelineKindSchema = z.enum(timelineKinds);
 export type TimelineKind = z.infer<typeof timelineKindSchema>;
 
-const iataSchema = z
-  .string()
-  .trim()
-  .toUpperCase()
-  .regex(/^[A-Z]{3}$/, 'Airport codes are three letters, e.g. LHR');
+/**
+ * How a segment carries you (PLAN-V3 §3a).
+ *
+ * A train has everything a flight has — origin, destination, departure,
+ * arrival — and only `flights` modelled that shape, so a rail journey landed as
+ * a generic activity and its destination was thrown away. Most travel apps are
+ * US-built and flight-first; in Canada and Europe that is simply wrong.
+ */
+export const segmentModes = ['air', 'rail', 'coach', 'ferry'] as const;
+export const segmentModeSchema = z.enum(segmentModes);
+export type SegmentMode = z.infer<typeof segmentModeSchema>;
+
+/**
+ * An endpoint is an IATA code for air and a place name for everything else.
+ *
+ * There is no IATA for railway stations, and inventing one would be worse than
+ * a name: "Ottawa" is what the ticket says. The zone is asked for rather than
+ * derived, exactly as lodging already does — the airport table can answer it
+ * for air, and nothing can answer it for rail.
+ */
+const endpointSchema = z.string().trim().min(1).max(80);
 
 /**
  * One traveller on a booking.
@@ -40,25 +56,47 @@ export const passengerSchema = z.object({
 });
 export type Passenger = z.infer<typeof passengerSchema>;
 
-export const flightInputSchema = z
+export const segmentInputSchema = z
   .object({
-    airline: z.string().trim().min(1).max(80),
-    flightNumber: z.string().trim().min(1).max(10),
+    mode: segmentModeSchema,
+    /** The airline, the railway, the operator. */
+    carrier: z.string().trim().min(1).max(80),
+    /** The flight number, the train number, the sailing. */
+    service: z.string().trim().min(1).max(20),
     confirmationCode: z.string().trim().max(40).optional(),
-    departureAirport: iataSchema,
+    origin: endpointSchema,
     departure: eventTimeSchema,
-    arrivalAirport: iataSchema,
+    destination: endpointSchema,
     arrival: eventTimeSchema,
     passengers: z.array(passengerSchema).max(20).optional(),
     notes: z.string().trim().max(2000).optional(),
   })
+  // Air endpoints are still held to IATA: the code is what derives the zone,
+  // and a free-text airport would quietly lose that.
+  .superRefine((seg, ctx) => {
+    if (seg.mode !== 'air') return;
+    for (const field of ['origin', 'destination'] as const) {
+      if (!/^[A-Z]{3}$/.test(seg[field].toUpperCase())) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [field],
+          message: 'Airport codes are three letters, e.g. LHR',
+        });
+      }
+    }
+  })
+  .transform((seg) =>
+    seg.mode === 'air'
+      ? { ...seg, origin: seg.origin.toUpperCase(), destination: seg.destination.toUpperCase() }
+      : seg,
+  )
   // Checked on the instants server-side too; this catches the obvious case
   // early and gives the form a field to point at.
   .refine((f) => f.departure.local <= f.arrival.local || f.departure.timezone !== f.arrival.timezone, {
     message: 'Arrival is before departure',
     path: ['arrival'],
   });
-export type FlightInput = z.infer<typeof flightInputSchema>;
+export type SegmentInput = z.infer<typeof segmentInputSchema>;
 
 export const lodgingInputSchema = z.object({
   name: z.string().trim().min(1).max(160),
@@ -111,6 +149,19 @@ export const timelineItemSchema = z.object({
    * show instead.
    */
   startPlace: z.string().nullable(),
+  /** Present on segments only: how this one carries you. */
+  mode: segmentModeSchema.nullable(),
+  /**
+   * The endpoints as the booking states them — an IATA code for air, a station
+   * name for rail. Null for anything that is not a segment.
+   *
+   * Separate from `startPlace`/`endPlace`, which name the *place* for the zone
+   * badge. The two differ on purpose: LHR and LGW are both "London" and must
+   * still compare as a change of airport, while an Ottawa arrival must read as
+   * Ottawa and not as its zone's namesake.
+   */
+  origin: z.string().nullable(),
+  destination: z.string().nullable(),
   /** Present for flights (arrival), lodging (check-out) and timed activities. */
   endAt: z.string().nullable(),
   endLocal: localDateTimeSchema.nullable(),

@@ -1,5 +1,5 @@
 import { and, eq, isNull, lte } from 'drizzle-orm';
-import { activities, flights, lodging, pushSubscriptions, reminders, users } from '../db/schema';
+import { activities, lodging, pushSubscriptions, reminders, segments, users } from '../db/schema';
 import type { Db } from '../db/client';
 import type { Mailer } from '../mail/mailer';
 import { GoneError, type Pusher } from './push';
@@ -27,7 +27,7 @@ export const STALE_AFTER_MS = 2 * 60 * 60 * 1000;
 
 export type SweepDeps = { db: Db; mailer: Mailer; pusher: Pusher | null };
 
-const TABLES = { flight: flights, lodging, activity: activities } as const;
+const TABLES = { segment: segments, lodging, activity: activities } as const;
 
 /** Does the thing this reminder is about still exist? */
 async function targetExists(db: Db, kind: keyof typeof TABLES, id: string): Promise<boolean> {

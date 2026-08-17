@@ -67,7 +67,16 @@ function Event({ item, homeTimezone }: { item: TimelineItem; homeTimezone: strin
    * because it departed from London, which is noise.
    */
   const showStartZone = item.startTimezone !== homeTimezone;
-  const showEndZone = item.endTimezone !== null && item.endTimezone !== homeTimezone;
+  /**
+   * The end is badged only when it is a *different* zone from the start as well
+   * as from home. A train from Ottawa to Toronto Union is one zone end to end,
+   * and badging both ends said the same thing twice — the badge exists to warn
+   * that a time is not on the trip's clock, not to restate the route.
+   */
+  const showEndZone =
+    item.endTimezone !== null &&
+    item.endTimezone !== homeTimezone &&
+    item.endTimezone !== item.startTimezone;
 
   /**
    * An end on a different calendar day needs its date shown. A hotel rendered
@@ -101,7 +110,7 @@ function Event({ item, homeTimezone }: { item: TimelineItem; homeTimezone: strin
             <div className="zone">{item.endPlace ?? zoneLabel(item.endTimezone!)}</div>
           )}
         </div>
-        <KindChip kind={item.kind} />
+        <KindChip kind={item.kind} mode={item.mode} />
         <div className="body">
           <div className="title">
             {/* The chip is decorative to assistive tech, so the kind is said

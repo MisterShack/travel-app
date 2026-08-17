@@ -15,13 +15,47 @@ import { TimezoneField } from '@/features/timeline/AirportField';
 
 const guessZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
-const KINDS = ['flight', 'lodging', 'activity'] as const;
+const KINDS = ['segment', 'lodging', 'activity'] as const;
 
-const ADD_HINT: Record<TimelineItem['kind'], string> = {
-  flight: 'Departure and arrival, each in its own timezone',
-  lodging: 'Check-in and check-out',
-  activity: 'A booking, a reservation, or something to be somewhere for',
-};
+/**
+ * What the add sheet offers.
+ *
+ * A flight and a train are the same kind of thing to the data model and two
+ * different things to a traveller, so the sheet asks for the mode directly
+ * rather than making anyone pick "Journey" and then a mode. Coach and ferry are
+ * reachable by switching mode inside the form — four options is a choice, seven
+ * is a menu.
+ */
+const ADD_OPTIONS = [
+  {
+    to: 'segment/new',
+    kind: 'segment' as const,
+    mode: 'air' as const,
+    label: 'Flight',
+    hint: 'Departure and arrival, each in its own timezone',
+  },
+  {
+    to: 'segment/new?mode=rail',
+    kind: 'segment' as const,
+    mode: 'rail' as const,
+    label: 'Train',
+    hint: 'A rail journey, with the station it actually arrives at',
+  },
+  {
+    to: 'lodging/new',
+    kind: 'lodging' as const,
+    mode: null,
+    label: 'Stay',
+    hint: 'Check-in and check-out',
+  },
+  {
+    to: 'activity/new',
+    kind: 'activity' as const,
+    mode: null,
+    label: 'Activity',
+    hint: 'A booking, a reservation, or something to be somewhere for',
+  },
+];
 
 /**
  * A date range, rendered in the reader's locale. Noon UTC avoids the classic
@@ -299,17 +333,17 @@ export function TripDetailPage() {
       {adding && (
         <Sheet title="Add to trip" onClose={closeSheet}>
           <div className="sheet-options">
-            {KINDS.map((kind) => (
+            {ADD_OPTIONS.map((option) => (
               <Link
-                key={kind}
-                className={`sheet-option kind-${kind}`}
-                to={`/trips/${tripId}/${kind}/new`}
+                key={option.to}
+                className={`sheet-option kind-${option.kind}`}
+                to={`/trips/${tripId}/${option.to}`}
                 onClick={closeSheet}
               >
-                <KindChip kind={kind} size="lg" />
+                <KindChip kind={option.kind} mode={option.mode} size="lg" />
                 <span>
-                  <span className="label">{KIND_LABEL[kind]}</span>
-                  <span className="sub">{ADD_HINT[kind]}</span>
+                  <span className="label">{option.label}</span>
+                  <span className="sub">{option.hint}</span>
                 </span>
               </Link>
             ))}

@@ -12,11 +12,12 @@ afterEach(() => h?.cleanup());
 const NOW = new Date('2026-08-15T12:00:00.000Z');
 const TRIP = { name: 'Lisbon', startDate: '2026-09-10', endDate: '2026-09-18', homeTimezone: 'Europe/Lisbon' };
 const FLIGHT = {
-  airline: 'TAP',
-  flightNumber: 'TP1233',
-  departureAirport: 'LHR',
+  mode: 'air' as const,
+  carrier: 'TAP',
+  service: 'TP1233',
+  origin: 'LHR',
   departure: { local: '2026-09-10T10:00', timezone: 'Europe/London' },
-  arrivalAirport: 'LIS',
+  destination: 'LIS',
   arrival: { local: '2026-09-10T13:00', timezone: 'Europe/Lisbon' },
 };
 
@@ -24,8 +25,8 @@ async function trip(cookie: string) {
   const res = await h.app.request(jsonRequest('/trips', 'POST', TRIP, cookie));
   return ((await res.json()) as { id: string }).id;
 }
-async function addFlight(cookie: string, tripId: string, over: Partial<typeof FLIGHT> = {}) {
-  const res = await h.app.request(jsonRequest(`/trips/${tripId}/flights`, 'POST', { ...FLIGHT, ...over }, cookie));
+async function addSegment(cookie: string, tripId: string, over: Partial<typeof FLIGHT> = {}) {
+  const res = await h.app.request(jsonRequest(`/trips/${tripId}/segments`, 'POST', { ...FLIGHT, ...over }, cookie));
   return ((await res.json()) as { id: string }).id;
 }
 const rowsFor = (tripId: string) => h.db.select().from(reminders).where(eq(reminders.tripId, tripId));
@@ -43,7 +44,7 @@ describe('fan-out', () => {
       jsonRequest(`/invites/${tokenFromMail(h.mailer, 'b@example.com')}/accept`, 'POST', undefined, member),
     );
 
-    await addFlight(owner, id);
+    await addSegment(owner, id);
     const rows = await rowsFor(id);
     expect(rows).toHaveLength(2);
     expect(new Set(rows.map((r) => r.userId)).size).toBe(2);
@@ -56,7 +57,7 @@ describe('fan-out', () => {
     const id = await trip(cookie);
     await h.app.request(jsonRequest(`/trips/${id}/reminders`, 'POST', { enabled: false }, cookie));
 
-    await addFlight(cookie, id);
+    await addSegment(cookie, id);
     expect(await rowsFor(id)).toHaveLength(0);
   });
 
@@ -68,7 +69,7 @@ describe('fan-out', () => {
       jsonRequest('/push/subscribe', 'POST', { endpoint: 'https://push.example/x', keys: { p256dh: 'k', auth: 'a' } }, cookie),
     );
 
-    await addFlight(cookie, id);
+    await addSegment(cookie, id);
     const rows = await rowsFor(id);
     expect(new Set(rows.map((r) => r.channel))).toEqual(new Set(['email', 'push']));
   });
@@ -77,12 +78,12 @@ describe('fan-out', () => {
     h = await createHarness();
     const cookie = await signUp(h, 'a@example.com');
     const id = await trip(cookie);
-    await addFlight(cookie, id);
+    await addSegment(cookie, id);
 
     const [row] = await rowsFor(id);
     // Departure is 2026-09-10T09:00Z; flights lead by 3 hours.
     expect(row?.remindAt).toBe('2026-09-10T06:00:00.000Z');
-    expect(DEFAULT_LEAD_MINUTES.flight).toBe(180);
+    expect(DEFAULT_LEAD_MINUTES.segment).toBe(180);
   });
 
   it('creates nothing for an event whose reminder time has already passed', async () => {
@@ -90,7 +91,7 @@ describe('fan-out', () => {
     const cookie = await signUp(h, 'a@example.com');
     const id = await trip(cookie);
     // Departs 30 minutes from the harness clock — the 3h lead is in the past.
-    await addFlight(cookie, id, {
+    await addSegment(cookie, id, {
       departure: { local: '2026-08-15T13:30', timezone: 'UTC' },
       arrival: { local: '2026-08-15T15:30', timezone: 'UTC' },
     });
@@ -104,12 +105,12 @@ describe('regeneration', () => {
     h = await createHarness();
     const cookie = await signUp(h, 'a@example.com');
     const id = await trip(cookie);
-    const flightId = await addFlight(cookie, id);
+    const flightId = await addSegment(cookie, id);
     expect((await rowsFor(id))[0]?.remindAt).toBe('2026-09-10T06:00:00.000Z');
 
     await h.app.request(
       jsonRequest(
-        `/flights/${flightId}`,
+        `/segments/${flightId}`,
         'PATCH',
         { ...FLIGHT, departure: { local: '2026-09-10T14:00', timezone: 'Europe/London' } },
         cookie,
@@ -124,8 +125,8 @@ describe('regeneration', () => {
     h = await createHarness();
     const cookie = await signUp(h, 'a@example.com');
     const id = await trip(cookie);
-    const flightId = await addFlight(cookie, id);
-    await h.app.request(jsonRequest(`/flights/${flightId}`, 'DELETE', undefined, cookie));
+    const flightId = await addSegment(cookie, id);
+    await h.app.request(jsonRequest(`/segments/${flightId}`, 'DELETE', undefined, cookie));
     expect(await rowsFor(id)).toHaveLength(0);
   });
 
@@ -135,10 +136,10 @@ describe('regeneration', () => {
     h = await createHarness();
     const cookie = await signUp(h, 'a@example.com');
     const id = await trip(cookie);
-    const flightId = await addFlight(cookie, id);
+    const flightId = await addSegment(cookie, id);
     await h.db.update(reminders).set({ sentAt: NOW.toISOString() }).where(eq(reminders.tripId, id));
 
-    await h.app.request(jsonRequest(`/flights/${flightId}`, 'PATCH', { ...FLIGHT, seat: '3A' }, cookie));
+    await h.app.request(jsonRequest(`/segments/${flightId}`, 'PATCH', { ...FLIGHT, seat: '3A' }, cookie));
     const rows = await rowsFor(id);
     expect(rows.filter((r) => r.sentAt !== null)).toHaveLength(1);
   });
@@ -150,7 +151,7 @@ describe('the sweep', () => {
   async function dueFlight() {
     const cookie = await signUp(h, 'a@example.com');
     const id = await trip(cookie);
-    await addFlight(cookie, id);
+    await addSegment(cookie, id);
     return { cookie, tripId: id };
   }
 
@@ -180,12 +181,13 @@ describe('the sweep', () => {
     h = await createHarness();
     const cookie = await signUp(h, 'a@example.com');
     const id = await trip(cookie);
-    await addFlight(cookie, id, {
-      airline: 'WestJet',
-      flightNumber: 'WS3120',
-      departureAirport: 'YWG',
+    await addSegment(cookie, id, {
+      mode: 'air',
+      carrier: 'WestJet',
+      service: 'WS3120',
+      origin: 'YWG',
       departure: { local: '2026-09-10T07:15', timezone: 'America/Winnipeg' },
-      arrivalAirport: 'YOW',
+      destination: 'YOW',
       arrival: { local: '2026-09-10T10:40', timezone: 'America/Toronto' },
     });
 
@@ -221,9 +223,9 @@ describe('the sweep', () => {
     h = await createHarness();
     const cookie = await signUp(h, 'a@example.com');
     const id = await trip(cookie);
-    await addFlight(cookie, id);
-    // Delete the flight directly, leaving the reminder behind.
-    await h.db.delete((await import('../src/db/schema')).flights);
+    await addSegment(cookie, id);
+    // Delete the journey directly, leaving the reminder behind.
+    await h.db.delete((await import('../src/db/schema')).segments);
 
     const result = await sweepOnce(deps(), new Date('2026-09-10T06:00:00.000Z'));
     expect(result.orphaned).toBe(1);
@@ -253,7 +255,7 @@ describe('the sweep', () => {
     for (const e of ['https://push.example/phone', 'https://push.example/laptop']) {
       await h.app.request(jsonRequest('/push/subscribe', 'POST', { endpoint: e, keys: { p256dh: 'k', auth: 'a' } }, cookie));
     }
-    await addFlight(cookie, id);
+    await addSegment(cookie, id);
 
     const pusher = new MemoryPusher();
     await sweepOnce({ db: h.db, mailer: h.mailer, pusher }, new Date('2026-09-10T06:00:00.000Z'));
@@ -301,8 +303,8 @@ describe('muting', () => {
     const two = await trip(cookie);
     await h.app.request(jsonRequest(`/trips/${one}/reminders`, 'POST', { enabled: false }, cookie));
 
-    await addFlight(cookie, one);
-    await addFlight(cookie, two);
+    await addSegment(cookie, one);
+    await addSegment(cookie, two);
     expect(await rowsFor(one)).toHaveLength(0);
     expect(await rowsFor(two)).toHaveLength(1);
   });

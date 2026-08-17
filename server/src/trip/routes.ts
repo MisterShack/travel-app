@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import {
   activityInputSchema,
-  flightInputSchema,
+  segmentInputSchema,
   inviteInputSchema,
   lodgingInputSchema,
   tripInputSchema,
@@ -32,7 +32,7 @@ import {
 } from '../notify/reminders';
 import {
   createActivity,
-  createFlight,
+  createSegment,
   createLodging,
   deleteEntity,
   getEntity,
@@ -41,7 +41,7 @@ import {
   timeAnomalies,
   tripIdOf,
   updateActivity,
-  updateFlight,
+  updateSegment,
   updateLodging,
   type EntityKind,
 } from './timeline';
@@ -289,19 +289,19 @@ export function createTripRoutes(deps: TripDeps) {
    * owners: this is a family trip planner, and requiring an owner to enter every
    * hotel would make sharing pointless (PLAN.md §5).
    */
-  app.post('/trips/:id/flights', auth, async (c) => {
+  app.post('/trips/:id/segments', auth, async (c) => {
     const tripId = c.req.param('id');
     if (!(await roleIn(db, tripId, c.get('user').id))) return c.json({ error: 'not_found' }, 404);
 
-    const body = flightInputSchema.safeParse(await c.req.json().catch(() => null));
-    if (!body.success) return c.json(badRequest('Check the flight details.', body.error.issues), 400);
+    const body = segmentInputSchema.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json(badRequest('Check the journey details.', body.error.issues), 400);
 
     const at = now();
-    const id = await createFlight(db, tripId, body.data, at);
+    const id = await createSegment(db, tripId, body.data, at);
     // Reminders fan out from the stored row, so they reflect the derived
     // instant rather than whatever the client submitted (PLAN.md §7).
-    const stored = await getEntity(db, 'flight', id);
-    if (stored) await generateReminders(db, reminderSubjectFor('flight', stored), at);
+    const stored = await getEntity(db, 'segment', id);
+    if (stored) await generateReminders(db, reminderSubjectFor('segment', stored), at);
     return c.json({ ok: true, id, ...warn(timeAnomalies({ departure: body.data.departure, arrival: body.data.arrival })) }, 201);
   });
 
@@ -344,7 +344,7 @@ export function createTripRoutes(deps: TripDeps) {
   };
 
   /**
-   * The entity routes are flat (`/flights/:id`), so authorisation resolves
+   * The entity routes are flat (`/segments/:id`), so authorisation resolves
    * entity → trip → role. An id in the URL is a claim, never an authorisation.
    *
    * The three kinds share this shape but not their schemas, so the parse and
@@ -377,11 +377,11 @@ export function createTripRoutes(deps: TripDeps) {
       const raw = await c.req.json().catch(() => null);
 
       switch (kind) {
-        case 'flight': {
-          const body = flightInputSchema.safeParse(raw);
-          if (!body.success) return c.json(badRequest('Check the flight details.', body.error.issues), 400);
-          await updateFlight(db, found.id, body.data, at);
-          await regenerateFor('flight', found.id, at);
+        case 'segment': {
+          const body = segmentInputSchema.safeParse(raw);
+          if (!body.success) return c.json(badRequest('Check the journey details.', body.error.issues), 400);
+          await updateSegment(db, found.id, body.data, at);
+          await regenerateFor('segment', found.id, at);
           return c.json({ ok: true, ...warn(timeAnomalies({ departure: body.data.departure, arrival: body.data.arrival })) });
         }
         case 'lodging': {
@@ -405,14 +405,14 @@ export function createTripRoutes(deps: TripDeps) {
       const found = await authorise(c);
       if ('error' in found) return found.error;
       // Pending reminders go with it, or the app pings you about a cancelled
-      // flight. Already-sent ones survive as a record (PLAN.md §7).
+      // journey. Already-sent ones survive as a record (PLAN.md §7).
       await deleteAutoReminders(db, kind, found.id);
       await deleteEntity(db, kind, found.id, found.tripId);
       return c.json({ ok: true });
     });
   };
 
-  entityRoute('/flights/:id', 'flight');
+  entityRoute('/segments/:id', 'segment');
   entityRoute('/lodging/:id', 'lodging');
   entityRoute('/activities/:id', 'activity');
 

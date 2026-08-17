@@ -4,7 +4,7 @@ import { index, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
  * Timestamps are ISO-8601 UTC strings, matching the convention `shared/` uses.
  * No `Date` objects anywhere in stored values.
  *
- * Phase 2 covers auth and trips. The timeline entities (flights, lodging,
+ * Phase 2 covers auth and trips. The timeline entities (segments, lodging,
  * activities), booking imports and reminders arrive in Phases 3–5; see
  * PLAN.md §3 for their shape, including the local+zone+instant triple every
  * event time carries.
@@ -83,7 +83,7 @@ export const authTokens = sqliteTable(
 /* -------------------------------------------------------------------------- */
 
 /**
- * A trip is what flights, lodging and activities belong to — not a user
+ * A trip is what segments, lodging and activities belong to — not a user
  * (PLAN.md §4). Unlike budget-app's ledgers there is no personal/shared
  * distinction: every trip starts with exactly one owner and can gain members.
  */
@@ -156,34 +156,49 @@ export const tripMembers = sqliteTable(
  * of them nullable.
  */
 
-export const flights = sqliteTable(
-  'flights',
+export const segments = sqliteTable(
+  'segments',
   {
     id: text('id').primaryKey(),
     tripId: text('trip_id')
       .notNull()
       .references(() => trips.id, { onDelete: 'cascade' }),
-    airline: text('airline').notNull(),
-    flightNumber: text('flight_number').notNull(),
+    /**
+     * How this segment carries you (PLAN-V3 §3a).
+     *
+     * This table was `flights`. A train has everything a flight has — origin,
+     * destination, departure, arrival — and only that table modelled the shape,
+     * so a rail journey landed as a generic activity and its destination was
+     * discarded. Most travel apps are US-built and flight-first; in Canada and
+     * Europe that is simply wrong.
+     */
+    mode: text('mode', { enum: ['air', 'rail', 'coach', 'ferry'] })
+      .notNull()
+      .default('air'),
+    /** The airline, the railway, the ferry operator. */
+    carrier: text('carrier').notNull(),
+    /** The flight number, the train number, the sailing. */
+    service: text('service').notNull(),
     confirmationCode: text('confirmation_code'),
 
-    departureAirport: text('departure_airport').notNull(),
+    /** An IATA code for air; a station or port name for everything else. */
+    origin: text('origin').notNull(),
     departureLocal: text('departure_local').notNull(),
     departureTimezone: text('departure_timezone').notNull(),
     departureAt: text('departure_at').notNull(),
 
-    arrivalAirport: text('arrival_airport').notNull(),
+    destination: text('destination').notNull(),
     arrivalLocal: text('arrival_local').notNull(),
     arrivalTimezone: text('arrival_timezone').notNull(),
     arrivalAt: text('arrival_at').notNull(),
 
     /**
-     * JSON `[{ "name": string, "seat": string }]` — everyone on this flight.
+     * JSON `[{ "name": string, "seat": string }]` — everyone on this segment.
      *
      * Replaced a single `seat` column, which could hold a family booking only
      * by discarding all but one of them. JSON rather than a join table: a
-     * passenger has no identity outside its flight, is never queried across
-     * flights, and a trip has tens of rows.
+     * passenger has no identity outside its segment, is never queried across
+     * segments, and a trip has tens of rows.
      */
     passengers: text('passengers'),
     notes: text('notes'),
@@ -193,7 +208,7 @@ export const flights = sqliteTable(
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
-  (table) => [index('flights_trip_idx').on(table.tripId, table.departureAt)],
+  (table) => [index('segments_trip_idx').on(table.tripId, table.departureAt)],
 );
 
 export const lodging = sqliteTable(
@@ -256,7 +271,7 @@ export const activities = sqliteTable(
   (table) => [index('activities_trip_idx').on(table.tripId, table.startAt)],
 );
 
-export type FlightRow = typeof flights.$inferSelect;
+export type SegmentRow = typeof segments.$inferSelect;
 export type LodgingRow = typeof lodging.$inferSelect;
 export type ActivityRow = typeof activities.$inferSelect;
 
@@ -310,7 +325,7 @@ export const reminders = sqliteTable(
      * regenerated when the event is edited and deleted with it; the sweep also
      * skips any whose target has gone (PLAN.md §7).
      */
-    relatedType: text('related_type', { enum: ['flight', 'lodging', 'activity'] }).notNull(),
+    relatedType: text('related_type', { enum: ['segment', 'lodging', 'activity'] }).notNull(),
     relatedId: text('related_id').notNull(),
     origin: text('origin', { enum: ['auto', 'custom'] }).notNull(),
 
@@ -377,7 +392,7 @@ export const bookingImports = sqliteTable(
     status: text('status', {
       enum: ['pending', 'needs_review', 'applied', 'rejected', 'failed'],
     }).notNull(),
-    extractedType: text('extracted_type', { enum: ['flight', 'lodging', 'activity'] }),
+    extractedType: text('extracted_type', { enum: ['segment', 'lodging', 'activity'] }),
     /** JSON of the parse result, shown on the review screen. Never the email. */
     extractedFields: text('extracted_fields'),
     /** How it was read, so a bad parser run can be told from a bad email. */

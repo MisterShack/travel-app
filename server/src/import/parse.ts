@@ -14,9 +14,12 @@ import type { Attachment, ReceivedEmail } from './resendInbound';
  */
 
 export type Draft = {
-  type: 'flight' | 'lodging' | 'activity';
+  type: 'segment' | 'lodging' | 'activity';
   fields: Record<string, unknown>;
 };
+
+/** Anything the model does not name as a known mode is treated as a flight. */
+const MODES = ['air', 'rail', 'coach', 'ferry'];
 
 export type ParseResult =
   | { ok: true; draft: Draft; by: 'heuristic' | 'llm' }
@@ -114,16 +117,17 @@ export function parseHeuristic(email: ReceivedEmail): ParseResult | null {
       ok: true,
       by: 'heuristic',
       draft: {
-        type: 'flight',
+        type: 'segment',
         // The same shape the model path produces, so the review screen has one
         // case to handle rather than two. The heuristic only ever finds one leg
         // and never finds passengers; it says so by returning a list of one.
         fields: {
-          flights: [
+          segments: [
             {
-              flightNumber: `${carrier}${flight[2]}`,
-              departureAirport: route.from,
-              arrivalAirport: route.to,
+              mode: 'air',
+              service: `${carrier}${flight[2]}`,
+              origin: route.from,
+              destination: route.to,
             },
           ],
           passengers: [{ name: '', seat: '' }],
@@ -143,12 +147,12 @@ const SCHEMA_PROMPT = `You extract travel booking details from a forwarded confi
 Return ONLY JSON matching this shape, with no prose and no markdown fence:
 
 {
-  "type": "flight" | "lodging" | "activity" | "unknown",
+  "type": "segment" | "lodging" | "activity" | "unknown",
   "confirmationCode": string | null,
   "passengers": [ { "name": string, "seat": string | null } ] | null,
-  "flights": [ { "airline": string, "flightNumber": string, "departureAirport": string,
-                 "departureLocal": "YYYY-MM-DDTHH:mm", "arrivalAirport": string,
-                 "arrivalLocal": "YYYY-MM-DDTHH:mm" } ] | null,
+  "segments": [ { "mode": "air"|"rail"|"coach"|"ferry", "carrier": string, "service": string,
+                  "origin": string, "departureLocal": "YYYY-MM-DDTHH:mm",
+                  "destination": string, "arrivalLocal": "YYYY-MM-DDTHH:mm" } ] | null,
   "lodging": { "name": string, "address": string | null,
                "checkInLocal": "YYYY-MM-DDTHH:mm", "checkOutLocal": "YYYY-MM-DDTHH:mm" } | null,
   "activity": { "kind": "restaurant"|"attraction"|"transport"|"other", "name": string,
@@ -159,16 +163,22 @@ Return ONLY JSON matching this shape, with no prose and no markdown fence:
 Rules:
 - Times are LOCAL wall-clock at the place they happen. Never convert to UTC and never add an offset.
 - Airports are three-letter IATA codes.
-- departureAirport is where the passenger boards that flight and arrivalAirport is where they get
-  off it. Take both from the itinerary itself. Airports named in fare rules, baggage terms,
-  advertisements, loyalty-programme text or the airline's own mailing address are not part of this
+- A "segment" is anything that carries the traveller from one place to another: a flight, a train,
+  a coach or a ferry. Use type "segment" for all four, and set "mode" accordingly.
+- carrier is the airline, railway or operator ("WestJet", "Via Rail"). service is the flight number,
+  train number or sailing ("WS3120", "55").
+- origin and destination are where the traveller boards and gets off. For mode "air" they are
+  three-letter IATA codes. For every other mode they are the station, stop or port NAME as the
+  ticket writes it ("Ottawa", "Toronto Union") — there is no IATA for stations, so never invent one.
+- Take both endpoints from the itinerary itself. Places named in fare rules, baggage terms,
+  advertisements, loyalty-programme text or the operator's own mailing address are not part of this
   booking.
-- "flights" is a LIST, in the order flown. A return trip has two entries; a journey with a
+- "segments" is a LIST, in the order travelled. A return trip has two entries; a journey with a
   connection has one entry per leg, not one entry for the whole journey. Never merge an outbound
   and a return into a single entry, and never drop the return because the outbound was found first.
 - "passengers" lists everyone on the booking, with each person's seat if the email states one. One
   traveller is a list of one. Seats belong to people, not to the booking: if the email gives seats
-  per flight and they differ, use the seat for the FIRST flight and leave the rest to the reviewer.
+  per segment and they differ, use the seat for the FIRST segment and leave the rest to the reviewer.
 - Never invent a passenger name. If the email names no one, return one passenger with an empty name
   and whatever seat is stated.
 - If a field is not stated in the email, use null. Do not infer, guess or invent.
@@ -176,9 +186,8 @@ Rules:
   with kind "restaurant". The restaurant's name goes in name and its address in location. Leave
   endLocal null: a table booking states when to arrive, not when to leave, and inventing a sitting
   length would put a wrong end time on the timeline.
-- A train, coach or ferry booking is an activity with kind "transport". Put the route in the name
-  ("Via Rail 55, Ottawa to Toronto"), the origin in location, and the arrival time in endLocal —
-  without it the arrival is lost entirely.
+- A rail, coach or ferry booking is a "segment", NOT an activity. It has an origin, a destination
+  and an arrival time, and recording it as an activity throws the destination away.
 - If the email is not a travel booking, return {"type":"unknown"} and nothing else.`;
 
 /**
@@ -267,7 +276,7 @@ export async function parseWithLlm(
   }
 
   const type = parsed['type'];
-  if (type !== 'flight' && type !== 'lodging' && type !== 'activity') {
+  if (type !== 'segment' && type !== 'lodging' && type !== 'activity') {
     return { ok: false, by: 'none', reason: 'Not recognised as a travel booking' };
   }
 
@@ -284,19 +293,19 @@ export async function parseWithLlm(
    * the first flight — so a return trip imported as a one-way and the second
    * leg was silently lost. A family booking lost everyone but the seat.
    */
-  if (type === 'flight') {
-    const flights = Array.isArray(parsed['flights'])
-      ? (parsed['flights'] as Record<string, unknown>[]).filter(
-          (f) => f !== null && typeof f === 'object',
-        )
+  if (type === 'segment') {
+    const legs = Array.isArray(parsed['segments'])
+      ? (parsed['segments'] as Record<string, unknown>[])
+          .filter((f) => f !== null && typeof f === 'object')
+          .map((f) => ({ ...f, mode: MODES.includes(f['mode'] as string) ? f['mode'] : 'air' }))
       : [];
-    if (flights.length === 0) {
-      return { ok: false, by: 'none', reason: 'Read as a flight booking with no flights in it' };
+    if (legs.length === 0) {
+      return { ok: false, by: 'none', reason: 'Read as a journey with no legs in it' };
     }
     return {
       ok: true,
       by: 'llm',
-      draft: { type, fields: { ...common, flights, passengers: passengersFrom(parsed) } },
+      draft: { type, fields: { ...common, segments: legs, passengers: passengersFrom(parsed) } },
     };
   }
 

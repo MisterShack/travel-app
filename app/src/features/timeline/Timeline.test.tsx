@@ -15,6 +15,9 @@ function item(over: Partial<TimelineItem>): TimelineItem {
     startLocal: '2026-09-10T13:00',
     startTimezone: 'Europe/Lisbon',
     startPlace: null,
+    mode: null,
+    origin: null,
+    destination: null,
     endAt: null,
     endLocal: null,
     endTimezone: null,
@@ -40,7 +43,7 @@ describe('Timeline', () => {
     draw([
       item({
         id: 'f1',
-        kind: 'flight',
+        kind: 'segment',
         title: 'TAP TP1233',
         startAt: '2026-09-10T23:00:00.000Z',
         startTimezone: 'America/New_York',
@@ -69,7 +72,7 @@ describe('Timeline', () => {
       [
         item({
           id: 'f1',
-          kind: 'flight',
+          kind: 'segment',
           startTimezone: 'America/Winnipeg',
           startPlace: 'Winnipeg',
           endAt: '2026-09-10T14:40:00.000Z',
@@ -91,7 +94,7 @@ describe('Timeline', () => {
       [
         item({
           id: 'f1',
-          kind: 'flight',
+          kind: 'segment',
           startTimezone: 'Europe/London',
           endAt: '2026-09-10T12:00:00.000Z',
           endTimezone: 'Europe/Lisbon',
@@ -131,5 +134,30 @@ describe('Timeline', () => {
   it('shows an empty state rather than a blank screen', () => {
     draw([]);
     expect(screen.getByText(/Nothing on this trip yet/)).toBeInTheDocument();
+  });
+});
+
+describe('journeys', () => {
+  it('badges one zone, not the same zone twice', () => {
+    // A train from Ottawa to Toronto Union is one zone end to end. Badging both
+    // ends said the same thing twice; the badge warns that a time is not on the
+    // trip's clock, it does not restate the route.
+    draw(
+      [
+        item({
+          id: 's1',
+          kind: 'segment',
+          mode: 'rail',
+          startTimezone: 'America/Toronto',
+          startPlace: 'Ottawa',
+          endAt: '2026-09-10T17:00:00.000Z',
+          endTimezone: 'America/Toronto',
+          endPlace: 'Toronto Union',
+        }),
+      ],
+      'Europe/Lisbon',
+    );
+    expect(screen.getByText('Ottawa')).toBeInTheDocument();
+    expect(screen.queryByText('Toronto Union')).toBeNull();
   });
 });

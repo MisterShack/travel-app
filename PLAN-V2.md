@@ -74,7 +74,7 @@ Nameservers point at Cloudflare; records live in Terraform through the official 
 whitelisting, no balance requirement, free. It also puts the R2 bucket for Litestream in the same
 provider and account, which collapses two problems into one.
 
-The cost is a migration of live records — `trips.myze.ca`, budget-app's `ledger.myze.ca`, the
+The cost is a migration of live records — `waypoint.myze.ca`, budget-app's `ledger.myze.ca`, the
 Resend DKIM and inbound MX — and a nameserver cutover that is briefly all-or-nothing. That is the
 riskiest single action in this plan and it is not reversible in seconds.
 

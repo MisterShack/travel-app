@@ -1,10 +1,11 @@
 import { useEffect, useId, useState, type FormEvent } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import type { Passenger } from '@travel/shared';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { segmentModes, type Passenger, type SegmentMode } from '@travel/shared';
 import { api, ApiError } from '@/api/client';
 import { ErrorText, Field, Warnings } from '@/components/Bits';
 import { AirportField, TimezoneField } from './AirportField';
 import { ACTIVITY_KINDS, applyDraft, type ActivityKind } from './draft';
+import { MODE_COPY } from '@/components/kinds';
 import { PassengerFields } from './PassengerFields';
 import { storedPassengers } from './passengers';
 
@@ -17,8 +18,8 @@ import { storedPassengers } from './passengers';
  * get out of step with what the user typed.
  */
 
-type Kind = 'flight' | 'lodging' | 'activity';
-const PATHS: Record<Kind, string> = { flight: 'flights', lodging: 'lodging', activity: 'activities' };
+type Kind = 'segment' | 'lodging' | 'activity';
+const PATHS: Record<Kind, string> = { segment: 'segments', lodging: 'lodging', activity: 'activities' };
 /**
  * Fallback only. A new event defaults to the **trip's** home zone, not the
  * browser's — planning a Lisbon trip from a laptop in Chicago otherwise records
@@ -29,12 +30,13 @@ const PATHS: Record<Kind, string> = { flight: 'flights', lodging: 'lodging', act
 const guessZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
 type State = {
-  airline: string;
-  flightNumber: string;
-  departureAirport: string;
+  mode: SegmentMode;
+  carrier: string;
+  service: string;
+  origin: string;
   departureLocal: string;
   departureTimezone: string;
-  arrivalAirport: string;
+  destination: string;
   arrivalLocal: string;
   arrivalTimezone: string;
   passengers: Passenger[];
@@ -51,12 +53,13 @@ type State = {
 };
 
 const blank = (): State => ({
-  airline: '',
-  flightNumber: '',
-  departureAirport: '',
+  mode: 'air',
+  carrier: '',
+  service: '',
+  origin: '',
   departureLocal: '',
   departureTimezone: guessZone(),
-  arrivalAirport: '',
+  destination: '',
   arrivalLocal: '',
   arrivalTimezone: guessZone(),
   // Always at least one row, so there is somewhere to type. Blank rows are
@@ -91,6 +94,15 @@ export function EventFormPage() {
    * is what stops an import writing a row a human could not have typed
    * (PLAN.md §4).
    */
+  /**
+   * The add sheet offers "Flight" and "Train" as separate choices, because to a
+   * traveller they are separate things even though the model treats them as one
+   * kind. It says which by query parameter, so a deep link to "add a train"
+   * works and is bookmarkable — the select below can still change it.
+   */
+  const [params] = useSearchParams();
+  const requestedMode = params.get('mode');
+
   const handover = (useLocation().state ?? {}) as {
     draft?: Record<string, unknown>;
     importId?: string;
@@ -100,12 +112,21 @@ export function EventFormPage() {
   const [busy, setBusy] = useState(false);
   const set = (patch: Partial<State>) => setF((prev) => ({ ...prev, ...patch }));
   const kindSelectId = useId();
+  const modeSelectId = useId();
 
   /**
    * The trip's home zone, used as the default for a new event's times. Fetched
    * rather than passed through route state so a deep link into the form gets it
    * too.
    */
+  useEffect(() => {
+    if (isNew && requestedMode !== null && (segmentModes as readonly string[]).includes(requestedMode)) {
+      setF((prev) => ({ ...prev, mode: requestedMode as SegmentMode }));
+    }
+    // Runs once: after this the select owns the value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     const d = handover.draft;
     if (!d) return;
@@ -142,12 +163,13 @@ export function EventFormPage() {
         if (!item) return;
         setF({
           ...blank(),
-          airline: item['airline'] ?? '',
-          flightNumber: item['flightNumber'] ?? '',
-          departureAirport: item['departureAirport'] ?? '',
+          mode: (item['mode'] as SegmentMode) ?? 'air',
+          carrier: item['carrier'] ?? '',
+          service: item['service'] ?? '',
+          origin: item['origin'] ?? '',
           departureLocal: item['departureLocal'] ?? '',
           departureTimezone: item['departureTimezone'] ?? guessZone(),
-          arrivalAirport: item['arrivalAirport'] ?? '',
+          destination: item['destination'] ?? '',
           arrivalLocal: item['arrivalLocal'] ?? '',
           arrivalTimezone: item['arrivalTimezone'] ?? guessZone(),
           passengers: storedPassengers(item['passengers']),
@@ -168,14 +190,15 @@ export function EventFormPage() {
 
   const payload = (): Record<string, unknown> => {
     const common = { confirmationCode: opt(f.confirmationCode), notes: opt(f.notes) };
-    if (kind === 'flight') {
+    if (kind === 'segment') {
       return {
         ...common,
-        airline: f.airline,
-        flightNumber: f.flightNumber,
-        departureAirport: f.departureAirport,
+        mode: f.mode,
+        carrier: f.carrier,
+        service: f.service,
+        origin: f.origin,
         departure: { local: f.departureLocal, timezone: f.departureTimezone },
-        arrivalAirport: f.arrivalAirport,
+        destination: f.destination,
         arrival: { local: f.arrivalLocal, timezone: f.arrivalTimezone },
         passengers: f.passengers,
       };
@@ -258,26 +281,71 @@ export function EventFormPage() {
   return (
     <form onSubmit={onSubmit}>
       <h2>
-        {isNew ? 'Add' : 'Edit'} {kind === 'lodging' ? 'stay' : kind}
+        {isNew ? 'Add' : 'Edit'}{' '}
+        {kind === 'segment' ? MODE_COPY[f.mode].label.toLowerCase() : kind === 'lodging' ? 'stay' : kind}
       </h2>
 
-      {kind === 'flight' && (
+      {kind === 'segment' && (
         <>
+          {/* The mode chooses the words for everything below it. Calling a Via
+              Rail booking's operator an "Airline" is the flight-first
+              assumption this phase removes (PLAN-V3 §3a). */}
+          <div className="field">
+            <label className="field-label" htmlFor={modeSelectId}>
+              How
+            </label>
+            <select
+              id={modeSelectId}
+              value={f.mode}
+              onChange={(e) => set({ mode: e.target.value as SegmentMode })}
+            >
+              {segmentModes.map((m) => (
+                <option value={m} key={m}>
+                  {MODE_COPY[m].label}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="grid2">
-            <Field label="Airline">
-              <input value={f.airline} onChange={(e) => set({ airline: e.target.value })} required />
+            <Field label={MODE_COPY[f.mode].carrier}>
+              <input value={f.carrier} onChange={(e) => set({ carrier: e.target.value })} required />
             </Field>
-            <Field label="Flight number">
-              <input value={f.flightNumber} onChange={(e) => set({ flightNumber: e.target.value })} required />
+            <Field label={MODE_COPY[f.mode].service}>
+              <input value={f.service} onChange={(e) => set({ service: e.target.value })} required />
             </Field>
           </div>
-          <AirportField
-            label="From"
-            code={f.departureAirport}
-            timezone={f.departureTimezone}
-            onChange={(code, tz) => set({ departureAirport: code, departureTimezone: tz })}
-          />
-          <Field label="Departs (local time at the airport)">
+          {/*
+            Air endpoints are airport codes, and the code is what derives the
+            zone. There is no IATA for stations, so rail, coach and ferry take a
+            name and are asked for their zone — exactly as lodging already is.
+          */}
+          {f.mode === 'air' ? (
+            <AirportField
+              label={MODE_COPY[f.mode].origin}
+              code={f.origin}
+              timezone={f.departureTimezone}
+              onChange={(code, tz) => set({ origin: code, departureTimezone: tz })}
+            />
+          ) : (
+            <>
+              <Field label={MODE_COPY[f.mode].origin}>
+                <input value={f.origin} onChange={(e) => set({ origin: e.target.value })} required />
+              </Field>
+              {/*
+                Setting the departure zone sets the arrival zone too. Most rail
+                journeys do not cross a zone, and leaving the arrival on the
+                trip's home zone while the departure moved records an instant
+                hours out — silently, because both fields look filled in. A
+                journey that does cross one changes the arrival afterwards.
+              */}
+              <TimezoneField
+                label="Departure timezone"
+                value={f.departureTimezone}
+                onChange={(tz) => set({ departureTimezone: tz, arrivalTimezone: tz })}
+              />
+            </>
+          )}
+          <Field label={`Departs (local time at ${f.mode === 'air' ? 'the airport' : 'the origin'})`}>
             <input
               type="datetime-local"
               value={f.departureLocal}
@@ -285,12 +353,29 @@ export function EventFormPage() {
               required
             />
           </Field>
-          <AirportField
-            label="To"
-            code={f.arrivalAirport}
-            timezone={f.arrivalTimezone}
-            onChange={(code, tz) => set({ arrivalAirport: code, arrivalTimezone: tz })}
-          />
+          {f.mode === 'air' ? (
+            <AirportField
+              label={MODE_COPY[f.mode].destination}
+              code={f.destination}
+              timezone={f.arrivalTimezone}
+              onChange={(code, tz) => set({ destination: code, arrivalTimezone: tz })}
+            />
+          ) : (
+            <>
+              <Field label={MODE_COPY[f.mode].destination}>
+                <input
+                  value={f.destination}
+                  onChange={(e) => set({ destination: e.target.value })}
+                  required
+                />
+              </Field>
+              <TimezoneField
+                label="Arrival timezone"
+                value={f.arrivalTimezone}
+                onChange={(tz) => set({ arrivalTimezone: tz })}
+              />
+            </>
+          )}
           <Field label="Arrives (local time at the destination)">
             <input
               type="datetime-local"

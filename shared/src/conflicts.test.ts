@@ -14,6 +14,9 @@ function item(over: Partial<TimelineItem> & { id: string }): TimelineItem {
     startLocal: '2026-09-10T13:00',
     startTimezone: 'Europe/Lisbon',
     startPlace: null,
+    mode: null,
+    origin: null,
+    destination: null,
     endAt: null,
     endLocal: null,
     endTimezone: null,
@@ -25,8 +28,22 @@ function item(over: Partial<TimelineItem> & { id: string }): TimelineItem {
   };
 }
 
-const flight = (id: string, dep: string, arr: string, route: string) =>
-  item({ id, kind: 'flight', title: `Flight ${id}`, subtitle: route, startAt: dep, endAt: arr });
+/**
+ * A journey. The endpoints are structured fields, not text parsed back out of
+ * the subtitle — the subtitle also carries seats now, and parsing it made every
+ * connection compare "LIS · 14C" against "LIS".
+ */
+const leg = (id: string, dep: string, arr: string, from: string, to: string) =>
+  item({
+    id,
+    kind: 'segment',
+    title: `Flight ${id}`,
+    subtitle: `${from} → ${to}`,
+    origin: from,
+    destination: to,
+    startAt: dep,
+    endAt: arr,
+  });
 
 /** Lodging covering the whole trip, so night checks stay quiet by default. */
 const hotel = item({
@@ -44,7 +61,7 @@ describe('overlaps', () => {
     const issues = findIssues(
       [
         hotel,
-        flight('f1', '2026-09-10T09:00:00.000Z', '2026-09-10T12:00:00.000Z', 'LHR → LIS'),
+        leg('f1', '2026-09-10T09:00:00.000Z', '2026-09-10T12:00:00.000Z', 'LHR', 'LIS'),
         item({ id: 'a1', title: 'Dinner', startAt: '2026-09-10T11:30:00.000Z', endAt: '2026-09-10T13:00:00.000Z' }),
       ],
       TRIP,
@@ -88,8 +105,8 @@ describe('connections', () => {
     const issues = findIssues(
       [
         hotel,
-        flight('f1', '2026-09-10T09:00:00.000Z', '2026-09-10T12:00:00.000Z', 'LHR → LIS'),
-        flight('f2', '2026-09-10T13:00:00.000Z', '2026-09-10T15:00:00.000Z', 'LIS → OPO'),
+        leg('f1', '2026-09-10T09:00:00.000Z', '2026-09-10T12:00:00.000Z', 'LHR', 'LIS'),
+        leg('f2', '2026-09-10T13:00:00.000Z', '2026-09-10T15:00:00.000Z', 'LIS', 'OPO'),
       ],
       TRIP,
     );
@@ -102,8 +119,8 @@ describe('connections', () => {
     const issues = findIssues(
       [
         hotel,
-        flight('f1', '2026-09-10T09:00:00.000Z', '2026-09-10T12:00:00.000Z', 'LHR → LIS'),
-        flight('f2', '2026-09-10T16:00:00.000Z', '2026-09-10T18:00:00.000Z', 'LIS → OPO'),
+        leg('f1', '2026-09-10T09:00:00.000Z', '2026-09-10T12:00:00.000Z', 'LHR', 'LIS'),
+        leg('f2', '2026-09-10T16:00:00.000Z', '2026-09-10T18:00:00.000Z', 'LIS', 'OPO'),
       ],
       TRIP,
     );
@@ -116,13 +133,13 @@ describe('connections', () => {
     const issues = findIssues(
       [
         hotel,
-        flight('f1', '2026-09-10T09:00:00.000Z', '2026-09-10T12:00:00.000Z', 'LIS → LHR'),
-        flight('f2', '2026-09-11T09:00:00.000Z', '2026-09-11T11:00:00.000Z', 'LGW → OPO'),
+        leg('f1', '2026-09-10T09:00:00.000Z', '2026-09-10T12:00:00.000Z', 'LIS', 'LHR'),
+        leg('f2', '2026-09-11T09:00:00.000Z', '2026-09-11T11:00:00.000Z', 'LGW', 'OPO'),
       ],
       TRIP,
     );
     const change = issues.find((i) => i.kind === 'airport-change');
-    expect(change?.message).toMatch(/land at LHR .* leaves from LGW/);
+    expect(change?.message).toMatch(/arrive at LHR .* leaves from LGW/);
   });
 });
 
@@ -144,7 +161,7 @@ describe('unbooked nights', () => {
     const issues = findIssues(
       [
         item({ id: 'l1', kind: 'lodging', startAt: '2026-09-10T12:00:00.000Z', endAt: '2026-09-11T09:00:00.000Z' }),
-        flight('f1', '2026-09-11T20:00:00.000Z', '2026-09-12T06:00:00.000Z', 'LIS → JFK'),
+        leg('f1', '2026-09-11T20:00:00.000Z', '2026-09-12T06:00:00.000Z', 'LIS', 'JFK'),
         item({ id: 'l2', kind: 'lodging', startAt: '2026-09-12T14:00:00.000Z', endAt: '2026-09-13T09:00:00.000Z' }),
       ],
       TRIP,

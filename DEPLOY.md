@@ -125,8 +125,8 @@ someone tries to subscribe.
 
 ## 4. Point the domain at it
 
-The domain is **`trips.myze.ca`** (decided 2026-08-15), the parallel to budget-app's
-`ledger.myze.ca`. So `APP_ORIGIN` and `PUBLIC_URL` are both `https://trips.myze.ca`.
+The domain is **`waypoint.myze.ca`** (decided 2026-08-15), the parallel to budget-app's
+`ledger.myze.ca`. So `APP_ORIGIN` and `PUBLIC_URL` are both `https://waypoint.myze.ca`.
 
 Service → **Settings** → **Networking** → **Custom Domain**. Railway shows a CNAME target like
 `xyz.up.railway.app`; add it at Namecheap:
@@ -396,7 +396,7 @@ record, so there is nothing to collide with.
 |---|---|---|---|
 | `MX` | `mail` | the target Resend gives you | lowest number present |
 
-> **It cannot go on `trips.myze.ca`** — that name is a CNAME to Railway, and DNS forbids a CNAME
+> **It cannot go on `waypoint.myze.ca`** — that name is a CNAME to Railway, and DNS forbids a CNAME
 > coexisting with any other record type. This is not a preference; the record would be rejected or
 > silently break the site.
 

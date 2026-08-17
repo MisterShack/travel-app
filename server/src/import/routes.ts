@@ -341,14 +341,16 @@ export function createImportRoutes(deps: ImportDeps) {
   /**
    * How many separate timeline rows this import proposes.
    *
-   * One, for everything except a flight booking; for a flight booking, one per
-   * leg — a return trip is a single email and two flights.
+   * One, for everything except a journey; for a journey, one per leg — a return
+   * trip is a single email and two segments.
    */
   const segmentCount = (extractedFields: string | null): number => {
     if (extractedFields === null) return 1;
     try {
-      const parsed = JSON.parse(extractedFields) as { flights?: unknown };
-      return Array.isArray(parsed.flights) && parsed.flights.length > 0 ? parsed.flights.length : 1;
+      const parsed = JSON.parse(extractedFields) as { segments?: unknown };
+      return Array.isArray(parsed.segments) && parsed.segments.length > 0
+        ? parsed.segments.length
+        : 1;
     } catch {
       return 1;
     }
@@ -361,7 +363,7 @@ export function createImportRoutes(deps: ImportDeps) {
    *
    * A body of `{ "segment": n }` records one leg of a multi-leg booking. The
    * import only leaves the queue once every leg has been recorded — otherwise
-   * adding the outbound flight would file the email and take the return with
+   * adding the outbound leg would file the email and take the return with
    * it.
    */
   app.post('/imports/:id/apply', auth, async (c) => {

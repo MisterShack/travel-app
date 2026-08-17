@@ -12,7 +12,7 @@ LIGHT = {
     "ink": "#16181d", "ink-soft": "#5a6473", "paper": "#faf9f7",
     "surface": "#ffffff", "surface-sunk": "#f1efec", "rule": "#dcd8d2",
     "field": "#8f887c",
-    "kind-flight": "#2c5c8a", "kind-lodging": "#2f6b4f", "kind-activity": "#6b4a8a",
+    "kind-segment": "#2c5c8a", "kind-lodging": "#2f6b4f", "kind-activity": "#6b4a8a",
     "accent": "#b45309", "accent-ink": "#ffffff",
     "accent-wash": "#fdf3e8", "accent-line": "#e8c9a6",
     "warn": "#a8500a", "alert": "#a4232c", "focus": "#b45309",
@@ -21,7 +21,7 @@ DARK = {
     "ink": "#eceef2", "ink-soft": "#98a2b3", "paper": "#101216",
     "surface": "#191c22", "surface-sunk": "#22262e", "rule": "#2c313a",
     "field": "#6b7280",
-    "kind-flight": "#7fb3e0", "kind-lodging": "#7fc9a3", "kind-activity": "#bda1e0",
+    "kind-segment": "#7fb3e0", "kind-lodging": "#7fc9a3", "kind-activity": "#bda1e0",
     "accent": "#f0a03c", "accent-ink": "#1a1204",
     "accent-wash": "#241a0c", "accent-line": "#4a3517",
     "warn": "#f5b25e", "alert": "#ff8a8a", "focus": "#f0a03c",
@@ -58,7 +58,7 @@ PAIRS = [
     ("ink-soft", "accent-wash", 4.5, "secondary text on the trip header"),
     ("accent", "accent-wash", 4.5, "accent text on its own wash"),
     # Kind hues mark small non-text elements, so 3:1 is the bar that applies.
-    ("kind-flight", "surface", 3.0, "flight marker"),
+    ("kind-segment", "surface", 3.0, "journey marker"),
     ("kind-lodging", "surface", 3.0, "stay marker"),
     ("kind-activity", "surface", 3.0, "activity marker"),
 ]
