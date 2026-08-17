@@ -65,7 +65,7 @@ certificate, `/health` answering JSON, the client served at `/`, SPA deep links 
 `/api/*` returning JSON rather than being shadowed by the static fallback. Registration and email
 verification work against real Resend delivery.
 
-**All phases (0–5) are done.** 157 tests, typecheck and lint clean.
+**All phases (0–5) are done.** 162 tests, typecheck and lint clean.
 
 **Phase 4 (booking import) shipped and verified end to end against a real forwarded airline
 confirmation, 2026-08-15** — including two per-passenger PDF tickets, read correctly.
@@ -135,6 +135,14 @@ Findings from building that contradict a straight port from budget-app, all enco
   `processedAt`, which is stamped at ingest and so is never null. One `AWAITING` predicate now
   serves all three. The badge also lives in `InboxProvider` rather than `App`, because reviewing an
   import does not navigate and the count was only ever re-read on a route change.
+- **`registerType: 'autoUpdate'` auto-updates the *worker*, not the page.** The generated
+  `registerSW.js` is a single line that registers `/sw.js`; our worker calls `skipWaiting()` and
+  `clients.claim()`, so a new build activates at once — and the page already running keeps the
+  JavaScript it downloaded when it opened. On an installed PWA, which iOS keeps warm for days, a
+  user can sit on a week-old build while the server has moved on. `data/updates.ts` reloads on
+  `controllerchange` (guarded so a first visit does not reload). The Account screen shows a build
+  stamp, because the first time this happened it took a minified bundle diff to establish that the
+  fix really had deployed.
 - **A draft's `kind` was extracted and then thrown away.** The model reports whether an activity is
   a restaurant, an attraction or transport; the review form's prefill never read it, so a forwarded
   OpenTable booking arrived as "Other" on the one screen the import flow exists to save work on. The

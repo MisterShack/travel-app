@@ -4,7 +4,10 @@ import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
 import { AuthProvider } from './auth/AuthContext';
 import { InboxProvider } from './data/InboxProvider';
+import { reloadOnNewVersion } from './data/updates';
 import './styles.css';
+
+reloadOnNewVersion();
 
 const root = document.getElementById('root');
 if (!root) throw new Error('No #root element — index.html and main.tsx disagree.');

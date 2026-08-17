@@ -37,6 +37,12 @@ export function AccountPage() {
           Sign out
         </button>
       </div>
+
+      {/* So "am I running the build that was just deployed?" is a question the
+          app can answer, rather than one that needs a minified bundle diff. */}
+      <p className="muted tiny" style={{ marginTop: 'var(--space-6)' }}>
+        Build {__BUILD_ID__} UTC
+      </p>
     </>
   );
 }

@@ -6,6 +6,13 @@ import { VitePWA } from 'vite-plugin-pwa';
 // `defineConfig` comes from `vitest/config`, not `vite` — the `test` key below
 // is not part of Vite's own config type.
 export default defineConfig({
+  /*
+   * A build stamp, shown on the Account screen. Without one, "is this the build
+   * I just deployed?" can only be answered by diffing minified bundles, which
+   * is what it took the first time a deployed fix appeared not to have shipped.
+   * A timestamp rather than a git SHA: the Docker build has no git history.
+   */
+  define: { __BUILD_ID__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ')) },
   plugins: [
     react(),
     VitePWA({
