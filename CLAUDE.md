@@ -233,11 +233,17 @@ wordmark alone until something earns its place. The app icon is a `W`.
 A phase is done when `npm run typecheck`, `npm run lint` and `npm test` all pass from the repo
 root, and the phase's own acceptance criterion in PLAN.md §11 is met.
 
+**This table is the owner of the gates.** `.claude/skills/orchestrate/SKILL.md` routes work to the
+team and links here rather than restating it; a gate written down twice drifts.
+
 | Trigger | Run |
 |---|---|
 | Any UI change, and before showing the app to anyone | `web-accessibility-reviewer` agent |
 | Wanting to see the app rather than its test output | `node app/e2e/drive.mjs` (see its header) |
 | Touching the Railway dashboard, and before turning backups on | `npm run check-drift` (DEPLOY.md §8a) |
+| Any migration that touches existing rows, before it deploys | `migration-rehearser` agent |
+| After a push reaches production | `release-verifier` agent |
+| A deploy that failed, or behaves in a way the repo does not explain | `deploy-investigator` agent |
 
 The first two exist because the unit suites were green and the app was still wrong: a browser drive
 found six defects in one pass, including new events defaulting to the browser's timezone instead of
