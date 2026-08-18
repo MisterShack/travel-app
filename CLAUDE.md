@@ -1,10 +1,11 @@
 # Waypoint — project guide
 
 Personal/family travel agent: flights, lodging, and activities merged into one timeline per trip,
-with reminders. **PLAN.md** is the V1 spec (shipped, phases 0–5). **PLAN-V2.md** (Terraform and Playwright) and
-**PLAN-V3.md** (maps and suggestions) are drafts, not started. Read the relevant one before implementing anything. It has not been
-built against yet; if you're about to start Phase 0, confirm PLAN.md has been through
-`.claude/skills/plan-review` first (§ of PLAN.md's header note).
+with reminders. **Start at ROADMAP.md** — it holds what is left, in what order, and the greenlight
+gate that backups are scheduled to. The specs behind it: **PLAN.md** (V1, phases 0–5, shipped),
+**PLAN-V2.md** (Terraform and Playwright — reviewed 2026-08-17, step 6.3 shipped), **PLAN-V3.md**
+(place and suggestions — phases 8, 11 and 12 shipped). Read the relevant one before implementing
+anything.
 
 **The product is called Waypoint** (BRAND.md). The repo directory, the npm workspaces
 (`@travel/*`) still say *travel* — those are identifiers rather than the product name, and renaming
@@ -66,7 +67,10 @@ certificate, `/health` answering JSON, the client served at `/`, SPA deep links 
 `/api/*` returning JSON rather than being shadowed by the static fallback. Registration and email
 verification work against real Resend delivery.
 
-**All phases (0–5) are done.** 176 tests, typecheck and lint clean.
+**All phases (0–5) are done**, with one stated exception: Phase 1’s acceptance criterion includes a
+Litestream restore drill, and backups are deliberately deferred until the greenlight (ROADMAP.md §1).
+PLAN.md §11 says so under Phase 1; this line used to say it without the caveat. 218 tests,
+typecheck and lint clean.
 
 **Phase 4 (booking import) shipped and verified end to end against a real forwarded airline
 confirmation, 2026-08-15** — including two per-passenger PDF tickets, read correctly.

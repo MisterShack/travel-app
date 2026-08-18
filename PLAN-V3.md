@@ -1,9 +1,15 @@
 # Waypoint — Plan V3: place
 
-> **Status: draft, not started.** Authored by Opus on 2026-08-15 from a request by David for maps
+> **Status: partly built, and never reviewed.** Authored by Opus on 2026-08-15 from a request by David for maps
 > and restaurant/attraction suggestions.
 >
-> **Run `/review-kit:plan-review PLAN-V3.md` before building any of it.** This plan rests on
+> **Phases 8, 11 and 12 have shipped from this document and the review below was never run.**
+> That is the finding: the instruction was passed over three times, once deliberately and twice by
+> habit. Either run it against what is left — phases 9 and 10, which are the ones resting on
+> third-party pricing — or record that it was consciously skipped. ROADMAP.md §4 tracks the
+> decision.
+>
+> **Run `/review-kit:plan-review PLAN-V3.md` before building any more of it.** This plan rests on
 > third-party pricing and on a claim about what people actually need, which are the two things
 > that skill is best at attacking.
 
