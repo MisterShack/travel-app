@@ -192,6 +192,43 @@ and confirm you are not seeing that line.**
 > fault: the same command shape (`node --import tsx server/src/index.ts` from `/app`) starts and
 > serves `/health` correctly both natively and in the image, and the entrypoint's own WARNING line
 > printed before the failure. Capture the crash logs when retrying rather than guessing.
+>
+> #### What has been eliminated (2026-08-18, by reading — no Docker daemon available)
+>
+> The two boot paths differ in exactly one respect that could plausibly matter: the **working
+> directory** of the node process. The Start Command runs the script with cwd `/app/server` (npm
+> sets a workspace script's cwd to its own package); the `ENTRYPOINT` runs it with cwd `/app`.
+> Everything else — the script, the interpreter, the environment — is identical.
+>
+> That is the most promising lead, because this repo has already been bitten by a path resolved
+> against cwd (`STATIC_DIR`, §"the app served nothing"). **It does not survive contact with the
+> code.** Nothing in `server/src` resolves a path against cwd:
+>
+> - `MIGRATIONS_FOLDER` is `fileURLToPath(new URL('../../drizzle', import.meta.url))` — anchored to
+>   the module, so it is `/app/server/drizzle` from either cwd.
+> - `STATIC_DIR` is set absolute in the Dockerfile *and* `env.ts` rejects a relative value with a
+>   Zod `refine`. It cannot silently become wrong.
+> - `--import tsx` resolves from either cwd: `tsx` is declared in `server/package.json` but hoisted
+>   to `/app/node_modules/tsx`, which is on the lookup path from `/app` and from `/app/server`.
+> - The Start Command's extra `--env-file-if-exists=.env.local` is a no-op in the image:
+>   `.dockerignore` excludes `**/.env.*` and `**/*.local`, so no such file is ever present.
+>
+> So the cwd difference has **no known mechanism**. Treat "it must be the working directory" as
+> already tried.
+>
+> **The cheapest remaining check needs no deploy and no Docker — read the current logs.** If the
+> line `WARNING: LITESTREAM_BUCKET is not set` appears in the *running* service's boot output, then
+> `entrypoint.sh` is executing today and the premise of this whole box is wrong: the Start Command
+> would be being passed as arguments to the entrypoint, which ignores them, rather than replacing
+> it. That would dissolve most of gate 1. If the line is absent, the premise holds. Either way it is
+> a thirty-second answer that decides where the next hour goes, and it should be done before
+> anything is rebuilt.
+>
+> After that, and only with the daemon running, the one local experiment worth doing is the
+> roadmap's: build the image and run it with `LITESTREAM_BUCKET` unset and the `ENTRYPOINT` active —
+> the exact configuration that crashed. Serving `/health` locally proves the cause is Railway-side
+> and narrows it to what Railway adds: injected `PORT`, the volume mount, healthcheck timing against
+> a cold start, and node running as PID 1 under `exec` rather than as a child of npm.
 
 ---
 

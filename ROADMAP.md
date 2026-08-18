@@ -119,6 +119,14 @@ instead of being bolted onto it, which is what conflict detection and segments b
 - **Per-event reminder overrides.** Deferred once already, on the reasoning that sensible defaults
   matter more than a setting nobody opens. Revisit only if a default has actually annoyed someone on
   a real trip.
+- **The commit SHA in the `/health` payload.** `/health` currently answers
+  `{"status":"ok","version":"0.0.0"}` — the package version, which is the same string on every build
+  ever deployed and therefore identifies nothing. Observed 2026-08-18 while checking a push landed.
+  It means no deploy can be confirmed from outside as *the commit you intended*: a correct deploy and
+  a skipped build are indistinguishable, which is one of the failures gate 4 exists to catch. A few
+  lines in the Dockerfile to inject the SHA at build time turns every future deploy from "probably
+  fine" into checkable. Not urgent enough to push alone; fold it into the next change that touches
+  the server. The Account screen's build stamp covers the client and has no server-side equivalent.
 
 ### Named and rejected
 
