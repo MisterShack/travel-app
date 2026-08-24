@@ -40,9 +40,11 @@ export function buildApp({ db, env, mailer, inbound = null, pusher = null, now }
   app.use('*', originGuard(env.APP_ORIGIN));
 
   /**
-   * Railway's healthcheck target (`railway.json`). Reports liveness *and* that
-   * the database opens — a server answering happily while its volume is missing
-   * is exactly the failure the `/data` mount gotcha produces (DEPLOY.md §2).
+   * Railway's healthcheck target — `healthcheckPath` on the service itself
+   * since 2026-08-24, having previously come from `railway.json` (DEPLOY.md
+   * §8b). Reports liveness *and* that the database opens: a server answering
+   * happily while its volume is missing is exactly the failure the `/data`
+   * mount gotcha produces (DEPLOY.md §2).
    */
   app.get('/health', async (c) => {
     try {
@@ -64,8 +66,11 @@ export function buildApp({ db, env, mailer, inbound = null, pusher = null, now }
    * trip receives `401 {"error":"unauthenticated"}` as JSON instead of the app
    * shell. Found by opening the deployed shape rather than by reading it.
    *
-   * `/health` deliberately stays at the root — `railway.json` points its
-   * healthcheck there, and moving it would silently fail deploys.
+   * `/health` deliberately stays at the root, because the service's
+   * `healthcheckPath` points there. Moving it would not fail loudly: the
+   * fallback below answers every unmatched GET with `index.html`, so a
+   * healthcheck aimed anywhere else gets 200 and HTML and passes forever
+   * (DEPLOY.md §8b).
    */
   app.route('/api/auth', createAuthRoutes({ db, mailer, env, now }));
   app.route('/api', createTripRoutes({ db, mailer, env, now }));

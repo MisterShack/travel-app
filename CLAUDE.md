@@ -106,19 +106,26 @@ Two things that are true and worth keeping in view:
 - **Registration is open.** The app is publicly reachable, so anyone with the URL can create an
   account and consume the Resend quota. There is no invite gate.
 
-**`railway.json` is deprecated and load-bearing.** It stops being read on 2026-12-01, and it
-supplies more than `numReplicas: 1` — the healthcheck path, the restart policy and the Dockerfile
-builder rest on it too, and each falls back to the service's own value, which is unset. The
-healthcheck is the dangerous one: unset means deploys stop being checked at all, silently, in the
-direction that always looks healthy.
+**`railway.json` is gone, and nothing rests on it.** Deleted 2026-08-24. It had supplied the
+healthcheck path, the healthcheck timeout, the replica count and the Dockerfile builder, and it
+would have stopped being read on 2026-12-01 — at which point each fell back to the service's own
+value, all of them unset. The healthcheck was the dangerous one: unset means deploys stop being
+checked at all, silently, in the direction that always looks healthy.
 
-**The fix is the dashboard, not `.railway/railway.ts` — decided 2026-08-24, DEPLOY.md §8b.**
-Railway's own `config migrate` generated a file that named the wrong project, **omitted the volume**
-from its `resources`, dropped the restart policy without comment and could only emit the builder as
-a comment. `railway config apply` carries a `--confirm-destructive` flag, and the volume is the only
-copy of every account and trip. Railway IaC is a declarative plan/apply system over the whole
-project — structurally the thing Phase 6 was closed to avoid. Set the five settings on the service,
-verify with `check-drift`, *then* delete the file; the order is the point.
+**The fix was the dashboard, not `.railway/railway.ts` (DEPLOY.md §8b).** Railway IaC is a
+declarative plan/apply system over the whole project — structurally what Phase 6 was closed to
+avoid — and `railway config migrate` generated a file that named the wrong project, **omitted the
+volume** from its `resources`, dropped the restart policy silently and could only emit the builder
+as a comment. `railway config apply` carries `--confirm-destructive`, and the volume is the only
+copy of every account and trip.
+
+Two things worth keeping from doing it. **Config as Code locks the dashboard fields it owns**, so
+the values could not be set there while the file existed and the file could not safely go until
+they were — a real deadlock, broken with `serviceInstanceUpdate`, which writes the service's values
+*underneath* the file. That was a no-op for behaviour (every value was identical to what the file
+already supplied) and it did not even trigger a redeploy. And **`builder` was never the field
+selecting the Dockerfile**: the enum is `HEROKU | NIXPACKS | PAKETO | RAILPACK` with no `DOCKERFILE`
+member, so `dockerfilePath` is what pins it. `builder` still reads `RAILPACK` and does not matter.
 
 **The drift check grew to seven rules on 2026-08-24**, when Phase 6 was closed and it became the
 thing that covers the dashboard instead of Terraform. It now also asserts the healthcheck path, the

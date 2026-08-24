@@ -166,33 +166,12 @@ Each gates something above. Full context in the section named.
 
 - **The LLM spend cap** (PLAN.md §13). The per-user import cap bounds the damage but no number was
   ever chosen and no billing alert is set. On the paid tier the exposure is money, not a quota.
-- ~~**`railway.json` is deprecated, and it is load-bearing.**~~ **Decided 2026-08-24 — now a task,
-  not a question. See DEPLOY.md §8b.** It stops being read on **2026-12-01**, and it supplies more
-  than the replica count: the healthcheck path, the restart policy and the Dockerfile builder rest
-  on it too. The healthcheck is the dangerous one — it falls back to *unset*, and a deploy with no
-  healthcheck goes green regardless of what it does.
-
-  **The fix is to set all five on the service and delete the file, in that order**, rather than
-  adopt Infrastructure as Code. `railway config migrate` was run on 2026-08-24 and what it produced
-  named the wrong project, omitted the volume from its `resources`, dropped the restart policy
-  silently and could only emit the builder as a comment — against the only copy of every account and
-  trip, with `railway config apply` carrying a `--confirm-destructive` flag. Railway IaC is a
-  declarative plan/apply system over the whole project, which is structurally what Phase 6 was
-  closed to avoid.
-
-  Blocked on dashboard access, which is David's. The drift check warns on every setting still
-  resting on the file, so this cannot rot silently in the meantime.
-- **Trip deletion, and account deletion** (PLAN.md §13). Hard delete, soft delete, or blocked while
-  others are members? Account deletion is covered nowhere in any plan, and for an app whose stated
-  audience includes a dev portfolio its absence is conspicuous.
-- **`tzdata` refresh policy** (PLAN.md §13). The UTC instant is derived and must be recomputed when
-  zone rules change; the container's data is pinned at image build. Only matters for trips booked
-  months ahead.
-- **Is *quiet* worth more than *helpful*?** (PLAN-V3 §5). Decides Phase 10 outright.
-- **Do PLAN-V2 and PLAN-V3 still need their adversarial review?** PLAN-V2 was reviewed on
-  2026-08-17. PLAN-V3 still says "draft, not started" in its header and asks for `plan-review`
-  before anything is built from it, while phases 8, 11 and 12 have all shipped from it. Either run
-  it or record that it was consciously skipped.
+- ~~**`railway.json` is deprecated, and it is load-bearing.**~~ **DONE 2026-08-24.** The five
+  settings it supplied are now on the service itself and the file is deleted, so the 2026-12-01
+  sunset no longer threatens anything. DEPLOY.md §8b records the sequence, why Infrastructure as
+  Code was rejected, and the two things that made it awkward: Config as Code locks the dashboard
+  fields it owns (broken with `serviceInstanceUpdate`, which writes underneath the file), and
+  `builder` was never the field selecting the Dockerfile — `dockerfilePath` is.
 
 ## 5. Candidates, not commitments
 
