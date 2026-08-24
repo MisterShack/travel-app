@@ -96,9 +96,10 @@ Nothing below is started. Sizes are the plans' own where they gave one.
 
    **Step 3 is half done — these journeys are still to write:**
 
-   - adding each timeline entity type to a trip, and the timezone assertion that goes with it (a new
-     event defaulting to the *browser's* zone rather than the trip's was one of the six defects the
-     first browser drive found, and it is the single highest-value assertion left)
+   - adding each timeline entity type to a trip — segment, lodging and activity. **The timezone
+     assertion is done** (`timezone.spec.ts`): the browser is pinned to `America/Chicago` and the
+     trip to `Europe/Lisbon`, which is the scenario `EventForm.tsx` names in a comment, and the spec
+     guards its own premise so it cannot pass vacuously if the two ever coincide
    - invite and redeem, across two accounts
    - import review and apply
    - offline read, which is the app's central claim and the one PLAN.md §4 puts in writing

@@ -29,8 +29,10 @@ test.describe('a trip', () => {
     await page.getByRole('button', { name: /create trip/i }).click();
 
     // Landing on the trip is the contract: creating something and being left
-    // on the form is the shape of a silent failure.
-    await expect(page).toHaveURL(/\/trips\/[^/]+$/);
+    // on the form is the shape of a silent failure. Match the id prefix rather
+    // than `[^/]+`, which also matches `/trips/new` and so would pass while
+    // still sitting on the form this test just submitted.
+    await expect(page).toHaveURL(/\/trips\/trp_[^/]+$/);
     await expect(page.getByText(TRIP.name).first()).toBeVisible();
 
     // And it survives a reload, which is the difference between "the API
