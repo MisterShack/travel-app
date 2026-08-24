@@ -558,16 +558,33 @@ volume safe.
 **Order matters, and this is the whole point of writing it down.** Deleting the file first leaves
 every setting above resting on nothing until the dashboard catches up.
 
-1. **Set all five on the service**, in the Railway dashboard — Settings → Deploy, and Settings →
-   Build for the builder:
+**The real fallback values were read from the live service on 2026-08-24**, rather than assumed —
+`railway api` will do it with the CLI's own session, no separate token needed:
 
-   | Setting | Value | Why it matters |
-   |---|---|---|
-   | Healthcheck Path | `/health` | Anything else hits the SPA fallback, returns 200 and HTML, and passes forever while the API is dead |
-   | Healthcheck Timeout | `60` | |
-   | Replicas | `1` | Two writers on one SQLite file; two reminder sweeps racing (PLAN.md §4, §7) |
-   | Restart Policy | `On Failure`, max retries `10` | The reminder sweep runs in-process and has nowhere else to live |
-   | Builder | `Dockerfile`, path `Dockerfile` | Anything else drops `entrypoint.sh`, `tsx`, the pinned Rolldown binary and the absolute `STATIC_DIR` |
+```sh
+railway api 'query { serviceInstance(serviceId: "SERVICE_ID", environmentId: "ENV_ID") {
+  builder healthcheckPath healthcheckTimeout numReplicas
+  restartPolicyType restartPolicyMaxRetries startCommand watchPatterns sleepApplication region } }'
+```
+
+What that returned is the reason this section is not a formality:
+
+| Setting | On the service today | Needed | If `railway.json` went first |
+|---|---|---|---|
+| **Builder** | **`RAILPACK`** | `DOCKERFILE`, path `Dockerfile` | **The whole deploy changes shape.** No `entrypoint.sh` and so no Litestream mechanism, `tsx` pruned, the pinned Rolldown binary bypassed, `STATIC_DIR` wrong |
+| Healthcheck Path | `null` | `/health` | No healthcheck at all — so the broken Railpack build above is marked healthy and goes live |
+| Healthcheck Timeout | `null` | `60` | |
+| Replicas | `null` | `1` | Falls back to Railway's default; the single-writer guarantee stops being asserted anywhere |
+| Restart Policy | `ON_FAILURE`, retries `10` | *(already correct)* | Nothing — this one is already on the service |
+
+**The builder is the dangerous one, not the healthcheck.** The service's own builder is `RAILPACK`
+and only `railway.json` is making the Dockerfile win — `fileServiceManifest.build.builder` is
+`DOCKERFILE` while `serviceInstance.builder` is `RAILPACK`. Delete the file first and the next
+deploy builds a completely different image *and* has no healthcheck to catch it. The two failures
+compound: a build that cannot work, reported as healthy.
+
+1. **Set the four on the service**, in the Railway dashboard — Settings → Build for the builder,
+   Settings → Deploy for the rest. The restart policy is already right and needs no change.
 
 2. **Run the drift check** (§8a). The `num-replicas-from-file-only` and `healthcheck-from-file-only`
    warnings must both be gone. That is the proof the service now owns them, and it is the gate on

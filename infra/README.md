@@ -73,8 +73,16 @@ schema — do not add them blind:
 
 - **App Sleeping.** If Railway ever sleeps this service the in-process reminder sweep stops with it,
   silently, and PLAN.md §4 says there is nowhere else for a scheduler to live. Probably the highest-
-  value rule left.
+  value rule left. **The field is now proven**: `serviceInstance.sleepApplication` returned `false`
+  on 2026-08-24, so a rule can be written without a speculative query.
 - **Region, and multi-region.** A second region is a second writer by another name.
+  **Both fields are now proven**: `serviceInstance.region` returned `null`, and the deployment
+  manifest carries `deploy.multiRegionConfig`, which read `{"ams": {"numReplicas": 1}}` — a
+  per-region replica count, so this is where a second writer would actually appear rather than in
+  `numReplicas`.
+
+Both were read with `railway api`, which authenticates from the CLI's own session and needs no
+separate token — that is the cheap way to prove a field exists before putting it in the query.
 
 The split is the same one the Svix webhook uses: the logic is testable without a network, so the
 rules can be proved right on a machine that has no Railway token. `npm test` runs them.
