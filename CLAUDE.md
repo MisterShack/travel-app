@@ -71,7 +71,8 @@ verification work against real Resend delivery.
 Litestream restore drill, and backups are deliberately deferred until the greenlight (ROADMAP.md §1).
 PLAN.md §11 says so under Phase 1; this line used to say it without the caveat. 224 tests,
 typecheck and lint clean — 198 under vitest across the three workspaces plus 26 in `infra/` under
-`node --test`, which a vitest-only count misses.
+`node --test`, which a vitest-only count misses. Plus 19 Playwright specs, which are not in
+`npm test` and are run separately.
 
 **Phase 4 (booking import) shipped and verified end to end against a real forwarded airline
 confirmation, 2026-08-15** — including two per-passenger PDF tickets, read correctly.
@@ -142,6 +143,26 @@ would have shown a grey box.
 
 Segments get nothing on purpose — an IATA code is not an address and a station's city is not the
 station. `TimelineItem` gained a structured `address` rather than the action reading `subtitle`.
+
+**Phase 7 (Playwright) is started, not finished** — 2026-08-24, from PLAN-V2 §5. The harness, the
+auth fixture, the first journeys and the accessibility layer are in and green (19 specs); the
+remaining journeys are listed in ROADMAP.md §2. Three things it found or forced, none of which a
+unit test could have:
+
+- **The plan's auth fixture could not be built as written.** It asked for one that "completes
+  verification by reading the token straight from the test database". `auth_tokens` stores only the
+  SHA-256, deliberately, so there is nothing to read. The fixture mints a token and writes the hash
+  the server will look for, which exercises the real `/verify` route without a mailbox, a log
+  scrape, or a test-only hole in production code.
+- **A Playwright config is a module, and workers re-import it.** `mkdtempSync` at module scope ran
+  once per process, so the fixtures opened a different, unmigrated database from the one the API was
+  started against. It reads as `no such table: users` — a broken migration, not two files. The path
+  is published through the environment now and read in exactly one place.
+- **The suite must not use the dev ports.** The first run collided with dev servers that had been up
+  for eight days, the second with two more Vite instances walking up from 5173. Worse than failing
+  would have been succeeding: a suite that reuses a running server drives whatever database that
+  server was started with. Nothing is reused, and `API_PROXY_TARGET` lets Vite point at the
+  suite's own API.
 
 **Phase 11 (conflict and gap detection) shipped 2026-08-15**, from PLAN-V3. Pure function in
 `shared/`, run on the client, so it works offline and costs nothing per use. It is the feature that
@@ -245,8 +266,15 @@ team and links here rather than restating it; a gate written down twice drifts.
 
 | Trigger | Run |
 |---|---|
+| Any change at all | `npm run typecheck`, `npm run lint`, `npm test` from the root |
+| Any change to the client, the API, or a user-facing flow | `npm run test:e2e --workspace @travel/app` |
 | Any UI change, and before showing the app to anyone | `web-accessibility-reviewer` agent |
 | Wanting to see the app rather than its test output | `node app/e2e/drive.mjs` (see its header) |
+
+The e2e suite runs a real browser against both servers on its own ports (8799/5199, clear of the
+dev defaults), with a throwaway SQLite file per run. It needs no mail credential: verification
+tokens are minted against the test database, because they are SHA-256 hashed at rest and cannot be
+read back.
 | Touching the Railway dashboard, and before turning backups on | `npm run check-drift` (DEPLOY.md §8a) |
 | Any migration that touches existing rows, before it deploys | `migration-rehearser` agent |
 | After a push reaches production | `release-verifier` agent |

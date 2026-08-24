@@ -53,6 +53,19 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   {
+    // The Playwright suite is Node, not React. It matters for one rule in
+    // particular: a fixture is declared as `{ storageState: ({ ... }, use) =>
+    // use(value) }`, and `react-hooks` sees a bare call to something named
+    // `use` and reports a hook called outside a component. It is Playwright's
+    // fixture-provider callback and has nothing to do with React.
+    files: ['app/e2e/**/*.ts', 'app/playwright.config.ts'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
+      'react-refresh/only-export-components': 'off',
+    },
+  },
+  {
     // PLAN.md §4: no `any` in the layers that own correctness. The timezone
     // triple and the membership check are the two things most expensive to get
     // wrong, so their layers are typed strictly.

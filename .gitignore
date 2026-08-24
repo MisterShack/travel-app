@@ -9,3 +9,7 @@ build/
 *.db-wal
 *.db-shm
 .DS_Store
+
+# Playwright: the HTML report, and the traces/screenshots it links to.
+playwright-report/
+test-results/

@@ -1,0 +1,70 @@
+name: CI
+
+# Pull requests and pushes to main. The deploy is Railway's own, triggered by
+# the push rather than by this workflow — nothing here touches production.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A second push to the same branch makes the first run irrelevant.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Fast gates first, in one job: if the types are wrong there is no point
+  # spending a browser download on the same commit.
+  checks:
+    name: typecheck, lint, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # `npm ci` works on Linux only because the root package.json declares the
+      # Linux native binaries as optionalDependencies — npm records only the
+      # current platform's optional packages (npm/cli#4828), so a lockfile
+      # generated on macOS describes only macOS. See DEPLOY.md §9.
+      - run: npm ci
+
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
+  e2e:
+    name: end-to-end
+    runs-on: ubuntu-latest
+    needs: checks
+    # Playwright's own image ships the browsers and every system library they
+    # need. Installing them onto a bare runner is the step that breaks whenever
+    # Ubuntu moves, and the image is how that stops being our problem.
+    # The tag must match the @playwright/test version in package-lock.json.
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+      options: --user 1001
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run Playwright
+        run: npm run test:e2e --workspace @travel/app
+        env:
+          CI: 'true'
+
+      # The report is the whole point on a failure: a trace, a screenshot and
+      # the DOM at the moment it broke, rather than one line of stack.
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: app/playwright-report/
+          retention-days: 7

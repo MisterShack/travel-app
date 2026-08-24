@@ -88,10 +88,24 @@ Nothing below is started. Sizes are the plans' own where they gave one.
 
 1. **Gate 1 — the Start Command investigation.** Not a phase, and the highest-value hour available.
    See above.
-2. **Phase 7 — Playwright.** PLAN-V2 §5. The largest item and the one whose value depends most on
-   being done early: every defect that reached production in V1 was invisible to the unit suites and
-   was caught by a person clicking, or not at all. Being pre-greenlight is the argument for it, not
-   against it.
+2. **Phase 7 — Playwright. Started 2026-08-24, and the harness is done.** PLAN-V2 §5. Steps 1, 2, 4
+   and 5 are in: the `@playwright/test` harness with both servers and a throwaway database, the auth
+   fixture, `@axe-core/playwright` on every screen in both themes, and the repo's first GitHub
+   Actions workflow. `audit.mjs` is deleted as the plan asked; `drive.mjs` keeps its screenshot role.
+   19 specs, green.
+
+   **Step 3 is half done — these journeys are still to write:**
+
+   - adding each timeline entity type to a trip, and the timezone assertion that goes with it (a new
+     event defaulting to the *browser's* zone rather than the trip's was one of the six defects the
+     first browser drive found, and it is the single highest-value assertion left)
+   - invite and redeem, across two accounts
+   - import review and apply
+   - offline read, which is the app's central claim and the one PLAN.md §4 puts in writing
+
+   The fixtures and the ports are settled, so each of these is now a spec file rather than a
+   project. Note the registration rate limit — 10 per 15 minutes per IP — bounds how many accounts a
+   run can create; the invite journey needs a second one, which is still well inside it.
 3. **Phase 6 steps 1–2 — Terraform skeleton and import.** PLAN-V2 §4, as revised by the 2026-08-17
    review. Adopted on David's forward-looking argument that future integrations will make
    infrastructure-as-code pay off; recorded in PLAN-V2 §7 as a bet rather than a reason, because no

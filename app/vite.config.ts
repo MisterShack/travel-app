@@ -76,8 +76,19 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:8787',
-      '/health': 'http://localhost:8787',
+      /**
+       * The dev server proxies to the API so the browser only ever talks to one
+       * origin — the deployed shape, where a single process serves both.
+       *
+       * Overridable because the e2e suite runs its own API on its own port: a
+       * developer's dev servers are typically already holding 8787 and 5173,
+       * and a test run that demands those ports either fails or, worse,
+       * silently drives the dev database. `API_PROXY_TARGET` lets the suite
+       * point at its own throwaway instance without anyone shutting anything
+       * down.
+       */
+      '/api': process.env['API_PROXY_TARGET'] ?? 'http://localhost:8787',
+      '/health': process.env['API_PROXY_TARGET'] ?? 'http://localhost:8787',
     },
   },
   test: {
