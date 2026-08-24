@@ -1,7 +1,22 @@
 # Waypoint — Plan V2: infrastructure as code, and browser testing
 
-> **Status: reviewed 2026-08-17, partly built.** Authored by Opus on 2026-08-15 from a scoping
-> request by David. Provider capabilities in §2 were checked against the registries and
+> **Status: closed and shipped, respectively — 2026-08-24.** This document holds two phases and
+> they ended differently.
+>
+> - **Phase 6 (Terraform) is CLOSED, unbuilt.** The community Railway provider was judged an
+>   unacceptable dependency for a live deployment, and the forward-looking bet the phase rested on
+>   was called in and did not pay — no integration could be named. §7 records both. **§4's steps are
+>   history, not a backlog; do not build from them.** What survived is `infra/`, which was
+>   deliberately built first and alone (§2a) and now carries the whole job: seven drift rules over
+>   the settings Terraform structurally could not own.
+> - **Phase 7 (Playwright) SHIPPED**, all five steps, 31 specs. §5 is the built thing.
+>
+> The one live obligation left from this document is **`railway.json`'s 2026-12-01 sunset**
+> (ROADMAP.md §4). §2a leaned on that file; the drift check now warns on every setting resting on
+> it, and the migration to `.railway/railway.ts` is the open task.
+>
+> Authored by Opus on 2026-08-15 from a scoping request by David. Provider capabilities in §2 were
+> checked against the registries and
 > repositories on that date rather than assumed — see §2a for what that check found, because it
 > changes the plan's shape.
 >
@@ -259,12 +274,20 @@ both.
 
 ## 7. Open questions
 
-- **Is the Railway provider maintained enough to depend on?** 42 stars, 24 open issues and a last
-  push four months old is not abandoned, but it is one person's side project standing between this
-  repo and its deployment. Read the open issues before step 2 and decide deliberately.
-- **Does the DNS migration earn its risk?** It is the only genuinely dangerous step here, and its
-  payoff is DNS-as-code plus a free R2 bucket. Doing step 4 without step 5 is possible — R2 does
-  not require Cloudflare to host the DNS.
+- ~~**Is the Railway provider maintained enough to depend on?**~~ **Answered 2026-08-24, by David:
+  no.** 42 stars, 24 open issues and one person's side project is not an acceptable dependency for
+  a live deployment, and no reading of the issue tracker was going to change that — the objection
+  is structural rather than about any particular bug. **This alone closes Phase 6 steps 1–2**, and
+  with them everything downstream, since steps 4 and 5 were never reachable without a working
+  provider foundation.
+- ~~**Does the DNS migration earn its risk?**~~ **Moot as of 2026-08-24.** Its payoff was
+  DNS-as-code, and there is no longer any code for the DNS to be in. The nameserver cutover was
+  always the only genuinely dangerous step in this plan and nothing depended on it; it is now
+  simply not happening. The domain stays registered and hosted at Namecheap.
+
+  Worth keeping the reasoning, because the *destination* was never the question. Moving nameservers
+  is the same one-way door whether they point at Cloudflare, Google or anywhere else — so if DNS
+  ever does need to move, this section's risk analysis still applies to whatever the target is.
 - ~~**Where does remote state live before R2 exists?**~~ **Settled 2026-08-17.** The chicken-and-egg
   only existed because one item created both buckets. They are separate now (§3): a state bucket at
   step 1, the Litestream bucket at step 4 behind the greenlight. Neither waits on the other.
@@ -282,8 +305,23 @@ both.
   Terraform covers none of them and the bet does not pay. If they look like Cloudflare, GitHub or
   object storage, it pays well. Worth revisiting once two or three of them are actually named.
 
-- **Is Terraform still the right tool once `railway.json` is counted?** Raised by the 2026-08-17
-  review and not yet answered. Railway's config-as-code file is already in the repo, already
-  version-controlled, already reviewed as a diff — which is most of what §1 claims Terraform buys.
-  It is not a reason to abandon Phase 6, but "what does Terraform add over `railway.json`" deserves
-  a real answer before step 2 rather than after it.
+  **Settled 2026-08-24: the bet was called in and did not pay.** Asked directly to name the
+  integrations, the answer was that there are none yet — it was a general direction rather than a
+  roadmap. So there is nothing for Terraform to manage today and nothing named for tomorrow, and
+  the provider question above independently rules out the only thing it *could* have managed.
+
+  **Recording it as a bet is what made this cheap to settle.** Written down as a reason it would
+  have been re-argued from scratch; written down as a bet it had a falsification test attached, and
+  the test was one question. That is the pattern worth repeating, not the outcome.
+
+- ~~**Is Terraform still the right tool once `railway.json` is counted?**~~ **Answered
+  2026-08-24, and it turned out to be the decisive question rather than a side one.** The 2026-08-17
+  review raised it and nobody answered it before deciding. The answer is that Terraform adds very
+  little: config-as-code is already in the repo, already version-controlled, already reviewed as a
+  diff. What it adds on top is remote state, a provider dependency, and an `apply` step — all cost,
+  no new capability, for a single service nobody else administers.
+
+  Note the shape of the mistake, because it is repeatable. Phase 6 was adopted on a forward-looking
+  bet (below), and this question was filed as "deserves a real answer before step 2" — which meant
+  the decision to adopt was made *before* the question that would have unmade it. The bet is not
+  wrong to have taken; deferring its falsification test past the commitment point is.
