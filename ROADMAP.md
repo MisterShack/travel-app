@@ -84,29 +84,45 @@ finished" with "the app is safe to hold other people's data" is how the second o
 
 ## 2. What is left, in the order worth doing it
 
-Nothing below is started. Sizes are the plans' own where they gave one.
+Sizes are the plans' own where they gave one.
 
-1. **Gate 1 — the Start Command investigation.** Not a phase, and the highest-value hour available.
-   See above.
-2. **Phase 7 — Playwright. Started 2026-08-24, and the harness is done.** PLAN-V2 §5. Steps 1, 2, 4
-   and 5 are in: the `@playwright/test` harness with both servers and a throwaway database, the auth
-   fixture, `@axe-core/playwright` on every screen in both themes, and the repo's first GitHub
-   Actions workflow. `audit.mjs` is deleted as the plan asked; `drive.mjs` keeps its screenshot role.
-   19 specs, green.
+**The first two entries are done.** They are kept in place rather than deleted because the order
+was the argument, and a list that silently loses its finished items reads as though nothing was
+ever sequenced. The next actually-open item is 3.
 
-   **Step 3 is half done — these journeys are still to write:**
+1. ~~**Gate 1 — the Start Command investigation.**~~ **DONE 2026-08-24** — see §1, which owns the
+   gate. It was the highest-value hour available and it cost one setting.
+2. **Phase 7 — Playwright. DONE 2026-08-24.** PLAN-V2 §5. All five steps are in: the
+   `@playwright/test` harness with both servers and a throwaway database, the auth fixture, every
+   step-3 journey, `@axe-core/playwright` on every screen in both themes, and the repo's first
+   GitHub Actions workflow. `audit.mjs` is deleted as the plan asked; `drive.mjs` keeps its
+   screenshot role. **31 specs, green three runs running.**
 
-   - adding each timeline entity type to a trip — segment, lodging and activity. **The timezone
-     assertion is done** (`timezone.spec.ts`): the browser is pinned to `America/Chicago` and the
-     trip to `Europe/Lisbon`, which is the scenario `EventForm.tsx` names in a comment, and the spec
-     guards its own premise so it cannot pass vacuously if the two ever coincide
-   - invite and redeem, across two accounts
-   - import review and apply
-   - offline read, which is the app's central claim and the one PLAN.md §4 puts in writing
+   **Step 3's journeys, and what each one is actually for:**
 
-   The fixtures and the ports are settled, so each of these is now a spec file rather than a
-   project. Note the registration rate limit — 10 per 15 minutes per IP — bounds how many accounts a
-   run can create; the invite journey needs a second one, which is still well inside it.
+   - **adding each timeline entity type** (`timeline.spec.ts`) — flight, train, stay and activity.
+     Each asserts the **stored UTC instant**, not that the event appeared: the instant is derived
+     and never rendered, so a timeline that reads perfectly and a database an hour out are
+     indistinguishable on screen. The flight runs four distinct zones — browser Chicago, trip
+     Toronto, endpoints Lisbon and Paris — so every fallback bug produces a wrong number. Lisbon
+     and London would have proved nothing, because they never differ
+   - **the timezone default** (`timezone.spec.ts`) — browser pinned to `America/Chicago`, trip to
+     `Europe/Lisbon`, the scenario `EventForm.tsx` names in a comment; guards its own premise so it
+     cannot pass vacuously if the two ever coincide
+   - **invite and redeem** (`invite.spec.ts`) — two signed-in contexts at once rather than signing
+     one out and the other in, which would pass even if sessions leaked. Includes the security
+     property: a forwarded invitation joins nothing, asserted against the membership table
+   - **import review and apply** (`imports.spec.ts`) — including the multi-leg case, where a return
+     trip must stay in the queue until *both* legs are added. That is a defect this repo already
+     shipped and fixed, and it is invisible to a single-leg test
+   - **offline read** (`offline.spec.ts`) — the app's central claim (PLAN.md §4). Covers the
+     IndexedDB read-through cache by client-side navigation, plus the honest refusal of an offline
+     *write*. It does **not** cover the service worker: it is disabled in dev, so a reload offline
+     has no shell to load. That needs the production build and is a separate question
+
+   The registration rate limit — 10 per 15 minutes per IP — bounds how many accounts a run can
+   create. The suite uses two: one per worker, plus one the invite journey registers. Well inside
+   it, but it is the ceiling any new multi-account spec has to respect.
 3. **Phase 6 steps 1–2 — Terraform skeleton and import.** PLAN-V2 §4, as revised by the 2026-08-17
    review. Adopted on David's forward-looking argument that future integrations will make
    infrastructure-as-code pay off; recorded in PLAN-V2 §7 as a bet rather than a reason, because no
@@ -168,6 +184,15 @@ instead of being bolted onto it, which is what conflict detection and segments b
   offline, and it puts the itinerary where family already look.
 - **A "next up" view.** The timeline answers *what is the plan*; nothing answers *what do I do now*.
   One screen, the next event, its countdown, in that event's own zone.
+- **`source` is a column with one value.** `segments`, `lodging` and `activities` each declare
+  `source: 'manual' | 'import'`, and `TimelineItem` carries it through to the client — but the
+  create helpers hardcode `'manual'`, nothing ever writes `'import'`, and nothing reads it. So an
+  applied import is indistinguishable from a typed-in row. Found 2026-08-24 while writing
+  `imports.spec.ts`, which deliberately does not assert the field rather than pin a distinction the
+  app does not make. Either set it when an import is applied — "added from your Air Canada email"
+  is genuinely useful on a review screen and in a conflict explanation — or drop the enum to one
+  value and stop implying a distinction exists. Small either way; the wrong move is leaving it
+  looking implemented.
 - **Data export and account deletion.** Closes the §4 gap above rather than adding surface.
 - **Past and upcoming trips, separated.** Small, and necessary rather than nice once there are more
   than a handful.

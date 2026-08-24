@@ -1,4 +1,9 @@
-import { test as base, expect, type APIRequestContext } from '@playwright/test';
+import {
+  test as base,
+  expect,
+  type APIRequestContext,
+  type PlaywrightWorkerArgs,
+} from '@playwright/test';
 import { join } from 'node:path';
 import { closeDb, isVerified, mintVerifyToken } from './db';
 import { dataDir } from './paths';
@@ -98,3 +103,66 @@ export const test = base.extend<Record<string, never>, WorkerFixtures>({
 });
 
 export { expect };
+
+/**
+ * Seeds a trip through the real API and returns it.
+ *
+ * Specs that are about *adding an event* create their trip this way rather than
+ * driving the trip form again. `trip.spec.ts` owns proving that form works;
+ * re-driving it in every other spec buys nothing and makes each of them fail
+ * for two unrelated reasons.
+ *
+ * The `request` fixture inherits `storageState` from `test.use`, so this is the
+ * signed-in account rather than a second anonymous context.
+ */
+export async function createTrip(
+  request: APIRequestContext,
+  overrides: Partial<{
+    name: string;
+    destination: string;
+    startDate: string;
+    endDate: string;
+    homeTimezone: string;
+  }> = {},
+): Promise<{ id: string; name: string; homeTimezone: string }> {
+  const input = {
+    name: `Trip ${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    startDate: '2027-03-01',
+    endDate: '2027-03-08',
+    homeTimezone: 'Europe/Lisbon',
+    ...overrides,
+  };
+
+  const created = await request.post('/api/trips', { data: input });
+  expect(created.status(), `creating a trip failed: ${await created.text()}`).toBe(201);
+
+  const { id } = (await created.json()) as { id: string };
+  expect(id, 'the API created a trip but returned no id').toBeTruthy();
+  return { id, name: input.name, homeTimezone: input.homeTimezone };
+}
+
+/**
+ * Signs an arbitrary account in and returns a storage-state path for it.
+ *
+ * The `account`/`storageStatePath` worker fixtures give a spec *one* signed-in
+ * user, which is all most journeys need. Sharing is the exception that needs
+ * two at once: the whole point of an invite is that it crosses accounts, so a
+ * spec proving it has to hold both sessions simultaneously rather than sign one
+ * out and the other in.
+ */
+export async function storageStateFor(
+  playwright: PlaywrightWorkerArgs['playwright'],
+  baseURL: string | undefined,
+  account: Account,
+  label: string,
+): Promise<string> {
+  const path = join(dataDir(), `storage-state-${label}.json`);
+  const request = await playwright.request.newContext({ baseURL });
+  const signedIn = await request.post('/api/auth/login', {
+    data: { email: account.email, password: account.password },
+  });
+  expect(signedIn.ok(), `login failed for ${account.email}: ${await signedIn.text()}`).toBe(true);
+  await request.storageState({ path });
+  await request.dispose();
+  return path;
+}

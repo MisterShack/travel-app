@@ -71,7 +71,7 @@ verification work against real Resend delivery.
 Litestream restore drill, and backups are deliberately deferred until the greenlight (ROADMAP.md §1).
 PLAN.md §11 says so under Phase 1; this line used to say it without the caveat. 224 tests,
 typecheck and lint clean — 198 under vitest across the three workspaces plus 26 in `infra/` under
-`node --test`, which a vitest-only count misses. Plus 19 Playwright specs, which are not in
+`node --test`, which a vitest-only count misses. Plus 31 Playwright specs, which are not in
 `npm test` and are run separately.
 
 **Phase 4 (booking import) shipped and verified end to end against a real forwarded airline
@@ -144,10 +144,25 @@ would have shown a grey box.
 Segments get nothing on purpose — an IATA code is not an address and a station's city is not the
 station. `TimelineItem` gained a structured `address` rather than the action reading `subtitle`.
 
-**Phase 7 (Playwright) is started, not finished** — 2026-08-24, from PLAN-V2 §5. The harness, the
-auth fixture, the first journeys and the accessibility layer are in and green (19 specs); the
-remaining journeys are listed in ROADMAP.md §2. Three things it found or forced, none of which a
-unit test could have:
+**Phase 7 (Playwright) shipped 2026-08-24**, from PLAN-V2 §5. All five steps: the harness, the auth
+fixture, every step-3 journey, the accessibility layer and CI — **31 specs, green three runs
+running**. The journeys and what each is for are in ROADMAP.md §2.
+
+Two things worth carrying forward from writing the journeys:
+
+- **Assert the stored instant, not the rendered text.** The UTC instant is derived from local
+  wall-clock plus a zone and is never displayed, so a timeline that reads perfectly and a database
+  an hour out are indistinguishable on screen — until someone travels. The entity specs read the
+  row back out of the suite's database. And the zones have to differ: the flight spec runs four
+  distinct ones, because a Lisbon-to-London pair would have passed while proving nothing, those two
+  never differing.
+- **The offline spec covers the cache, not the service worker.** The worker is disabled in dev, so
+  a reload offline has no shell to load and fails before any application code runs. Client-side
+  navigation exercises the IndexedDB read-through cache, which is where the itinerary lives; the
+  worker's own behaviour needs the production build. `drive.mjs` splits it the same way. A spec
+  that quietly proves less than its name claims is worse than one that says so.
+
+Three things the harness found or forced, none of which a unit test could have:
 
 - **The plan's auth fixture could not be built as written.** It asked for one that "completes
   verification by reading the token straight from the test database". `auth_tokens` stores only the
