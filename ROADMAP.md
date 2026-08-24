@@ -26,7 +26,7 @@ differently in a month.
 
 | # | Gate | Where it is documented | Status |
 |---|---|---|---|
-| 1 | The Start Command no longer overrides the image `ENTRYPOINT`, **or** the reason it cannot be cleared is understood | DEPLOY.md §5, PLAN-V2 §4 step 0 | Unresolved, but no longer mysterious — the image is exonerated by exercise and the override is confirmed from production logs |
+| 1 | The Start Command no longer overrides the image `ENTRYPOINT`, **or** the reason it cannot be cleared is understood | DEPLOY.md §5, PLAN-V2 §4 step 0 | **Understood 2026-08-23** — the 2026-08-15 crash was the missing `RESEND_API_KEY`, misattributed. Clearing it is now a routine change, not an experiment |
 | 2 | `LITESTREAM_BUCKET` set and replication proven with `litestream snapshots` | DEPLOY.md §5 | Blocked on 1 |
 | 3 | The restore drill actually run — this is Phase 1's own acceptance criterion | DEPLOY.md §6, PLAN.md §11 | Never run |
 | 4 | `npm run check-drift` passes against production with a real token | DEPLOY.md §8a, `infra/README.md` | Never run against Railway |
@@ -44,22 +44,25 @@ run in the exact configuration that crashed, it boots and serves `/health`, the 
 ceiling, cold-start timing, an injected `PORT` and volume persistence are all eliminated by exercise
 rather than by reading. The cause is Railway-side. DEPLOY.md §5 has the detail.
 
-**The boot-log check was run on 2026-08-23 and came back negative**, which is the answer that keeps
-the gate open. The running deployment's first lines are npm's workspace banner and a *relative*
-`src/index.ts`, with no `LITESTREAM_BUCKET` warning anywhere — so the Start Command replaces the
-`ENTRYPOINT`, `entrypoint.sh` has never executed in production, and Litestream has never run.
-DEPLOY.md §5 quotes the log.
+**The boot-log check confirmed the override is real:** the running deployment's first lines are
+npm's workspace banner and a *relative* `src/index.ts`, with no `LITESTREAM_BUCKET` warning
+anywhere. `entrypoint.sh` has never executed in production and Litestream has never run.
 
-**One read-only check remains.** Did the crashed 2026-08-15 deploy and the healthy one build the
-*same commit*? The repo was moving hourly that day, and a different build is the only hypothesis
-left that explains a rollback restoring health while the environment was identical. If the SHAs
-differ, the Start Command was never the cause and clearing it is routine.
+**And the crash that blocked this for eight days was a misattribution.** The deploy history shows a
+single failure on 2026-08-15, at 17:08, which commit `29d8a17` diagnosed at 17:10:27 as the missing
+`RESEND_API_KEY`. The Start Command was blamed for the same crash at 17:28. The "entrypoint's own
+WARNING printed before the failure" detail — offered as evidence of the mystery — is exactly what a
+cleared Start Command plus an unset mail key produces, and it reproduces in the image. The WARNING
+was the change *working*. DEPLOY.md §5 has the full account.
 
-After that it is worth clearing the Start Command for real, at a moment when nothing else is
-changing — because any deploy that reaches node runs migrations against the live volume and there
-are no backups. Expect the three WARNING lines and `Waypoint API listening` within a couple of
-seconds; if they do not appear, capture the logs before rolling back, which is what was not done in
-2026-08-15.
+`RESEND_API_KEY` has been set ever since, so **there is no known reason clearing the Start Command
+should fail today.** It is a routine change rather than an experiment.
+
+Do it at a moment when nothing else is changing — any deploy that reaches node runs migrations
+against the live volume and there are no backups, which is the circularity this gate exists to
+break. Expect the three WARNING lines then `Waypoint API listening` within a couple of seconds.
+**Capture the logs before rolling back if it does fail** — that is what was not done in 2026-08-15,
+and it is what cost the eight days.
 
 Railway project `9953e26c-f283-4cca-ad08-b32283f28dfa`, service `6fd08928-a910-4500-a81e-8cdf56fbb9de`
 — gate 4's `check-drift` needs the project id and a token, and the id is now known.

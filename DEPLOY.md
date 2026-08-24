@@ -187,11 +187,48 @@ and confirm you are not seeing that line.**
 > set, prove it again with `litestream snapshots` (§6); an empty result means replication is not
 > running no matter what the variables say.
 >
-> Clearing it was attempted on 2026-08-15 and the deploy crashed, so it was rolled back and the
-> custom command left in place. **The cause is not yet known.** The entrypoint itself is not at
-> fault: the same command shape (`node --import tsx server/src/index.ts` from `/app`) starts and
-> serves `/health` correctly both natively and in the image, and the entrypoint's own WARNING line
-> printed before the failure. Capture the crash logs when retrying rather than guessing.
+> #### The 2026-08-15 crash was a misattribution (established 2026-08-23)
+>
+> This box used to say clearing the Start Command crashed the deploy and **the cause is not yet
+> known**. The cause is now known, and it was not the Start Command. It was the missing
+> `RESEND_API_KEY` — the same failure §3 already documents.
+>
+> The deploy history shows **exactly one failed deployment that day**, `d43f0e95` at 17:08,
+> followed by a successful one at 17:10. Commit `29d8a17`, timestamped 17:10:27, diagnoses that
+> failure: *"env.ts throws on boot when RESEND_API_KEY is unset in production… That cost a failed
+> deploy."* The Start Command was then blamed for the same crash in `216236b` at 17:28, eighteen
+> minutes later and ten minutes after `124df31` had already recorded the service live.
+>
+> The detail that clinches it is the one this box offered as evidence *for* the mystery: "the
+> entrypoint's own WARNING line printed before the failure". That is precisely what a cleared Start
+> Command plus an unset mail key produces, reproduced in the image on 2026-08-23:
+>
+> ```
+> WARNING: LITESTREAM_BUCKET is not set — trips are NOT being backed up.
+> Starting without replication.
+> Error: RESEND_API_KEY is required in production: …   (env.ts)   exit=1
+> ```
+>
+> Clearing the Start Command is what made the entrypoint run, which is what made the WARNING
+> appear. The WARNING was a symptom of the change working, not of it failing. The boot error two
+> lines later was the actual failure, and it was fixed at 17:10 by setting the key — but because the
+> Start Command was restored *and* the key set together, clearing it was never re-tested against a
+> working environment.
+>
+> **`RESEND_API_KEY` has been set ever since**, which is why the service has been healthy for eight
+> days. There is no known reason clearing the Start Command should fail today.
+>
+> Two lessons worth more than the fix. **Two changes in flight and one failure is a
+> misattribution waiting to happen** — the deploy that failed had both a cleared Start Command and
+> an unset mail key, and the wrong one got the write-up. And **a document that records a symptom
+> without the logs behind it will preserve the wrong conclusion indefinitely**: this one blocked
+> backups for eight days on a cause that had already been found and fixed. Capture the logs when
+> retrying, which is still the right instruction — it just was not followed in 2026-08-15.
+>
+> Not directly observed: `d43f0e95`'s own log body, which Railway's retention window had aged out
+> by the time this was investigated. The conclusion rests on there being a single failure that day,
+> the timestamps of the two commits, and the reproduced symptom shape — strong, but circumstantial.
+> **The confirming test is clearing the Start Command and watching it boot.**
 >
 > #### What has been eliminated (2026-08-18 by reading, 2026-08-23 by exercise)
 >
