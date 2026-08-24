@@ -571,17 +571,54 @@ What that returned is the reason this section is not a formality:
 
 | Setting | On the service today | Needed | If `railway.json` went first |
 |---|---|---|---|
-| **Builder** | **`RAILPACK`** | `DOCKERFILE`, path `Dockerfile` | **The whole deploy changes shape.** No `entrypoint.sh` and so no Litestream mechanism, `tsx` pruned, the pinned Rolldown binary bypassed, `STATIC_DIR` wrong |
-| Healthcheck Path | `null` | `/health` | No healthcheck at all — so the broken Railpack build above is marked healthy and goes live |
-| Healthcheck Timeout | `null` | `60` | |
-| Replicas | `null` | `1` | Falls back to Railway's default; the single-writer guarantee stops being asserted anywhere |
-| Restart Policy | `ON_FAILURE`, retries `10` | *(already correct)* | Nothing — this one is already on the service |
+| `dockerfilePath` | `null` | `Dockerfile` | Which builder wins becomes implicit — see below |
+| `healthcheckPath` | `null` | `/health` | No healthcheck at all, so *any* bad deploy is marked healthy and goes live |
+| `healthcheckTimeout` | `null` | `60` | |
+| `numReplicas` | `null` | `1` | Falls back to Railway's default; the single-writer guarantee stops being asserted anywhere |
+| `restartPolicyType` / `MaxRetries` | `ON_FAILURE` / `10` | *(already correct)* | Nothing — already on the service |
 
-**The builder is the dangerous one, not the healthcheck.** The service's own builder is `RAILPACK`
-and only `railway.json` is making the Dockerfile win — `fileServiceManifest.build.builder` is
-`DOCKERFILE` while `serviceInstance.builder` is `RAILPACK`. Delete the file first and the next
-deploy builds a completely different image *and* has no healthcheck to catch it. The two failures
-compound: a build that cannot work, reported as healthy.
+**A correction worth keeping, because the wrong version was briefly written down here.** The service
+reports `builder: RAILPACK`, and the first reading of that was "deleting the file gives a Railpack
+build". That is not established. The `Builder` enum is `HEROKU | NIXPACKS | PAKETO | RAILPACK` —
+**there is no `DOCKERFILE` member** — so `builder` names the buildpack to use when there is no
+Dockerfile, and Railway detects a root Dockerfile separately. The manifest's
+`build.builder: "DOCKERFILE"` is a resolved value, not that enum.
+
+So the honest status is *uncertain* rather than *catastrophic*, and `dockerfilePath` is the field
+that makes it certain either way. Set it and the question stops mattering. The healthcheck is the
+one whose fallback is unambiguously bad, which is where this section started before the detour.
+
+### The circularity, and the way out
+
+**The dashboard will not let you edit any of these while `railway.json` supplies them** — Config as
+Code locks the fields it owns. That is a genuine deadlock: the values cannot be set until the file
+goes, and the file cannot safely go until they are set.
+
+The API is not locked. `serviceInstanceUpdate` writes the service's own values *underneath* the
+file, which still overrides them at deploy time.
+
+**That is what makes this safe: it is a no-op for current behaviour.** Every value below is
+identical to what `railway.json` already supplies, so the running app builds and behaves exactly as
+it does now. The only thing that changes is what happens when the file is removed. Nothing about
+this step needs a maintenance window, because nothing about the deploy changes.
+
+```sh
+railway api 'mutation { serviceInstanceUpdate(
+  serviceId: "6fd08928-a910-4500-a81e-8cdf56fbb9de",
+  environmentId: "d9d851ab-898b-4bd1-b0be-b5c8d0e0ec95",
+  input: {
+    dockerfilePath: "Dockerfile",
+    healthcheckPath: "/health",
+    healthcheckTimeout: 60,
+    numReplicas: 1
+  }
+) }'
+```
+
+Read the values back afterwards with the query above; all four must be non-null before step 2.
+Expect the change to be able to trigger a redeploy — harmless here, since the resulting deploy is
+identical to the current one, but it does mean migrations run against the live volume, so do it
+when nothing else is in flight.
 
 1. **Set the four on the service**, in the Railway dashboard — Settings → Build for the builder,
    Settings → Deploy for the rest. The restart policy is already right and needs no change.
