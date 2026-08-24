@@ -169,23 +169,68 @@ server under `litestream replicate -exec`. With `LITESTREAM_BUCKET` unset it pri
 `WARNING: LITESTREAM_BUCKET is not set` and starts anyway. **Read the logs on the first deploy
 and confirm you are not seeing that line.**
 
-> ### ⚠ A custom Start Command silently disables replication
+> ### ✅ Resolved 2026-08-24 — the Start Command is cleared and the ENTRYPOINT runs
 >
-> As deployed on 2026-08-15 the Railway service has a **custom Start Command**
-> (`npm run start --workspace @travel/server`, running from `/app/server`) which overrides the
-> image's `ENTRYPOINT`. The app runs correctly that way — but `entrypoint.sh` never executes, so
-> **Litestream never starts**.
+> **This is fixed. The section below is the history, kept because the way it was wrong is worth
+> more than the fix.**
 >
-> Today that costs nothing, because no bucket is configured. The moment `LITESTREAM_BUCKET` is
-> set it becomes the worst kind of failure: the variables are present, the dashboard looks
+> From 2026-08-15 to 2026-08-24 the Railway service had a **custom Start Command**
+> (`npm run start --workspace=@travel/server`, running from `/app/server`) which overrode the
+> image's `ENTRYPOINT`. The app ran correctly that way — but `entrypoint.sh` never executed, so
+> **Litestream could never have started**, for nine days and forty-three deployments.
+>
+> It was cleared on 2026-08-24 and deployment `55d5f6e2` came up clean. This is the whole boot log,
+> and the first three lines had never appeared in production before:
+>
+> ```
+> Starting Container
+> WARNING: LITESTREAM_BUCKET is not set — trips are NOT being backed up.
+> Losing the volume would lose every account and every trip. See DEPLOY.md.
+> Starting without replication.
+> Waypoint API listening on http://localhost:8080 (production)
+> ```
+>
+> No npm banner, so the entrypoint is running. `/health` 200, `/` and `/trips/<id>` 200 HTML,
+> `/api/trips` 401 JSON, `manifest.webmanifest` 200. `npm run check-drift` dropped from two
+> warnings to one. There was no downtime at any point.
+>
+> #### Three Railway behaviours that cost an evening, none of them documented anywhere
+>
+> Getting from "clear the setting" to "the entrypoint runs" took three attempts, because two of
+> them silently did nothing:
+>
+> 1. **`serviceInstanceUpdate` with `startCommand: null` returns `true` and changes nothing.**
+>    GraphQL reads an explicit null as "field not provided". Clearing it needs `startCommand: ""`,
+>    which is what the dashboard writes — `infra/drift.test.mjs` had already recorded that Railway
+>    stores an empty string for a cleared command, and that was the clue.
+> 2. **`railway redeploy` replays the previous deployment's stored manifest**, not the service's
+>    current configuration. A config change followed by a plain redeploy deploys the *old* config,
+>    succeeds, and looks exactly like the change having no effect.
+> 3. **`railway redeploy --from-source` is the one that applies configuration changes.** It pulls
+>    the latest commit and reads current settings.
+>
+> **Always verify a Railway config change by reading it back, and verify the deployment by reading
+> its manifest — not by the mutation's return value and not by the deploy going green.** Two
+> deployments that evening (`b498ad0f`, `734e1d80`) were green, healthy, and completely inert.
+>
+> Behaviour 2 is worth holding onto for another reason: a setting that appears not to take effect,
+> on a service someone is actively reconfiguring, is exactly how a setting acquires a reputation
+> for being cursed. That is a plausible contributor to the 2026-08-15 confusion below, though the
+> mail-key account is still the better-supported one.
+>
+> #### Why this mattered, and what is still true
+>
+> While no bucket is configured a missing entrypoint costs nothing. The moment `LITESTREAM_BUCKET`
+> is set it becomes the worst kind of failure: the variables are present, the dashboard looks
 > configured, the app is healthy, and **nothing is being replicated**. You would stop worrying
-> about backups precisely when you had none.
+> about backups precisely when you had none. That is why this had to be fixed *before* backups were
+> turned on, not alongside them.
 >
-> **Before enabling backups, clear the Start Command** so the image's `ENTRYPOINT` runs, and
-> confirm from the deploy logs that the `WARNING: LITESTREAM_BUCKET is not set` line appears
-> *before* you set the bucket — that line is proof the entrypoint is executing. Once the bucket is
-> set, prove it again with `litestream snapshots` (§6); an empty result means replication is not
-> running no matter what the variables say.
+> **The order still stands for turning backups on.** The `WARNING: LITESTREAM_BUCKET is not set`
+> line above is the proof the entrypoint is executing; it must be seen *before* a bucket is set.
+> Once the bucket is set, prove replication again with `litestream snapshots` (§6) — an empty
+> result means it is not running no matter what the variables say. And read the boxed warning in §6
+> first: a wrong credential against an empty volume exits before node starts.
 >
 > #### The 2026-08-15 crash was a misattribution (established 2026-08-23)
 >

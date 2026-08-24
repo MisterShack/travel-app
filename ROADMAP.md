@@ -26,17 +26,18 @@ differently in a month.
 
 | # | Gate | Where it is documented | Status |
 |---|---|---|---|
-| 1 | The Start Command no longer overrides the image `ENTRYPOINT`, **or** the reason it cannot be cleared is understood | DEPLOY.md §5, PLAN-V2 §4 step 0 | **Understood 2026-08-23** — the 2026-08-15 crash was the missing `RESEND_API_KEY`, misattributed. Clearing it is now a routine change, not an experiment |
-| 2 | `LITESTREAM_BUCKET` set and replication proven with `litestream snapshots` | DEPLOY.md §5 | Blocked on 1 |
-| 3 | The restore drill actually run — this is Phase 1's own acceptance criterion | DEPLOY.md §6, PLAN.md §11 | Never run |
+| 1 | The Start Command no longer overrides the image `ENTRYPOINT`, **or** the reason it cannot be cleared is understood | DEPLOY.md §5, PLAN-V2 §4 step 0 | **DONE 2026-08-24** — cleared, `entrypoint.sh` runs, deployment `55d5f6e2` clean with no downtime |
+| 2 | `LITESTREAM_BUCKET` set and replication proven with `litestream snapshots` | DEPLOY.md §5 | **Unblocked — this is now the next thing to do.** Needs a bucket and credentials |
+| 3 | The restore drill actually run — this is Phase 1's own acceptance criterion | DEPLOY.md §6, PLAN.md §11 | Never run — blocked on 2, and read §6's boxed warning first |
 | 4 | `npm run check-drift` passes against production with a real token | DEPLOY.md §8a, `infra/README.md` | **Done 2026-08-24** — exits `0` with two accurate warnings. The first run also found two defects in the checker, both fixed |
 | 5 | `VAPID_*` set, if web push should work at launch | DEPLOY.md §3 | **Already set** — `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` are all present in production (confirmed 2026-08-24). Decided by action; what is unverified is whether push actually delivers |
 | 6 | Registration gate reconsidered, or the decision restated deliberately | — | Judged an acceptable risk 2026-08-18 |
 
-**Gate 1 is the one to pull forward.** Everything about backups waits behind it, and its size is
-genuinely unknown: clearing the Start Command crashed the deploy on 2026-08-15 and the cause was
-never established. Finding out whether that is a two-line fix or a real problem is an hour of work
-that can happen at any time, and it should happen long before the greenlight rather than on the day.
+**Gate 1 was the long pole and it is now done** (2026-08-24). What it cost is the useful part: the
+crash that justified nine days of caution was the missing `RESEND_API_KEY`, misattributed to the
+Start Command by a write-up made twenty minutes later without the logs. The fix itself was one
+setting. **Gate 2 is now the front of the queue**, and it needs a decision from David rather than
+an investigation — a bucket, or an explicit choice to stay unreplicated.
 
 **That local experiment was run on 2026-08-23 and the image is exonerated.** Built unmodified and
 run in the exact configuration that crashed, it boots and serves `/health`, the SPA and a 401 from

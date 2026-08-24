@@ -95,14 +95,20 @@ Two things that are true and worth keeping in view:
 - **There are no backups.** `LITESTREAM_BUCKET` is unset by David's decision (2026-08-15), so the
   Railway volume is the only copy of every account and trip, and the restore drill in DEPLOY.md §6
   has never been run. Deliberate, but it makes the volume a single point of failure.
-  **And a custom Railway Start Command currently overrides the image's `ENTRYPOINT`**, so
-  `entrypoint.sh` — and therefore Litestream — never runs. Harmless while no bucket is set;
-  actively dangerous the moment one is, because everything would look configured and nothing would
-  replicate. Clearing it crashed the deploy once, cause unknown. See the boxed warning in
-  DEPLOY.md §5 before turning backups on. **`npm run check-drift` now asserts this** and turns it
-  from a warning into a failure the moment `LITESTREAM_BUCKET` is set (DEPLOY.md §8a).
+  **The Start Command that overrode the image's `ENTRYPOINT` was cleared on 2026-08-24**, so
+  `entrypoint.sh` now runs and Litestream *can* start — nothing is replicating yet, because no
+  bucket is set, but the mechanism is no longer broken. It had been overridden for nine days and
+  43 deployments. The crash that justified leaving it alone was the missing `RESEND_API_KEY`,
+  misattributed; the deploy history holds exactly two failures ever, both before that key was set.
+  **`npm run check-drift` asserts this** and turns it into a failure the moment
+  `LITESTREAM_BUCKET` is set (DEPLOY.md §8a).
 - **Registration is open.** The app is publicly reachable, so anyone with the URL can create an
   account and consume the Resend quota. There is no invite gate.
+
+**`railway.json` is deprecated and load-bearing.** Railway sunsets Config as Code on 2026-12-01 and
+warns on every CLI command. It supplies `numReplicas: 1`, which is the single-writer guarantee the
+whole app is designed around (PLAN.md §4, §7) — the service's own override is unset, so after the
+date the count falls back to nothing. ROADMAP.md §4 tracks the decision.
 
 **The Railway drift check shipped 2026-08-17**, from PLAN-V2 §4 step 3 — built first and alone,
 because Terraform cannot own the volume mount path, the Start Command or the Watch Paths (PLAN-V2

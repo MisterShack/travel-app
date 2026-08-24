@@ -71,13 +71,23 @@ fixtures.
   rather than an assumption — with nothing observable it fails exactly as before, and the test that
   pins that behaviour is unchanged.
 
-## Expect two warnings today
+## The Start Command warning is gone (2026-08-24)
 
-**A custom Start Command**, which overrides the image `ENTRYPOINT` so Litestream cannot start. The
-check grades this rather than failing on it, because a check that fails from its first run is one
-people learn to ignore, and this project has already written down what that costs. Note that the
-reason it is still set did not survive investigation: the 2026-08-15 crash was the missing
-`RESEND_API_KEY`, misattributed (DEPLOY.md §5).
+The rule is still there and still graded, but it no longer fires: the Start Command was cleared and
+`entrypoint.sh` now runs (DEPLOY.md §5). The check went from two warnings to one, which is the first
+time it has been used to *confirm a fix* rather than to describe a known deviation — and is the
+argument for the graded WARN over a hard FAIL, since a rule that had been failing since its first
+run would have been muted long before it could do that.
+
+**One Railway behaviour worth knowing before trusting any config change**, learned the hard way
+while clearing it: `serviceInstanceUpdate` with `startCommand: null` returns `true` and changes
+nothing, and `railway redeploy` replays the previous deployment's manifest rather than current
+service config. Two deployments that evening were green, healthy and entirely inert. `""` clears the
+command, `--from-source` applies it, and **reading the value back is the only way to know** — which
+is the same argument this file already makes about exit code `2`. A tool that reports success
+without having acted is the failure mode; only the shape changes.
+
+## Expect one warning today
 
 **The single replica comes from `railway.json`, which Railway has deprecated.** Config as Code is
 sunset on **2026-12-01**. The effective count is 1 today and the app behaves correctly; the warning
