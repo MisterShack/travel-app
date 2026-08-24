@@ -69,8 +69,8 @@ verification work against real Resend delivery.
 
 **All phases (0–5) are done**, with one stated exception: Phase 1’s acceptance criterion includes a
 Litestream restore drill, and backups are deliberately deferred until the greenlight (ROADMAP.md §1).
-PLAN.md §11 says so under Phase 1; this line used to say it without the caveat. 224 tests,
-typecheck and lint clean — 198 under vitest across the three workspaces plus 26 in `infra/` under
+PLAN.md §11 says so under Phase 1; this line used to say it without the caveat. 236 tests,
+typecheck and lint clean — 198 under vitest across the three workspaces plus 38 in `infra/` under
 `node --test`, which a vitest-only count misses. Plus 31 Playwright specs, which are not in
 `npm test` and are run separately.
 
@@ -110,6 +110,17 @@ Two things that are true and worth keeping in view:
 warns on every CLI command. It supplies `numReplicas: 1`, which is the single-writer guarantee the
 whole app is designed around (PLAN.md §4, §7) — the service's own override is unset, so after the
 date the count falls back to nothing. ROADMAP.md §4 tracks the decision.
+
+**The drift check grew to seven rules on 2026-08-24**, when Phase 6 was closed and it became the
+thing that covers the dashboard instead of Terraform. It now also asserts the healthcheck path, the
+builder and the restart policy — all read from data it was *already fetching*, because a GraphQL
+field that does not exist fails the whole request and exits `2`, turning a working checker into a
+silent one. `latestDeployment.meta` carries the whole of `railway.json`, and
+`serviceInstance.healthcheckPath` was in the query and simply unread. The sharpest of the new rules:
+a healthcheck pointed anywhere but `/health` is **worse than none**, because the SPA fallback
+answers every unmatched GET with `index.html`, so it returns 200 and passes forever while the API
+behind it is dead. `infra/README.md` §"Adding a rule" records the method and the two rules still
+missing (App Sleeping, and region).
 
 **The Railway drift check shipped 2026-08-17**, from PLAN-V2 §4 step 3 — built first and alone,
 because Terraform cannot own the volume mount path, the Start Command or the Watch Paths (PLAN-V2

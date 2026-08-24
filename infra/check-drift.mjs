@@ -45,6 +45,9 @@ import {
   hasFailure,
   manifestNumReplicas,
   FAIL,
+  manifestBuilder,
+  manifestHealthcheckPath,
+  manifestRestartPolicy,
 } from './drift.mjs';
 
 const ENDPOINT = 'https://backboard.railway.com/graphql/v2';
@@ -191,6 +194,16 @@ async function main() {
     numReplicas: instance.numReplicas,
     manifestReplicas: manifestNumReplicas(instance.latestDeployment),
     backups,
+    /**
+     * All four of these come from data already fetched — the serviceInstance
+     * override, and the deployment manifest that `numReplicas` was already
+     * being read out of. No new field is named, so no new way for the query to
+     * fail and take the whole check down with it.
+     */
+    healthcheckPath: instance.healthcheckPath,
+    manifestHealthcheck: manifestHealthcheckPath(instance.latestDeployment),
+    builder: manifestBuilder(instance.latestDeployment),
+    restartPolicy: manifestRestartPolicy(instance.latestDeployment),
   });
 
   report({ projectName: projectData.project.name, environmentName, serviceName, findings });
@@ -205,6 +218,9 @@ function report({ projectName, environmentName, serviceName, findings }) {
     console.log('  OK  no custom Start Command, so the image ENTRYPOINT runs');
     console.log('  OK  no Watch Paths, so every push deploys');
     console.log('  OK  numReplicas is 1');
+    console.log('  OK  healthcheck points at /health, which the API actually answers');
+    console.log('  OK  built from the Dockerfile');
+    console.log('  OK  the service restarts after a crash');
     console.log('\nNo drift.');
     return;
   }

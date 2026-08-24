@@ -12,6 +12,9 @@ precisely the three settings on this deployment that have actually gone wrong:
 | Start Command | A custom one overrides the image's `ENTRYPOINT`, so `entrypoint.sh` never runs and Litestream never starts | Cannot manage |
 | Watch Paths | Railway silently skips deploys; the push succeeds and the running code stays as it was | Cannot manage |
 | `numReplicas` | Two writers on one SQLite file, and two reminder sweeps racing to send the same notification | `railway.json` declares it, but the live service can still differ |
+| Healthcheck path | Pointed anywhere but `/health` it hits the SPA fallback, returns 200 and HTML, and passes forever while the API is dead | Could manage, but does not know the fallback exists |
+| Builder | Anything but `DOCKERFILE` silently drops `entrypoint.sh`, the `tsx` runtime dependency and the pinned Linux Rolldown binary | Could manage |
+| Restart policy | `NEVER` means a crash at 03:00 stops every future reminder, and the first symptom is a missed flight | Could manage |
 
 So Terraform would codify the project, the service, the variables and the domain — the parts that
 have never broken — while leaving the dangerous parts exactly as manual as they are today, and
@@ -48,6 +51,30 @@ unknown into a false assurance, which is worse than having no checker at all.
 - `drift.mjs` — the rules and the GraphQL queries. Pure functions, no I/O.
 - `check-drift.mjs` — the runner: env, network, exit codes.
 - `drift.test.mjs` — the rules against fixtures, via `node --test`. No dependency, no network.
+
+## Adding a rule
+
+**Prefer a rule that reads data already being fetched.** A GraphQL field that does not exist makes
+the *whole* request fail, so the run exits `2` and every other assertion stops being made — one
+speculative field turns a working checker into a silent one, and `2` is deliberately indistinguishable
+from a network outage.
+
+The healthcheck, builder and restart-policy rules were added this way (2026-08-24) at no query cost
+at all: `latestDeployment.meta` was already being fetched for `numReplicas`, and it carries the
+whole of `railway.json` — `build.builder`, `deploy.healthcheckPath`, `deploy.restartPolicyType`.
+`serviceInstance.healthcheckPath` was likewise already in the query and simply unread. Check what is
+already in hand before naming a new field.
+
+**A new field needs a run with a token before it is trusted.** The rules are pure functions tested
+against fixtures, which proves they are right and cannot prove the query names anything real.
+
+Two things this still does not cover, both needing fields nobody has verified against the live
+schema — do not add them blind:
+
+- **App Sleeping.** If Railway ever sleeps this service the in-process reminder sweep stops with it,
+  silently, and PLAN.md §4 says there is nowhere else for a scheduler to live. Probably the highest-
+  value rule left.
+- **Region, and multi-region.** A second region is a second writer by another name.
 
 The split is the same one the Svix webhook uses: the logic is testable without a network, so the
 rules can be proved right on a machine that has no Railway token. `npm test` runs them.

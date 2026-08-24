@@ -123,12 +123,23 @@ ever sequenced. The next actually-open item is 3.
    The registration rate limit — 10 per 15 minutes per IP — bounds how many accounts a run can
    create. The suite uses two: one per worker, plus one the invite journey registers. Well inside
    it, but it is the ceiling any new multi-account spec has to respect.
-3. **Phase 6 steps 1–2 — Terraform skeleton and import.** PLAN-V2 §4, as revised by the 2026-08-17
-   review. Adopted on David's forward-looking argument that future integrations will make
-   infrastructure-as-code pay off; recorded in PLAN-V2 §7 as a bet rather than a reason, because no
-   integration is named yet and Resend — this app's most configuration-heavy dependency — has no
-   provider at all. Steps 1–2 open no one-way doors. **Needs a Railway token and a Cloudflare
-   account**; roughly an hour once they exist.
+3. ~~**Phase 6 steps 1–2 — Terraform skeleton and import.**~~ **CLOSED 2026-08-24, by David.**
+   The community Railway provider — 42 stars, 24 open issues, one person's side project — was
+   judged an unacceptable dependency for a live deployment, which ends steps 1–2 on its own.
+   Asked at the same time to name the future integrations the whole bet rested on (PLAN-V2 §7),
+   the answer was that there are none yet: so there is also nothing for Terraform to manage.
+
+   **What replaced it**, serving the goals Terraform was standing in for:
+
+   - **`check-drift` grew to seven rules** (2026-08-24) — healthcheck path, builder and restart
+     policy on top of the original four. This is the "stop clicking dashboards from memory" half,
+     and it is the half PLAN-V2 §2a says Terraform structurally *could not* have done
+   - **`.railway/railway.ts`** owns `numReplicas` before the 2026-12-01 sunset — see §4 below,
+     which is now a dated task rather than an open question
+
+   **Not reopened without new information.** The trigger is a named integration with a mature
+   official provider — Cloudflare, GitHub, object storage. Another Resend-shaped dependency is not
+   one, and neither is a tidier version of this argument.
 4. **Phase 9 — geocode on import.** PLAN-V3 §2 step 2. Blocked on choosing a provider and pricing
    it, which is the load-bearing unknown rather than the work.
 5. **Phase 6 step 5 — DNS to Cloudflare.** The only genuinely dangerous item on any plan, and

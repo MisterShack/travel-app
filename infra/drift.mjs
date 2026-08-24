@@ -80,15 +80,37 @@ export const SERVICE_INSTANCE_QUERY = `query ServiceInstance($serviceId: String!
  * Returns `null` when nothing observable says anything — which the rule must
  * still treat as a failure rather than assuming 1.
  */
-export function manifestNumReplicas(latestDeployment) {
+export function manifestSetting(latestDeployment, section, key, isValid = (v) => v != null) {
   const meta = latestDeployment?.meta;
   if (!meta || typeof meta !== 'object') return null;
-  for (const key of ['serviceManifest', 'fileServiceManifest']) {
-    const value = meta[key]?.deploy?.numReplicas;
-    if (typeof value === 'number') return value;
+  for (const source of ['serviceManifest', 'fileServiceManifest']) {
+    const value = meta[source]?.[section]?.[key];
+    if (isValid(value)) return value;
   }
   return null;
 }
+
+export function manifestNumReplicas(latestDeployment) {
+  return manifestSetting(latestDeployment, 'deploy', 'numReplicas', (v) => typeof v === 'number');
+}
+
+/**
+ * Everything else `railway.json` declares, read from the same manifest.
+ *
+ * **This is why the new rules below cost no extra API surface.** The deployment
+ * manifest was already being fetched for `numReplicas`, and it mirrors the
+ * whole file — `build.builder`, `deploy.healthcheckPath`,
+ * `deploy.restartPolicyType`. Reading more of an object already in hand cannot
+ * break the query, which matters because a field that does not exist makes the
+ * *whole* GraphQL request fail and the runner exit 2. A checker that stops
+ * checking is worse than one that checks less.
+ */
+export const manifestBuilder = (d) =>
+  manifestSetting(d, 'build', 'builder', (v) => typeof v === 'string' && v !== '');
+export const manifestHealthcheckPath = (d) =>
+  manifestSetting(d, 'deploy', 'healthcheckPath', (v) => typeof v === 'string' && v !== '');
+export const manifestRestartPolicy = (d) =>
+  manifestSetting(d, 'deploy', 'restartPolicyType', (v) => typeof v === 'string' && v !== '');
 
 /**
  * Variable *names* only.
@@ -181,8 +203,18 @@ export function backupsEnabled(variables) {
  */
 export function checkDrift(observed) {
   const findings = [];
-  const { mountPaths, startCommand, watchPatterns, numReplicas, manifestReplicas, backups } =
-    observed;
+  const {
+    mountPaths,
+    startCommand,
+    watchPatterns,
+    numReplicas,
+    manifestReplicas,
+    backups,
+    healthcheckPath,
+    manifestHealthcheck,
+    builder,
+    restartPolicy,
+  } = observed;
 
   /**
    * 1. The volume, mounted at `/data`.
@@ -343,6 +375,116 @@ export function checkDrift(observed) {
         ' the unset dashboard value. Set it explicitly on the service, or migrate to' +
         ' .railway/railway.ts.',
       doc: 'PLAN-V2 §2a, infra/README.md',
+    });
+  }
+
+  /**
+   * 5. The healthcheck, which must point at `/health`.
+   *
+   * The dangerous direction here is not a failing healthcheck — that is loud,
+   * and it is exactly how this project's one real boot failure was caught: the
+   * missing `RESEND_API_KEY` surfaced *only* as a Railway healthcheck failure
+   * (DEPLOY.md §0, §3). The dangerous direction is a healthcheck that cannot
+   * fail.
+   *
+   * `server/src/app.ts` serves `index.html` for every unmatched GET, because
+   * the client is a single-page app with deep links. So a healthcheck aimed at
+   * anything other than `/health` does not 404 — it gets 200 and a page of
+   * HTML from the static fallback, and passes forever while the API behind it
+   * is dead. That is why a wrong path is a failure rather than a warning, and
+   * why it is worse than no path at all.
+   *
+   * `/health` stays at the root rather than under `/api` because `railway.json`
+   * points there (CLAUDE.md); the two facts hold each other up.
+   */
+  const effectiveHealthcheck = healthcheckPath ?? manifestHealthcheck ?? null;
+
+  if (effectiveHealthcheck === null) {
+    findings.push({
+      level: FAIL,
+      id: 'healthcheck-missing',
+      title: 'No healthcheck path is configured',
+      detail:
+        'Railway marks a deploy healthy as soon as the container starts, so a server that boots' +
+        ' and then cannot serve goes live and stays live. The one real boot failure this project' +
+        ' has had — the missing RESEND_API_KEY — showed up only as a healthcheck failure. Without' +
+        ' this, that deploy would have gone green.',
+      doc: 'DEPLOY.md §0, §3',
+    });
+  } else if (effectiveHealthcheck !== '/health') {
+    findings.push({
+      level: FAIL,
+      id: 'healthcheck-path',
+      title: `Healthcheck points at ${effectiveHealthcheck}, not /health`,
+      detail:
+        'This is worse than having no healthcheck. The app serves index.html for every unmatched' +
+        ' GET so that SPA deep links resolve, so this path returns 200 and a page of HTML from' +
+        ' the static fallback — it passes whether or not the API works, and every future deploy' +
+        ' goes green regardless of what it does.',
+      doc: 'DEPLOY.md §0, server/src/app.ts',
+    });
+  } else if (healthcheckPath == null) {
+    findings.push({
+      level: WARN,
+      id: 'healthcheck-from-file-only',
+      title: 'The healthcheck comes from railway.json, which is deprecated',
+      detail:
+        'healthcheckPath is /health in the deployed manifest but unset on the service itself, so' +
+        ' it rests entirely on railway.json. Config as Code stops being honoured after' +
+        ' 2026-12-01, at which point this falls back to unset and deploys stop being checked at' +
+        ' all — silently, and in the direction that always looks healthy. The same sunset' +
+        ' threatens numReplicas; migrating to .railway/railway.ts covers both.',
+      doc: 'ROADMAP.md §4, DEPLOY.md §0',
+    });
+  }
+
+  /**
+   * 6. The builder, which must be the Dockerfile.
+   *
+   * Everything this deployment depends on lives in the image: `entrypoint.sh`
+   * and therefore Litestream, `tsx` as a runtime dependency, the pinned Linux
+   * Rolldown binary, and an absolute `STATIC_DIR`. Nixpacks would build
+   * something that plausibly boots and has none of it.
+   *
+   * Silent when the manifest says nothing, rather than guessing: Railway
+   * auto-detects a Dockerfile at the repo root, so an absent value is not
+   * evidence of anything wrong.
+   */
+  if (builder != null && builder !== 'DOCKERFILE') {
+    findings.push({
+      level: FAIL,
+      id: 'builder-not-dockerfile',
+      title: `The builder is ${builder}, not DOCKERFILE`,
+      detail:
+        'The Dockerfile is where entrypoint.sh, the tsx runtime dependency, the pinned Linux' +
+        ' Rolldown binary and the absolute STATIC_DIR all come from. Another builder produces an' +
+        ' image that may well start and has none of them — Litestream can never run, and the' +
+        ' static files are served from the wrong place if they are served at all.',
+      doc: 'DEPLOY.md §9, CLAUDE.md',
+    });
+  }
+
+  /**
+   * 7. The restart policy, which must not be NEVER.
+   *
+   * The reminder sweep runs in-process because a single Railway instance is the
+   * whole design and there is nowhere else for a scheduler to live (PLAN.md §4,
+   * §7). A process that dies and is never restarted takes every future reminder
+   * with it, and on a personal app nobody notices until a flight is missed.
+   *
+   * Only `NEVER` is reported. Railway's own default is ON_FAILURE, so an unset
+   * value is fine and warning about it would be crying wolf.
+   */
+  if (restartPolicy === 'NEVER') {
+    findings.push({
+      level: FAIL,
+      id: 'restart-policy-never',
+      title: 'The restart policy is NEVER',
+      detail:
+        'Nothing brings the service back after a crash. The reminder sweep runs in-process — a' +
+        ' single instance is the whole design — so a crash at 03:00 silently stops every' +
+        ' reminder from then on, and the first symptom is a missed flight rather than an alert.',
+      doc: 'PLAN.md §4, §7',
     });
   }
 

@@ -15,6 +15,10 @@ import {
   selectTarget,
   backupsEnabled,
   manifestNumReplicas,
+  manifestSetting,
+  manifestBuilder,
+  manifestHealthcheckPath,
+  manifestRestartPolicy,
   nodes,
   FAIL,
   WARN,
@@ -27,6 +31,10 @@ const healthy = {
   watchPatterns: [],
   numReplicas: 1,
   backups: false,
+  healthcheckPath: '/health',
+  manifestHealthcheck: '/health',
+  builder: 'DOCKERFILE',
+  restartPolicy: 'ON_FAILURE',
 };
 
 const ids = (findings) => findings.map((f) => f.id);
@@ -109,6 +117,9 @@ test('no Start Command means backups being on is not a finding', () => {
 });
 
 test('several wrong settings are all reported, not just the first', () => {
+  // Built from scratch rather than spread from `healthy`, because the point is
+  // a deployment where everything is wrong at once — including, now, a
+  // healthcheck nobody configured.
   const findings = checkDrift({
     mountPaths: [],
     startCommand: 'npm run start',
@@ -121,6 +132,7 @@ test('several wrong settings are all reported, not just the first', () => {
     'start-command-overrides-entrypoint',
     'watch-paths-set',
     'num-replicas',
+    'healthcheck-missing',
   ]);
 });
 
@@ -253,4 +265,122 @@ test('manifestNumReplicas falls back to the file manifest, and to null', () => {
   assert.equal(manifestNumReplicas(null), null);
   // A string is not a replica count; Railway's meta is a free-form JSON scalar.
   assert.equal(manifestNumReplicas({ meta: { serviceManifest: { deploy: { numReplicas: '1' } } } }), null);
+});
+
+/* ------------------------------------------------- healthcheck, builder, restart -- */
+
+test('no healthcheck at all fails, because a deploy then goes green regardless', () => {
+  const findings = checkDrift({ ...healthy, healthcheckPath: null, manifestHealthcheck: null });
+  assert.deepEqual(ids(findings), ['healthcheck-missing']);
+  assert.equal(findings[0].level, FAIL);
+});
+
+test('a healthcheck pointed anywhere but /health fails, and says why it is worse than none', () => {
+  // The SPA fallback in server/src/app.ts answers every unmatched GET with
+  // index.html, so a wrong path returns 200 and HTML and can never fail. This
+  // is the one case where a misconfiguration is more dangerous than an absence.
+  const findings = checkDrift({ ...healthy, healthcheckPath: '/healthz' });
+  assert.deepEqual(ids(findings), ['healthcheck-path']);
+  assert.equal(findings[0].level, FAIL);
+  assert.match(findings[0].title, /\/healthz/);
+  assert.match(findings[0].detail, /worse than having no healthcheck/);
+});
+
+test('the dashboard override beats the manifest for the healthcheck', () => {
+  // Same precedence the replica rule uses, and the same reason: the override is
+  // what actually wins at deploy time.
+  const findings = checkDrift({
+    ...healthy,
+    healthcheckPath: '/healthz',
+    manifestHealthcheck: '/health',
+  });
+  assert.deepEqual(ids(findings), ['healthcheck-path']);
+});
+
+test('a healthcheck that only railway.json supplies passes, but warns about the sunset', () => {
+  // The real production shape: nobody typed a path into the dashboard, and
+  // railway.json supplies /health at deploy time.
+  const findings = checkDrift({ ...healthy, healthcheckPath: null });
+  assert.deepEqual(ids(findings), ['healthcheck-from-file-only']);
+  assert.equal(hasFailure(findings), false);
+  assert.match(findings[0].detail, /2026-12-01/);
+});
+
+test('a builder that is not the Dockerfile fails', () => {
+  const findings = checkDrift({ ...healthy, builder: 'NIXPACKS' });
+  assert.deepEqual(ids(findings), ['builder-not-dockerfile']);
+  assert.equal(findings[0].level, FAIL);
+  assert.match(findings[0].title, /NIXPACKS/);
+});
+
+test('an unreported builder is silent rather than guessed at', () => {
+  // Railway auto-detects a Dockerfile at the repo root, so nothing observable
+  // is not evidence of anything wrong. Warning here would be crying wolf.
+  assert.deepEqual(checkDrift({ ...healthy, builder: null }), []);
+});
+
+test('a restart policy of NEVER fails, because the sweep has nowhere else to live', () => {
+  const findings = checkDrift({ ...healthy, restartPolicy: 'NEVER' });
+  assert.deepEqual(ids(findings), ['restart-policy-never']);
+  assert.equal(findings[0].level, FAIL);
+});
+
+test('any other restart policy, including none, is silent', () => {
+  // Railway's own default is ON_FAILURE.
+  assert.deepEqual(checkDrift({ ...healthy, restartPolicy: null }), []);
+  assert.deepEqual(checkDrift({ ...healthy, restartPolicy: 'ALWAYS' }), []);
+});
+
+test('several new findings are all reported together', () => {
+  const findings = checkDrift({
+    ...healthy,
+    healthcheckPath: '/healthz',
+    builder: 'NIXPACKS',
+    restartPolicy: 'NEVER',
+  });
+  assert.deepEqual(ids(findings), [
+    'healthcheck-path',
+    'builder-not-dockerfile',
+    'restart-policy-never',
+  ]);
+});
+
+test('the manifest readers pull the rest of railway.json out of the same object', () => {
+  // The whole reason these rules cost no new API surface: this is the object
+  // manifestNumReplicas was already reading.
+  const deployment = {
+    meta: {
+      fileServiceManifest: {
+        build: { builder: 'DOCKERFILE', dockerfilePath: 'Dockerfile' },
+        deploy: { healthcheckPath: '/health', restartPolicyType: 'ON_FAILURE', numReplicas: 1 },
+      },
+    },
+  };
+  assert.equal(manifestBuilder(deployment), 'DOCKERFILE');
+  assert.equal(manifestHealthcheckPath(deployment), '/health');
+  assert.equal(manifestRestartPolicy(deployment), 'ON_FAILURE');
+  assert.equal(manifestNumReplicas(deployment), 1);
+});
+
+test('the manifest readers return null rather than a guess when nothing says anything', () => {
+  for (const empty of [null, {}, { meta: {} }, { meta: { serviceManifest: {} } }]) {
+    assert.equal(manifestBuilder(empty), null);
+    assert.equal(manifestHealthcheckPath(empty), null);
+    assert.equal(manifestRestartPolicy(empty), null);
+  }
+  // An empty string is not a path, and would otherwise read as "configured".
+  assert.equal(
+    manifestHealthcheckPath({ meta: { serviceManifest: { deploy: { healthcheckPath: '' } } } }),
+    null,
+  );
+});
+
+test('manifestSetting prefers the merged manifest, as the deploy does', () => {
+  const deployment = {
+    meta: {
+      serviceManifest: { deploy: { healthcheckPath: '/health' } },
+      fileServiceManifest: { deploy: { healthcheckPath: '/old' } },
+    },
+  };
+  assert.equal(manifestSetting(deployment, 'deploy', 'healthcheckPath'), '/health');
 });
