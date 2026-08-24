@@ -616,9 +616,20 @@ railway api 'mutation { serviceInstanceUpdate(
 ```
 
 Read the values back afterwards with the query above; all four must be non-null before step 2.
-Expect the change to be able to trigger a redeploy — harmless here, since the resulting deploy is
-identical to the current one, but it does mean migrations run against the live volume, so do it
-when nothing else is in flight.
+
+**Done 2026-08-24.** The mutation returned `true` and the read-back shows `dockerfilePath:
+"Dockerfile"`, `healthcheckPath: "/health"`, `healthcheckTimeout: 60`, `numReplicas: 1`, with the
+restart policy untouched. **It did not trigger a redeploy** — the deployment id was
+`06918218-8393-461d-848a-b57865bf612f` before and after — and `/health` answered `200` throughout.
+`builder` still reads `RAILPACK`, which is expected and no longer matters now that `dockerfilePath`
+is set.
+
+Feeding those live values through the drift rules produces **no findings at all**: both
+`from-file-only` warnings are gone, which is the step 2 gate. (The `start-command-waived` warning is
+gone too, since gate 1 cleared that command — so the deployment is currently clean on every rule.)
+
+Step 3 — deleting `railway.json` — is now safe to do whenever, because every value it supplies is
+also on the service. It is a push, so it is David's call.
 
 1. **Set the four on the service**, in the Railway dashboard — Settings → Build for the builder,
    Settings → Deploy for the rest. The restart policy is already right and needs no change.
