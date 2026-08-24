@@ -55,8 +55,40 @@ export const SERVICE_INSTANCE_QUERY = `query ServiceInstance($serviceId: String!
     watchPatterns
     numReplicas
     healthcheckPath
+    latestDeployment {
+      id
+      meta
+    }
   }
 }`;
+
+/**
+ * The replica count the running deployment actually used.
+ *
+ * `serviceInstance.numReplicas` is only the *dashboard override* and is `null`
+ * whenever nobody has typed a number into the dashboard — which is the case
+ * here, while `railway.json` supplies `numReplicas: 1` at deploy time. Reading
+ * the override alone therefore reports drift on a service that is behaving
+ * correctly, which is exactly the "fails on its first run" trap `infra/README.md`
+ * warns about.
+ *
+ * The deployment's own manifest is the authoritative record of what was applied.
+ * `fileServiceManifest` is the manifest as read from `railway.json`;
+ * `serviceManifest` is the merged result. Preferring the merged one means an
+ * override typed into the dashboard still wins, as it does at deploy time.
+ *
+ * Returns `null` when nothing observable says anything — which the rule must
+ * still treat as a failure rather than assuming 1.
+ */
+export function manifestNumReplicas(latestDeployment) {
+  const meta = latestDeployment?.meta;
+  if (!meta || typeof meta !== 'object') return null;
+  for (const key of ['serviceManifest', 'fileServiceManifest']) {
+    const value = meta[key]?.deploy?.numReplicas;
+    if (typeof value === 'number') return value;
+  }
+  return null;
+}
 
 /**
  * Variable *names* only.
@@ -142,12 +174,15 @@ export function backupsEnabled(variables) {
  * The four assertions, plus the coupling between two of them.
  *
  * `observed` is `{ mountPaths, startCommand, watchPatterns, numReplicas,
- * backups }`, where `backups` is true, false, or null for "could not read the
- * variables". Returns a list of findings; an empty list is a pass.
+ * manifestReplicas, backups }`, where `backups` is true, false, or null for
+ * "could not read the variables" and `manifestReplicas` is the replica count the
+ * running deployment actually applied. Returns a list of findings; an empty list
+ * is a pass.
  */
 export function checkDrift(observed) {
   const findings = [];
-  const { mountPaths, startCommand, watchPatterns, numReplicas, backups } = observed;
+  const { mountPaths, startCommand, watchPatterns, numReplicas, manifestReplicas, backups } =
+    observed;
 
   /**
    * 1. The volume, mounted at `/data`.
@@ -185,9 +220,13 @@ export function checkDrift(observed) {
    * 2. The Start Command, which must be empty so the image's ENTRYPOINT runs.
    *
    * This is the one assertion PLAN-V2 §4 states flatly that cannot be made
-   * flatly, because the deployment violates it *on purpose*: clearing the
-   * Start Command crashed the deploy on 2026-08-15, cause unknown, and it was
-   * rolled back (DEPLOY.md §5).
+   * flatly, because the deployment violates it *on purpose* — though the reason
+   * turned out not to survive investigation. The 2026-08-15 crash that justified
+   * the Start Command was the missing RESEND_API_KEY, misattributed: the deploy
+   * history holds exactly two failures, both of commit f47f418 and both before
+   * the key was set, and the deploy of the very commit that documented the
+   * "Start Command trap" succeeded (DEPLOY.md §5). The waiver below stays only
+   * because the command is still set, not because clearing it is still feared.
    *
    * A check that fails from its first run is a check people learn to ignore,
    * and this project has already written down what that costs — "an app that
@@ -220,9 +259,10 @@ export function checkDrift(observed) {
       detail:
         `The Start Command (${startCommand.trim()}) means entrypoint.sh never runs, so` +
         ' Litestream cannot start. That costs nothing while LITESTREAM_BUCKET is unset, which it' +
-        ' is. This becomes a hard failure the moment a bucket is set. Clearing it was attempted' +
-        ' on 2026-08-15 and the deploy crashed, cause unknown — capture the crash logs when' +
-        ' retrying rather than guessing.',
+        ' is. This becomes a hard failure the moment a bucket is set. The 2026-08-15 crash that' +
+        ' justified keeping it was the missing RESEND_API_KEY, misattributed, and the key has' +
+        ' been set ever since — so there is no known reason clearing it should fail. Capture the' +
+        ' logs while it redeploys anyway; not doing that is what cost eight days.',
       doc: 'DEPLOY.md §5',
     });
   } else if (hasStartCommand && backups === null) {
@@ -269,16 +309,40 @@ export function checkDrift(observed) {
    * sending, which makes a second process a duplicate-send risk rather than an
    * impossibility.
    */
-  if (numReplicas !== 1) {
+  const effectiveReplicas = numReplicas ?? manifestReplicas ?? null;
+
+  if (effectiveReplicas !== 1) {
     findings.push({
       level: FAIL,
       id: 'num-replicas',
-      title: `numReplicas is ${numReplicas === null ? 'unset' : numReplicas}, not 1`,
+      title: `numReplicas is ${effectiveReplicas === null ? 'unset' : effectiveReplicas}, not 1`,
       detail:
         'Two processes mean two writers on one SQLite file, two in-memory rate limiters, and two' +
         ' reminder sweeps racing to send the same notification. The whole app is designed around' +
         ' there being exactly one.',
       doc: 'PLAN.md §4, §7',
+    });
+  } else if (numReplicas == null) {
+    /**
+     * Correct today, and resting on a mechanism with a sunset date.
+     *
+     * The single replica comes from `railway.json`, which Railway deprecated in
+     * favour of `.railway/railway.ts` — existing files keep working only until
+     * 2026-12-01. When it stops being honoured the effective value falls back to
+     * the dashboard override, which is unset, and the guarantee this whole app is
+     * designed around disappears without anything failing loudly.
+     */
+    findings.push({
+      level: WARN,
+      id: 'num-replicas-from-file-only',
+      title: 'The single replica comes from railway.json, which is deprecated',
+      detail:
+        'numReplicas is 1 in the deployed manifest but unset on the service itself, so the' +
+        ' guarantee rests entirely on railway.json. Railway has deprecated Config as Code and' +
+        ' existing files stop being honoured after 2026-12-01, at which point this falls back to' +
+        ' the unset dashboard value. Set it explicitly on the service, or migrate to' +
+        ' .railway/railway.ts.',
+      doc: 'PLAN-V2 §2a, infra/README.md',
     });
   }
 

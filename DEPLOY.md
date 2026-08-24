@@ -225,10 +225,33 @@ and confirm you are not seeing that line.**
 > backups for eight days on a cause that had already been found and fixed. Capture the logs when
 > retrying, which is still the right instruction — it just was not followed in 2026-08-15.
 >
-> Not directly observed: `d43f0e95`'s own log body, which Railway's retention window had aged out
-> by the time this was investigated. The conclusion rests on there being a single failure that day,
-> the timestamps of the two commits, and the reproduced symptom shape — strong, but circumstantial.
-> **The confirming test is clearing the Start Command and watching it boot.**
+> **The deploy history settles it (read with the CLI, 2026-08-24).** In 43 deployments the service
+> has ever had, there are exactly **two** failures:
+>
+> | | | |
+> |---|---|---|
+> | `4e9cb2e9` | 2026-08-15 21:52:26Z | FAILED — commit `f47f418` |
+> | `d43f0e95` | 2026-08-15 22:08:25Z | FAILED — commit `f47f418` |
+>
+> Three things follow, and none of them was knowable from the dashboard alone:
+>
+> - **Both failures built the same commit.** The "it was a different build" hypothesis is dead.
+> - **The first failure is the earliest deployment in the service's history.** These were the initial
+>   bring-up attempts, before the environment was fully configured — which is exactly when
+>   `RESEND_API_KEY` was missing, and `f47f418` never deployed successfully at all.
+> - **Nothing has failed since 22:08:25Z on 2026-08-15.** The deploy of `216236b` — the very commit
+>   that documents the "Start Command trap" — went out at 22:28:32Z and **succeeded**. There was no
+>   crash at 17:28 local to document.
+>
+> The first success was `081be0b9` at 22:12:18Z, four minutes after the last failure, on a
+> docs-only commit that had already been skipped once by Watch Paths — the signature of a redeploy
+> triggered by a **variable change**, not a Start Command change.
+>
+> So the Start Command was almost certainly *added* during bring-up and credited with a fix that
+> setting the mail key had produced. Not directly observed: the two failures' own log bodies, which
+> Railway's retention window had aged out. The reconstruction rests on the deployment metadata
+> above, the commit timestamps, and the reproduced symptom shape. **The confirming test is still
+> clearing the Start Command and watching it boot.**
 >
 > #### What has been eliminated (2026-08-18 by reading, 2026-08-23 by exercise)
 >

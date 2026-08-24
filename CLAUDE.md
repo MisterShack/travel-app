@@ -69,8 +69,9 @@ verification work against real Resend delivery.
 
 **All phases (0–5) are done**, with one stated exception: Phase 1’s acceptance criterion includes a
 Litestream restore drill, and backups are deliberately deferred until the greenlight (ROADMAP.md §1).
-PLAN.md §11 says so under Phase 1; this line used to say it without the caveat. 198 tests,
-typecheck and lint clean.
+PLAN.md §11 says so under Phase 1; this line used to say it without the caveat. 224 tests,
+typecheck and lint clean — 198 under vitest across the three workspaces plus 26 in `infra/` under
+`node --test`, which a vitest-only count misses.
 
 **Phase 4 (booking import) shipped and verified end to end against a real forwarded airline
 confirmation, 2026-08-15** — including two per-passenger PDF tickets, read correctly.

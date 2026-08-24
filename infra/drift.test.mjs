@@ -14,6 +14,7 @@ import {
   hasFailure,
   selectTarget,
   backupsEnabled,
+  manifestNumReplicas,
   nodes,
   FAIL,
   WARN,
@@ -198,4 +199,58 @@ test('an unknown environment or service throws rather than checking nothing', ()
 
 test('the error for a wrong name lists the names that do exist', () => {
   assert.throws(() => selectTarget(project, 'prod', 'travel-app'), /Found: production/);
+});
+
+test('a replica count that only railway.json supplies passes, but warns about the sunset', () => {
+  // The real production shape as of 2026-08-23: nobody typed a number into the
+  // dashboard, so the override is null, and railway.json supplies 1 at deploy
+  // time. Behaviour is correct, so this must not fail — but the guarantee rests
+  // on a file Railway stops honouring after 2026-12-01.
+  const findings = checkDrift({ ...healthy, numReplicas: null, manifestReplicas: 1 });
+  assert.deepEqual(ids(findings), ['num-replicas-from-file-only']);
+  assert.equal(hasFailure(findings), false);
+  assert.equal(findings[0].level, WARN);
+});
+
+test('an explicit replica count on the service warns about nothing', () => {
+  const findings = checkDrift({ ...healthy, numReplicas: 1, manifestReplicas: 1 });
+  assert.deepEqual(findings, []);
+});
+
+test('a deployed manifest with the wrong count fails even though the override is unset', () => {
+  const findings = checkDrift({ ...healthy, numReplicas: null, manifestReplicas: 2 });
+  assert.deepEqual(ids(findings), ['num-replicas']);
+  assert.equal(hasFailure(findings), true);
+  assert.match(findings[0].title, /is 2, not 1/);
+});
+
+test('nothing observable still fails rather than being assumed to be 1', () => {
+  // The point of the original rule, preserved: reading the effective value is an
+  // observation, not an assumption, and when there is nothing to observe the
+  // check must not invent a pass.
+  const findings = checkDrift({ ...healthy, numReplicas: null, manifestReplicas: null });
+  assert.deepEqual(ids(findings), ['num-replicas']);
+  assert.match(findings[0].title, /unset/);
+});
+
+test('manifestNumReplicas prefers the merged manifest over the file it came from', () => {
+  const deployment = {
+    meta: {
+      serviceManifest: { deploy: { numReplicas: 3 } },
+      fileServiceManifest: { deploy: { numReplicas: 1 } },
+    },
+  };
+  assert.equal(manifestNumReplicas(deployment), 3);
+});
+
+test('manifestNumReplicas falls back to the file manifest, and to null', () => {
+  assert.equal(
+    manifestNumReplicas({ meta: { fileServiceManifest: { deploy: { numReplicas: 1 } } } }),
+    1,
+  );
+  assert.equal(manifestNumReplicas({ meta: {} }), null);
+  assert.equal(manifestNumReplicas({}), null);
+  assert.equal(manifestNumReplicas(null), null);
+  // A string is not a replica count; Railway's meta is a free-form JSON scalar.
+  assert.equal(manifestNumReplicas({ meta: { serviceManifest: { deploy: { numReplicas: '1' } } } }), null);
 });

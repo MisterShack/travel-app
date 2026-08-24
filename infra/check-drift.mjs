@@ -10,7 +10,7 @@
  *   RAILWAY_TOKEN       alternatively, a project token
  *   RAILWAY_PROJECT_ID  the project's UUID, from its URL
  *   RAILWAY_ENVIRONMENT_NAME  optional, defaults to "production"
- *   RAILWAY_SERVICE_NAME      optional, defaults to "travel-app"
+ *   RAILWAY_SERVICE_NAME      optional, defaults to "@travel/server"
  *
  * Exit codes, and the distinction is the whole point:
  *
@@ -43,6 +43,7 @@ import {
   backupsEnabled,
   checkDrift,
   hasFailure,
+  manifestNumReplicas,
   FAIL,
 } from './drift.mjs';
 
@@ -114,7 +115,12 @@ function required(name, ...alternatives) {
 async function main() {
   const projectId = required('RAILWAY_PROJECT_ID');
   const environmentName = process.env['RAILWAY_ENVIRONMENT_NAME']?.trim() || 'production';
-  const serviceName = process.env['RAILWAY_SERVICE_NAME']?.trim() || 'travel-app';
+  /**
+   * The service is named for the workspace that builds it, not for the repo —
+   * `travel-app` was a guess that made the first real run exit 2 on "no such
+   * service" rather than checking anything.
+   */
+  const serviceName = process.env['RAILWAY_SERVICE_NAME']?.trim() || '@travel/server';
 
   /**
    * Account tokens authenticate as `Bearer`; project tokens use their own
@@ -183,6 +189,7 @@ async function main() {
     startCommand: instance.startCommand,
     watchPatterns: instance.watchPatterns,
     numReplicas: instance.numReplicas,
+    manifestReplicas: manifestNumReplicas(instance.latestDeployment),
     backups,
   });
 

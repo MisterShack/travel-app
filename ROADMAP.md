@@ -29,8 +29,8 @@ differently in a month.
 | 1 | The Start Command no longer overrides the image `ENTRYPOINT`, **or** the reason it cannot be cleared is understood | DEPLOY.md §5, PLAN-V2 §4 step 0 | **Understood 2026-08-23** — the 2026-08-15 crash was the missing `RESEND_API_KEY`, misattributed. Clearing it is now a routine change, not an experiment |
 | 2 | `LITESTREAM_BUCKET` set and replication proven with `litestream snapshots` | DEPLOY.md §5 | Blocked on 1 |
 | 3 | The restore drill actually run — this is Phase 1's own acceptance criterion | DEPLOY.md §6, PLAN.md §11 | Never run |
-| 4 | `npm run check-drift` passes against production with a real token | DEPLOY.md §8a, `infra/README.md` | Never run against Railway |
-| 5 | `VAPID_*` set, if web push should work at launch | DEPLOY.md §3 | Optional — decide, do not drift |
+| 4 | `npm run check-drift` passes against production with a real token | DEPLOY.md §8a, `infra/README.md` | **Done 2026-08-24** — exits `0` with two accurate warnings. The first run also found two defects in the checker, both fixed |
+| 5 | `VAPID_*` set, if web push should work at launch | DEPLOY.md §3 | **Already set** — `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` are all present in production (confirmed 2026-08-24). Decided by action; what is unverified is whether push actually delivers |
 | 6 | Registration gate reconsidered, or the decision restated deliberately | — | Judged an acceptable risk 2026-08-18 |
 
 **Gate 1 is the one to pull forward.** Everything about backups waits behind it, and its size is
@@ -114,6 +114,12 @@ Each gates something above. Full context in the section named.
 
 - **The LLM spend cap** (PLAN.md §13). The per-user import cap bounds the damage but no number was
   ever chosen and no billing alert is set. On the paid tier the exposure is money, not a quota.
+- **`railway.json` is deprecated, and it is load-bearing.** Railway sunsets Config as Code on
+  **2026-12-01**; the CLI warns on every command. It currently supplies `numReplicas: 1`, and the
+  single-writer guarantee that PLAN.md §4 and §7 are built around rests on it — after the date the
+  effective value falls back to the dashboard, where it is unset. Either set the replica count
+  explicitly on the service or migrate to `.railway/railway.ts`. This also weakens PLAN-V2 §2a's
+  reasoning for rejecting Terraform, which partly rested on `railway.json` covering this.
 - **Trip deletion, and account deletion** (PLAN.md §13). Hard delete, soft delete, or blocked while
   others are members? Account deletion is covered nowhere in any plan, and for an app whose stated
   audience includes a dev portfolio its absence is conspicuous.

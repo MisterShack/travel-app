@@ -30,7 +30,7 @@ RAILWAY_API_TOKEN=... RAILWAY_PROJECT_ID=... npm run check-drift
 | `RAILWAY_API_TOKEN` | An account or team token (railway.com → Account → Tokens). Or `RAILWAY_TOKEN` for a project token. |
 | `RAILWAY_PROJECT_ID` | The project's UUID, from its dashboard URL. |
 | `RAILWAY_ENVIRONMENT_NAME` | Optional, defaults to `production`. |
-| `RAILWAY_SERVICE_NAME` | Optional, defaults to `travel-app`. |
+| `RAILWAY_SERVICE_NAME` | Optional, defaults to `@travel/server` — the service is named for the workspace that builds it, not for the repo. `travel-app` was a guess, and it made the first real run exit `2` on "no such service" rather than checking anything. |
 
 Exit codes carry the meaning, and the third one is the reason this is worth writing carefully:
 
@@ -52,12 +52,42 @@ unknown into a false assurance, which is worse than having no checker at all.
 The split is the same one the Svix webhook uses: the logic is testable without a network, so the
 rules can be proved right on a machine that has no Railway token. `npm test` runs them.
 
-## Expect one warning today
+## First run against Railway: 2026-08-24
 
-The production service has a custom Start Command, deliberately — clearing it crashed the deploy
-on 2026-08-15, the cause is still unknown, and it was rolled back (DEPLOY.md §5). The check grades
-that finding rather than failing on it, because a check that fails from its first run is one people
-learn to ignore, and this project has already written down what that costs.
+It had never been run with a real token until then. It works, exits `0`, and reports two warnings
+and no failures. Both warnings are accurate; the run also found two defects in the checker itself,
+which is the argument for running a checker against the real thing rather than only against
+fixtures.
+
+**What the first run got wrong, now fixed:**
+
+- **The default service name was `travel-app`**, which is the repo. The service is `@travel/server`,
+  named for the workspace that builds it. A run with defaults exited `2` — correctly refusing to
+  report a pass — but it checked nothing.
+- **`numReplicas` failed on a healthy service.** The rule read `serviceInstance.numReplicas`, which
+  is only the *dashboard override* and is `null` here because nobody typed a number into the
+  dashboard; `railway.json` supplies `1` at deploy time. The rule now reads the replica count the
+  running deployment actually applied, from the deployment manifest. That is still an observation
+  rather than an assumption — with nothing observable it fails exactly as before, and the test that
+  pins that behaviour is unchanged.
+
+## Expect two warnings today
+
+**A custom Start Command**, which overrides the image `ENTRYPOINT` so Litestream cannot start. The
+check grades this rather than failing on it, because a check that fails from its first run is one
+people learn to ignore, and this project has already written down what that costs. Note that the
+reason it is still set did not survive investigation: the 2026-08-15 crash was the missing
+`RESEND_API_KEY`, misattributed (DEPLOY.md §5).
+
+**The single replica comes from `railway.json`, which Railway has deprecated.** Config as Code is
+sunset on **2026-12-01**. The effective count is 1 today and the app behaves correctly; the warning
+is that the guarantee rests entirely on a file that stops being honoured, after which it falls back
+to the unset dashboard value. Two writers on one SQLite file is the failure PLAN.md §4 and §7 are
+both built around avoiding, so this is worth closing before the date rather than on it — either by
+setting the count explicitly on the service or by migrating to `.railway/railway.ts`.
+
+That deprecation also lands on this directory's own conclusion: PLAN-V2 §2a rejected Terraform
+partly because `railway.json` already covered `numReplicas`. It covers it until 2026-12-01.
 
 It is a **warning** while `LITESTREAM_BUCKET` is unset and becomes a **failure** the moment a bucket
 is set — which is exactly when it stops being harmless, because every variable would be present,
