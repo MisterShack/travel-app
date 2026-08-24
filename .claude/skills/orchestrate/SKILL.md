@@ -49,9 +49,19 @@ Route by **instrument**, not by topic. The question is never "which agent sounds
 | A deploy that failed or behaves oddly | `deploy-investigator` | Gate 1, and any deploy mystery |
 | Docs claiming things the code does not show | `doc-drift-auditor` | After a phase ships; before a status claim is trusted |
 
-Portable cores live in `~/Code/claude-toolkit` (the `mistershack` marketplace). Where a
+Portable cores live in `~/Code/claude-toolkit` (the `mistershack` marketplace), across three
+plugins: **review-kit** (plan-review, accessibility, design, doc drift, migration rehearsal),
+**build-kit** (the three stack developers) and **ship-kit** (deploy and release). Where a
 project-tuned copy exists in `.claude/agents/`, it shadows the plugin version and is the one that
-runs — it knows Railway, `waypoint.myze.ca` and this repo's own history.
+runs — it knows Railway, `waypoint.myze.ca` and this repo's own history. Five do:
+`deploy-investigator`, `release-verifier`, `web-accessibility-reviewer`, `migration-rehearser` and
+`doc-drift-auditor`.
+
+**A plugin that is written is not a plugin that is installed.** review-kit gained three agents while
+its version stayed at `0.1.0`, so nothing installing by version fetched them and this table pointed
+at five agents nobody could reach for days — `migration-rehearser` among them, backing a gate marked
+*always*. Bump the version when a plugin gains an agent, and check
+`~/.claude/plugins/cache/mistershack/` rather than the toolkit source when asking what is available.
 
 **If the agents are not listed as available, the plugins are not loaded in this session.** They are
 enabled in `~/.claude/settings.json`; a session that began before an install or update will not see
