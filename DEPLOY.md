@@ -216,13 +216,32 @@ and confirm you are not seeing that line.**
 > So the cwd difference has **no known mechanism**. Treat "it must be the working directory" as
 > already tried.
 >
-> **The cheapest remaining check needs no deploy and no Docker — read the current logs.** If the
-> line `WARNING: LITESTREAM_BUCKET is not set` appears in the *running* service's boot output, then
-> `entrypoint.sh` is executing today and the premise of this whole box is wrong: the Start Command
-> would be being passed as arguments to the entrypoint, which ignores them, rather than replacing
-> it. That would dissolve most of gate 1. If the line is absent, the premise holds. Either way it is
-> a thirty-second answer that decides where the next hour goes, and it should be done before
-> anything is rebuilt.
+> #### That log check was run on 2026-08-23. The premise holds.
+>
+> Boot output of the running deployment (`07e997da`, deployed 2026-08-18T14:39:11Z), verbatim:
+>
+> ```
+> > @travel/server@0.0.0 start
+> > node --env-file-if-exists=.env.local --import tsx src/index.ts
+>
+> .env.local not found. Continuing without it.
+> Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/…/vol_imgz16t2g79ic8tq
+> Starting Container
+> Waypoint API listening on http://localhost:8080 (production)
+> ```
+>
+> **No `WARNING: LITESTREAM_BUCKET is not set`.** That line is unconditional when the bucket is
+> unset, so its absence is proof rather than ambiguity. Two further signals agree: the
+> `> @travel/server@0.0.0 start` banner is npm's, which the entrypoint path never prints, and the
+> script path is `src/index.ts` **relative** — cwd `/app/server` — where the entrypoint runs
+> `server/src/index.ts` from `/app`.
+>
+> So the Start Command **replaces** the image `ENTRYPOINT` rather than being passed to it as
+> arguments. `entrypoint.sh` has never executed in production and **Litestream has never run.**
+> Gate 1 stands and gates 2 and 3 remain blocked behind it.
+>
+> Incidentally, this confirms the local reproduction was faithful: `.env.local not found.` appears
+> in production at severity `error`, exactly as it did in the image.
 >
 > #### The local experiment was run on 2026-08-23. The entrypoint path works.
 >
