@@ -1,5 +1,5 @@
 import { fileURLToPath, URL } from 'node:url';
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
@@ -94,6 +94,18 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    /**
+     * Vitest's default `include` matches every `.test.` and `.spec.` file in the
+     * workspace, which swallows the Playwright suite in `e2e/specs/`. Those
+     * files import `@playwright/test` and call its `test.describe()`, so vitest
+     * collects them, fails to run them, and reports "Test Files 4 failed" while
+     * still printing "Tests 53 passed" — every test that actually ran did pass.
+     * A check that reads the second line and not the first sees a green suite.
+     *
+     * The e2e suite has its own runner and its own command; this stops the two
+     * fighting over the same glob.
+     */
+    exclude: [...configDefaults.exclude, 'e2e/**'],
     setupFiles: ['./vitest.setup.ts'],
     // Pinned so a developer's .env.local cannot change what the suite asserts.
     env: { VITE_API_URL: '' },
