@@ -27,7 +27,7 @@ differently in a month.
 | # | Gate | Where it is documented | Status |
 |---|---|---|---|
 | 1 | The Start Command no longer overrides the image `ENTRYPOINT`, **or** the reason it cannot be cleared is understood | DEPLOY.md §5, PLAN-V2 §4 step 0 | **DONE 2026-08-24** — cleared, `entrypoint.sh` runs, deployment `55d5f6e2` clean with no downtime |
-| 2 | `LITESTREAM_BUCKET` set and replication proven with `litestream snapshots` | DEPLOY.md §5 | **Unblocked — this is now the next thing to do.** Needs a bucket and credentials |
+| 2 | `LITESTREAM_BUCKET` set and replication proven with `litestream snapshots` | DEPLOY.md §5 | Unblocked by gate 1, and **deliberately not scheduled** — see below |
 | 3 | The restore drill actually run — this is Phase 1's own acceptance criterion | DEPLOY.md §6, PLAN.md §11 | Never run — blocked on 2, and read §6's boxed warning first |
 | 4 | `npm run check-drift` passes against production with a real token | DEPLOY.md §8a, `infra/README.md` | **Done 2026-08-24** — exits `0` with two accurate warnings. The first run also found two defects in the checker, both fixed |
 | 5 | `VAPID_*` set, if web push should work at launch | DEPLOY.md §3 | **Already set** — `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` are all present in production (confirmed 2026-08-24). Decided by action; what is unverified is whether push actually delivers |
@@ -36,8 +36,17 @@ differently in a month.
 **Gate 1 was the long pole and it is now done** (2026-08-24). What it cost is the useful part: the
 crash that justified nine days of caution was the missing `RESEND_API_KEY`, misattributed to the
 Start Command by a write-up made twenty minutes later without the logs. The fix itself was one
-setting. **Gate 2 is now the front of the queue**, and it needs a decision from David rather than
-an investigation — a bucket, or an explicit choice to stay unreplicated.
+setting.
+
+**Gates 2 and 3 are not scheduled, and that is a decision rather than a backlog.** Restated by
+David on 2026-08-24: Waypoint is a personal project until he says otherwise, and being publicly
+reachable does not change that. Backups are not a priority at this scale, and the cost of losing
+the volume is still him re-entering his own trips.
+
+**Do not re-propose them.** They come back onto the table when David indicates the project is no
+longer personal — that indication is the trigger, and it is his to give. Gate 1 was worth doing
+anyway because it was cheap, it is now impossible for backups to *look* configured while silently
+doing nothing, and the landmine is defused whenever the decision does change.
 
 **That local experiment was run on 2026-08-23 and the image is exonerated.** Built unmodified and
 run in the exact configuration that crashed, it boots and serves `/health`, the SPA and a 401 from
