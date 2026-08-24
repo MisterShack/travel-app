@@ -511,9 +511,9 @@ The data-survives-redeploy check has to wait for Phase 2, when there is somethin
 
 ### 8a. The drift check
 
-Four of this runbook's settings are dashboard state that no file in this repo can pin, and each
-fails quietly: the volume mount path (§2), the Start Command (§5), the Watch Paths, and
-`numReplicas`. `railway.json` declares `numReplicas` but the live service can still differ.
+Seven of this runbook's settings are dashboard state that no file in this repo can pin, and each
+fails quietly: the volume mount path (§2), the Start Command (§5), the Watch Paths, `numReplicas`,
+the healthcheck path, the builder, and the restart policy.
 
 ```sh
 RAILWAY_API_TOKEN=... RAILWAY_PROJECT_ID=... npm run check-drift
@@ -524,13 +524,64 @@ which is never reported as clean. See `infra/README.md`. Worth running before an
 in the Railway dashboard, and before turning backups on.
 
 It is the part of PLAN-V2's Terraform phase that carries the weight, and it was built first
-deliberately: Terraform cannot own any of these three, so the check covers the failures that have
-actually happened while the question of whether to adopt Terraform at all stays open.
+deliberately: Terraform cannot own any of these, which is most of why Phase 6 was closed on
+2026-08-24 (PLAN-V2 §7). The check is now the whole of the dashboard story, not a stopgap.
 
-**Expect one warning today** — the custom Start Command of §5. The check grades that rather than
-failing on it, and turns it into a failure the moment `LITESTREAM_BUCKET` is set.
+**Expect warnings today** — the custom Start Command of §5, which the check grades rather than
+fails on and turns into a failure the moment `LITESTREAM_BUCKET` is set; plus one per setting still
+resting on `railway.json`, which §8b is about removing.
 
 ---
+
+## 8b. Retiring `railway.json` before 2026-12-01
+
+`railway.json` is deprecated and **stops being read on 2026-12-01**. It currently supplies
+`healthcheckPath`, `numReplicas`, `restartPolicyType`, `restartPolicyMaxRetries` and the Dockerfile
+builder. When it stops being honoured each falls back to the service's own value, and those are
+unset — so the healthcheck silently becomes *no healthcheck*, which fails in the only direction that
+always looks healthy.
+
+**The fix is to make the service own them, not to adopt Infrastructure as Code.** Decided
+2026-08-24. `railway config migrate` does generate a `.railway/railway.ts`, but what it generated
+for this project was actively dangerous, and the reasons are worth keeping:
+
+- it named the project `@travel/server` — that is the *service*; the project is `myze-travel`;
+- its `resources: [...]` listed the service and **not the volume**, and `railway config apply` has a
+  `--confirm-destructive` flag, against the only copy of every account and trip with no backups;
+- it dropped `restartPolicyType` and `restartPolicyMaxRetries` silently, not even as comments;
+- it emitted the builder and `dockerfilePath` *as comments*, the DSL having no way to express them.
+
+Railway IaC is a declarative plan/apply system over the whole project. That is structurally what
+Phase 6 was closed to avoid, and being first-party does not by itself make an apply that omits the
+volume safe.
+
+**Order matters, and this is the whole point of writing it down.** Deleting the file first leaves
+every setting above resting on nothing until the dashboard catches up.
+
+1. **Set all five on the service**, in the Railway dashboard — Settings → Deploy, and Settings →
+   Build for the builder:
+
+   | Setting | Value | Why it matters |
+   |---|---|---|
+   | Healthcheck Path | `/health` | Anything else hits the SPA fallback, returns 200 and HTML, and passes forever while the API is dead |
+   | Healthcheck Timeout | `60` | |
+   | Replicas | `1` | Two writers on one SQLite file; two reminder sweeps racing (PLAN.md §4, §7) |
+   | Restart Policy | `On Failure`, max retries `10` | The reminder sweep runs in-process and has nowhere else to live |
+   | Builder | `Dockerfile`, path `Dockerfile` | Anything else drops `entrypoint.sh`, `tsx`, the pinned Rolldown binary and the absolute `STATIC_DIR` |
+
+2. **Run the drift check** (§8a). The `num-replicas-from-file-only` and `healthcheck-from-file-only`
+   warnings must both be gone. That is the proof the service now owns them, and it is the gate on
+   step 3 — if either warning survives, the dashboard did not take and deleting the file would break
+   production.
+
+3. **Only then delete `railway.json`** and push. Watch the deploy, and re-run the drift check after.
+
+**Known follow-up for step 3.** The checker reads the builder and the restart policy out of the
+deployment manifest, which is where `railway.json` put them. Once the file is gone they may report
+`null`, and both rules are deliberately *silent* on `null` rather than failing — the safe direction,
+but it means coverage is lost quietly. If the post-deletion run stops reporting them, they need to
+move to a `serviceInstance` field, and per `infra/README.md` no field goes into that query until a
+run with a token proves it exists.
 
 ## 9. The native-binary lockfile trap
 

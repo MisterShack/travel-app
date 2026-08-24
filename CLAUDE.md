@@ -106,10 +106,19 @@ Two things that are true and worth keeping in view:
 - **Registration is open.** The app is publicly reachable, so anyone with the URL can create an
   account and consume the Resend quota. There is no invite gate.
 
-**`railway.json` is deprecated and load-bearing.** Railway sunsets Config as Code on 2026-12-01 and
-warns on every CLI command. It supplies `numReplicas: 1`, which is the single-writer guarantee the
-whole app is designed around (PLAN.md §4, §7) — the service's own override is unset, so after the
-date the count falls back to nothing. ROADMAP.md §4 tracks the decision.
+**`railway.json` is deprecated and load-bearing.** It stops being read on 2026-12-01, and it
+supplies more than `numReplicas: 1` — the healthcheck path, the restart policy and the Dockerfile
+builder rest on it too, and each falls back to the service's own value, which is unset. The
+healthcheck is the dangerous one: unset means deploys stop being checked at all, silently, in the
+direction that always looks healthy.
+
+**The fix is the dashboard, not `.railway/railway.ts` — decided 2026-08-24, DEPLOY.md §8b.**
+Railway's own `config migrate` generated a file that named the wrong project, **omitted the volume**
+from its `resources`, dropped the restart policy without comment and could only emit the builder as
+a comment. `railway config apply` carries a `--confirm-destructive` flag, and the volume is the only
+copy of every account and trip. Railway IaC is a declarative plan/apply system over the whole
+project — structurally the thing Phase 6 was closed to avoid. Set the five settings on the service,
+verify with `check-drift`, *then* delete the file; the order is the point.
 
 **The drift check grew to seven rules on 2026-08-24**, when Phase 6 was closed and it became the
 thing that covers the dashboard instead of Terraform. It now also asserts the healthcheck path, the

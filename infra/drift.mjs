@@ -363,6 +363,10 @@ export function checkDrift(observed) {
      * 2026-12-01. When it stops being honoured the effective value falls back to
      * the dashboard override, which is unset, and the guarantee this whole app is
      * designed around disappears without anything failing loudly.
+     *
+     * The fix is the dashboard, not `.railway/railway.ts`. Railway's own
+     * migration generated a project declaration that omitted the volume, and
+     * `railway config apply` can be destructive — see DEPLOY.md §8b.
      */
     findings.push({
       level: WARN,
@@ -370,11 +374,11 @@ export function checkDrift(observed) {
       title: 'The single replica comes from railway.json, which is deprecated',
       detail:
         'numReplicas is 1 in the deployed manifest but unset on the service itself, so the' +
-        ' guarantee rests entirely on railway.json. Railway has deprecated Config as Code and' +
-        ' existing files stop being honoured after 2026-12-01, at which point this falls back to' +
-        ' the unset dashboard value. Set it explicitly on the service, or migrate to' +
-        ' .railway/railway.ts.',
-      doc: 'PLAN-V2 §2a, infra/README.md',
+        ' guarantee rests entirely on railway.json, which stops being read on 2026-12-01 — at' +
+        ' which point this falls back to the unset dashboard value. Set Replicas to 1 on the' +
+        ' service, then delete the file, in that order. DEPLOY.md §8b has the sequence and why' +
+        ' Infrastructure as Code was rejected for this.',
+      doc: 'DEPLOY.md §8b, ROADMAP.md §4',
     });
   }
 
@@ -430,11 +434,11 @@ export function checkDrift(observed) {
       title: 'The healthcheck comes from railway.json, which is deprecated',
       detail:
         'healthcheckPath is /health in the deployed manifest but unset on the service itself, so' +
-        ' it rests entirely on railway.json. Config as Code stops being honoured after' +
-        ' 2026-12-01, at which point this falls back to unset and deploys stop being checked at' +
-        ' all — silently, and in the direction that always looks healthy. The same sunset' +
-        ' threatens numReplicas; migrating to .railway/railway.ts covers both.',
-      doc: 'ROADMAP.md §4, DEPLOY.md §0',
+        ' it rests entirely on railway.json. That file stops being read on 2026-12-01, at which' +
+        ' point this falls back to unset and deploys stop being checked at all — silently, and in' +
+        ' the direction that always looks healthy. The same sunset threatens numReplicas. Set both' +
+        ' on the service and then delete the file; DEPLOY.md §8b has the order, which matters.',
+      doc: 'DEPLOY.md §8b, ROADMAP.md §4',
     });
   }
 

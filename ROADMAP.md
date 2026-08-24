@@ -166,12 +166,22 @@ Each gates something above. Full context in the section named.
 
 - **The LLM spend cap** (PLAN.md §13). The per-user import cap bounds the damage but no number was
   ever chosen and no billing alert is set. On the paid tier the exposure is money, not a quota.
-- **`railway.json` is deprecated, and it is load-bearing.** Railway sunsets Config as Code on
-  **2026-12-01**; the CLI warns on every command. It currently supplies `numReplicas: 1`, and the
-  single-writer guarantee that PLAN.md §4 and §7 are built around rests on it — after the date the
-  effective value falls back to the dashboard, where it is unset. Either set the replica count
-  explicitly on the service or migrate to `.railway/railway.ts`. This also weakens PLAN-V2 §2a's
-  reasoning for rejecting Terraform, which partly rested on `railway.json` covering this.
+- ~~**`railway.json` is deprecated, and it is load-bearing.**~~ **Decided 2026-08-24 — now a task,
+  not a question. See DEPLOY.md §8b.** It stops being read on **2026-12-01**, and it supplies more
+  than the replica count: the healthcheck path, the restart policy and the Dockerfile builder rest
+  on it too. The healthcheck is the dangerous one — it falls back to *unset*, and a deploy with no
+  healthcheck goes green regardless of what it does.
+
+  **The fix is to set all five on the service and delete the file, in that order**, rather than
+  adopt Infrastructure as Code. `railway config migrate` was run on 2026-08-24 and what it produced
+  named the wrong project, omitted the volume from its `resources`, dropped the restart policy
+  silently and could only emit the builder as a comment — against the only copy of every account and
+  trip, with `railway config apply` carrying a `--confirm-destructive` flag. Railway IaC is a
+  declarative plan/apply system over the whole project, which is structurally what Phase 6 was
+  closed to avoid.
+
+  Blocked on dashboard access, which is David's. The drift check warns on every setting still
+  resting on the file, so this cannot rot silently in the meantime.
 - **Trip deletion, and account deletion** (PLAN.md §13). Hard delete, soft delete, or blocked while
   others are members? Account deletion is covered nowhere in any plan, and for an app whose stated
   audience includes a dev portfolio its absence is conspicuous.
