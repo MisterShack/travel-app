@@ -641,12 +641,29 @@ also on the service. It is a push, so it is David's call.
 
 3. **Only then delete `railway.json`** and push. Watch the deploy, and re-run the drift check after.
 
-**Known follow-up for step 3.** The checker reads the builder and the restart policy out of the
-deployment manifest, which is where `railway.json` put them. Once the file is gone they may report
-`null`, and both rules are deliberately *silent* on `null` rather than failing — the safe direction,
-but it means coverage is lost quietly. If the post-deletion run stops reporting them, they need to
-move to a `serviceInstance` field, and per `infra/README.md` no field goes into that query until a
-run with a token proves it exists.
+**That follow-up is resolved — 2026-08-24, and the answer was the good one.** The worry was that
+the checker reads the builder and the restart policy out of the deployment manifest, which is where
+`railway.json` used to put them, so deleting the file might make both rules go quiet (they are
+deliberately silent on `null` rather than failing — the safe direction, but coverage lost without
+saying so).
+
+It did not happen. The first post-deletion deployment has **no `fileServiceManifest` at all**, as
+expected, and its `serviceManifest` still carries the lot:
+
+```
+build : builder DOCKERFILE · dockerfilePath Dockerfile · watchPatterns []
+deploy: healthcheckPath /health · healthcheckTimeout 60 · numReplicas 1
+        restartPolicyType ON_FAILURE · restartPolicyMaxRetries 10 · startCommand ""
+        multiRegionConfig {"ams":{"numReplicas":1}} · sleepApplication false
+```
+
+The manifest is the *resolved* configuration, not a copy of the file, so once the service owns the
+values it reports them just the same. No rule needs to move to a `serviceInstance` field, and the
+checker keeps full coverage.
+
+**And it settles the builder question for good.** `serviceInstance.builder` still reads `RAILPACK`,
+and the deployment built from the Dockerfile anyway — `builder: DOCKERFILE` in the manifest, Docker
+image export in the build log. `dockerfilePath` is what selects it, exactly as the enum implied.
 
 ## 9. The native-binary lockfile trap
 
