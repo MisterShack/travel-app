@@ -26,7 +26,7 @@ differently in a month.
 
 | # | Gate | Where it is documented | Status |
 |---|---|---|---|
-| 1 | The Start Command no longer overrides the image `ENTRYPOINT`, **or** the reason it cannot be cleared is understood | DEPLOY.md §5, PLAN-V2 §4 step 0 | Unresolved — the long pole |
+| 1 | The Start Command no longer overrides the image `ENTRYPOINT`, **or** the reason it cannot be cleared is understood | DEPLOY.md §5, PLAN-V2 §4 step 0 | Narrowed 2026-08-23 — the local half is done and the image is exonerated; two read-only Railway checks remain |
 | 2 | `LITESTREAM_BUCKET` set and replication proven with `litestream snapshots` | DEPLOY.md §5 | Blocked on 1 |
 | 3 | The restore drill actually run — this is Phase 1's own acceptance criterion | DEPLOY.md §6, PLAN.md §11 | Never run |
 | 4 | `npm run check-drift` passes against production with a real token | DEPLOY.md §8a, `infra/README.md` | Never run against Railway |
@@ -38,10 +38,25 @@ genuinely unknown: clearing the Start Command crashed the deploy on 2026-08-15 a
 never established. Finding out whether that is a two-line fix or a real problem is an hour of work
 that can happen at any time, and it should happen long before the greenlight rather than on the day.
 
-The cheapest first move costs nothing and touches no production: build the image locally and run it
-with `LITESTREAM_BUCKET` unset and the `ENTRYPOINT` active — the exact configuration that crashed.
-If it serves `/health`, the cause is Railway-specific and that narrows it a long way. If it fails,
-it has been found without risking anything.
+**That local experiment was run on 2026-08-23 and the image is exonerated.** Built unmodified and
+run in the exact configuration that crashed, it boots and serves `/health`, the SPA and a 401 from
+`/api` — and so does the Start Command path, in the same image. The working directory, the memory
+ceiling, cold-start timing, an injected `PORT` and volume persistence are all eliminated by exercise
+rather than by reading. The cause is Railway-side. DEPLOY.md §5 has the detail.
+
+**Two read-only checks remain, and either could dissolve the gate outright:**
+
+1. Does the *running* service's boot log contain `WARNING: LITESTREAM_BUCKET is not set`? The
+   entrypoint ignores any command passed to it — confirmed in the image — so if that line is there,
+   the entrypoint is executing today and most of the gate goes away.
+2. Did the crashed 2026-08-15 deploy and the healthy one build the *same commit*? The repo was
+   moving hourly that day, and a different build is the only hypothesis that explains why a rollback
+   restored health while the environment was identical. If the SHAs differ, the Start Command was
+   never the cause.
+
+Both need the Railway dashboard, which is David's to open. Only after them is it worth clearing the
+Start Command for real — and that should happen at a moment when nothing else is changing, because
+any deploy that reaches node runs migrations against the live volume and there are no backups.
 
 ### What the greenlight is not gated on
 

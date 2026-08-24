@@ -193,7 +193,7 @@ and confirm you are not seeing that line.**
 > serves `/health` correctly both natively and in the image, and the entrypoint's own WARNING line
 > printed before the failure. Capture the crash logs when retrying rather than guessing.
 >
-> #### What has been eliminated (2026-08-18, by reading — no Docker daemon available)
+> #### What has been eliminated (2026-08-18 by reading, 2026-08-23 by exercise)
 >
 > The two boot paths differ in exactly one respect that could plausibly matter: the **working
 > directory** of the node process. The Start Command runs the script with cwd `/app/server` (npm
@@ -224,11 +224,46 @@ and confirm you are not seeing that line.**
 > a thirty-second answer that decides where the next hour goes, and it should be done before
 > anything is rebuilt.
 >
-> After that, and only with the daemon running, the one local experiment worth doing is the
-> roadmap's: build the image and run it with `LITESTREAM_BUCKET` unset and the `ENTRYPOINT` active —
-> the exact configuration that crashed. Serving `/health` locally proves the cause is Railway-side
-> and narrows it to what Railway adds: injected `PORT`, the volume mount, healthcheck timing against
-> a cold start, and node running as PID 1 under `exec` rather than as a child of npm.
+> #### The local experiment was run on 2026-08-23. The entrypoint path works.
+>
+> Built from the unmodified repo and run in the exact configuration that crashed —
+> `LITESTREAM_BUCKET` unset, `ENTRYPOINT` active, no command override. It **boots and serves**:
+> the three WARNING lines, then `Waypoint API listening` within a couple of seconds, `/health` 200,
+> `/trips/<id>` 200 HTML, `/api/trips` 401 JSON, `/data/travel.db` created and surviving a restart.
+> The Start Command path was run in the same image and behaved identically.
+>
+> So **the cause is Railway-side.** Eliminated by exercise, not by reading: the working directory
+> (both paths serve every route identically), `--env-file-if-exists` (logged as not found), memory
+> (the entrypoint path uses *less* — 328 MiB against 591 MiB — and survived a 512 MiB cap that
+> OOM-killed the Start Command path), cold start (4.2s against 5.4s, both far inside
+> `healthcheckTimeout: 60`), an injected `PORT`, and volume persistence across a restart.
+>
+> **`entrypoint.sh` ignores any command passed to it** — it never references `"$@"`. Confirmed by
+> running the image with the Start Command as CMD args: it printed the WARNING and ran node itself.
+> That is what makes the log check below decisive.
+>
+> **The WARNING line proves only that node started.** Dropping `RESEND_API_KEY` under the entrypoint
+> reproduces the recorded 2026-08-15 symptom shape exactly — WARNING lines, then
+> `Error: RESEND_API_KEY is required in production`, exit 1. "The warning printed, then it failed"
+> therefore implicates nothing after `exec`, and should not be read as evidence about the entrypoint.
+>
+> **The leading hypothesis is now that the crashed deploy and the healthy one were not the same
+> build.** Clearing the Start Command triggers a redeploy, and the repo was moving hourly that day
+> (service recorded live at 17:18, the crash at 17:28, Phase 5 committed at 17:41). It is the only
+> hypothesis that explains why a rollback restored health while an identical environment was in
+> play. **Check it read-only:** open the crashed deployment in Railway's deploy history and compare
+> its commit SHA with the healthy one. If they differ, gate 1 is a non-issue.
+>
+> Two further facts, both true and neither previously written down:
+>
+> - **Nothing in `server/src` handles `SIGTERM`** — no `process.on` anywhere. Under the `ENTRYPOINT`
+>   node is PID 1, so on Railway it is SIGKILLed at every shutdown rather than closing down
+>   cleanly. The Start Command path is killed too. It is not a difference between them, but it does
+>   mean an in-flight request is cut at every deploy.
+> - Do not trust signal or timing behaviour measured under emulation. On Apple Silicon, QEMU
+>   installs its own handlers and manufactured a clean exit that does not happen natively; it also
+>   produced non-deterministic esbuild crashes (§10) that are pure emulation artefacts. Re-test any
+>   signal-level claim on a native arch before believing it.
 
 ---
 
@@ -274,6 +309,27 @@ exist, and check the row counts.
 If the volume is lost, a new one restores automatically — `entrypoint.sh` runs
 `litestream restore -if-replica-exists` whenever `/data/travel.db` is absent. Redeploy and the
 database comes back.
+
+> ### ⚠ A wrong bucket credential takes the site down on exactly the deploy that needs the restore
+>
+> Verified locally 2026-08-23, in the image. The restore path and the steady-state path fail in
+> opposite directions, and only one of them is loud:
+>
+> - **Bucket set, endpoint or key wrong, `/data/travel.db` already present.** The app boots and
+>   serves `/health` normally. Litestream logs `level=ERROR msg="monitor error"` on every sync and
+>   nothing else says a word. **A broken replica is invisible from outside** — this is precisely why
+>   §5 insists on `litestream snapshots` rather than on the dashboard looking right.
+> - **Bucket set, endpoint or key wrong, `/data` empty.** `litestream restore` fails, and under
+>   `set -eu` the entrypoint **exits 1 before node ever starts**. The container never serves. That is
+>   the fresh-volume case — so a bad credential is silent for as long as the volume survives and
+>   then takes the site down at the exact moment you are relying on the restore.
+>
+> Test a new bucket credential against a *populated* volume first, and confirm with
+> `litestream snapshots` before you ever need the restore path.
+>
+> Note also that first replication flips the database from `journal_mode=delete` to `wal` and
+> creates `/data/.travel.db-litestream`, `-wal` and `-shm`. That is a one-way change to the live
+> file; it is normal and expected, but it is not reversible by unsetting the bucket.
 
 To roll back to a point in time instead, stop the service first so nothing writes, then:
 

@@ -69,7 +69,7 @@ verification work against real Resend delivery.
 
 **All phases (0–5) are done**, with one stated exception: Phase 1’s acceptance criterion includes a
 Litestream restore drill, and backups are deliberately deferred until the greenlight (ROADMAP.md §1).
-PLAN.md §11 says so under Phase 1; this line used to say it without the caveat. 218 tests,
+PLAN.md §11 says so under Phase 1; this line used to say it without the caveat. 198 tests,
 typecheck and lint clean.
 
 **Phase 4 (booking import) shipped and verified end to end against a real forwarded airline
