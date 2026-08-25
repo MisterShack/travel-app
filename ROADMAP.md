@@ -144,8 +144,19 @@ ever sequenced. The next actually-open item is 3.
    it, which is the load-bearing unknown rather than the work.
 5. **Phase 6 step 5 — DNS to Cloudflare.** The only genuinely dangerous item on any plan, and
    nothing above depends on it. The honest default is to leave it undone until something needs it.
-6. **Phase 10 — suggestions.** Gated on a values question that belongs to David, not to a document:
-   is *quiet* worth more than *helpful*? PLAN-V3 §3 argues against it more than for it.
+6. **Phase 10 — "what's nearby". Decided 2026-08-25 and ready to build**, bar one gate. PLAN-V3 §3
+   holds the design. Asked for directly — from an activity, "what restaurants are nearby", "where
+   is the nearest metro" — which is both the answer to the values question and the test §3 set for
+   whether anyone wanted it at all.
+
+   Gemini's **Grounding with Google Maps**, so no new vendor: `GEMINI_API_KEY` exists and is on the
+   paid tier. **5,000 grounded prompts a month free, then $14/1,000** — the cost objection that
+   gated this phase does not survive the actual number. Fixed intent chips on the event's own page,
+   cached per place and readable offline, with the import's per-user daily cap.
+
+   **The gate:** how long a grounded Maps result may be cached is undocumented, and the cache *is*
+   the cost strategy. Maps attribution is also contractual — citations and their links must render
+   with the answer — so that is a design constraint rather than a polish pass.
 
 ## 3. Standing risks
 
@@ -166,12 +177,31 @@ Each gates something above. Full context in the section named.
 
 - **The LLM spend cap** (PLAN.md §13). The per-user import cap bounds the damage but no number was
   ever chosen and no billing alert is set. On the paid tier the exposure is money, not a quota.
+  **Phase 10 adds a second metered surface** on an app anyone can register for, bounded by the same
+  per-user cap. The number is still unchosen and the alert still unset.
 - ~~**`railway.json` is deprecated, and it is load-bearing.**~~ **DONE 2026-08-24.** The five
   settings it supplied are now on the service itself and the file is deleted, so the 2026-12-01
   sunset no longer threatens anything. DEPLOY.md §8b records the sequence, why Infrastructure as
   Code was rejected, and the two things that made it awkward: Config as Code locks the dashboard
   fields it owns (broken with `serviceInstanceUpdate`, which writes underneath the file), and
   `builder` was never the field selecting the Dockerfile — `dockerfilePath` is.
+- **Trip deletion, and account deletion** (PLAN.md §13). Hard delete, soft delete, or blocked while
+  others are members? Account deletion is covered nowhere in any plan, and for an app whose stated
+  audience includes a dev portfolio its absence is conspicuous.
+- **`tzdata` refresh policy** (PLAN.md §13). The UTC instant is derived and must be recomputed when
+  zone rules change; the container's data is pinned at image build. Only matters for trips booked
+  months ahead.
+- ~~**Is *quiet* worth more than *helpful*?**~~ **Answered 2026-08-25: helpful when asked, quiet
+  otherwise.** Nothing is volunteered, so no character is spent. PLAN-V3 §3.
+- **How long may a grounded Maps result be cached?** The new load-bearing unknown, and the only
+  thing blocking Phase 10's cache — which is the whole cost strategy. Maps Platform terms have
+  historically restricted retention of Places content. Answer it against the service terms before
+  building that half; everything else in the phase can proceed while it is open.
+- **Do PLAN-V2 and PLAN-V3 still need their adversarial review?** PLAN-V2 was reviewed on
+  2026-08-17. PLAN-V3 still says "draft, not started" in its header and asks for `plan-review`
+  before anything is built from it, while phases 8, 11 and 12 have all shipped from it — and
+  Phase 10 is now decided from it too, which raises the stakes. Either run it or record that it was
+  consciously skipped.
 
 ## 5. Candidates, not commitments
 
