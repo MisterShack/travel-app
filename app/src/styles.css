@@ -587,7 +587,63 @@ a.btn.backlink span, a.btn.backlink { overflow: hidden; text-overflow: ellipsis;
   margin-bottom: var(--space-3);
 }
 
-ul.events { list-style: none; margin: 0; padding: 0; }
+/*
+ * The day's spine.
+ *
+ * A hairline runs the length of the group and each event's kind chip sits on it
+ * as a node, so the column reads as a timeline rather than as a stack of cards.
+ * Chosen over a fixed time column with both on screen (BRAND.md §7): the column
+ * scans better, and this buys full-width content and a zone badge with room for
+ * "Los Angeles" instead of clipping it inside 76px.
+ */
+ul.events {
+  list-style: none; margin: 0; padding: 0 0 0 var(--space-10);
+  /* Node geometry in one place, so the rail and the chips cannot drift apart.
+     Everything below is derived from these rather than measured by eye. */
+  --node: 32px;
+  --node-top: 10px;
+  --rail: 2px;
+  --gap: var(--space-3);
+}
+ul.events > li { margin-bottom: var(--gap); }
+ul.events > li > .card { margin-bottom: 0; }
+
+/*
+ * The rail is drawn per row, from this node's centre to the next one's, rather
+ * than as one line down the whole list. A single line has to stop somewhere,
+ * and stopping at the list's edge leaves a thread hanging past the last node —
+ * which reads as unfinished rather than as a timeline that ended.
+ */
+li.event-item::before {
+  content: '';
+  position: absolute;
+  /* The list is indented by --space-10; the rail's centre is the node's centre. */
+  left: calc(var(--space-10) * -1 + (var(--node) - var(--rail)) / 2);
+  top: calc(var(--node-top) + var(--node) / 2);
+  bottom: calc((var(--gap) + var(--node-top) + var(--node) / 2) * -1);
+  width: var(--rail); background: var(--rule);
+}
+/* Nothing to connect to. */
+li.event-item:last-child::before { content: none; }
+
+/*
+ * The node masks the rule behind it with the page's own colour, so the line
+ * appears to pass behind the chip rather than through it. `--paper` and not
+ * `--surface`: the rule sits on the page, not on a card.
+ */
+.event-node {
+  /*
+   * Pulled back out of the list's own padding so the node's centre lands on the
+   * rule. The rule is 2px at 15px from the list's edge, so its centre is 16px;
+   * the node is 32px wide and the list is indented by --space-10, which puts
+   * that centre at exactly -1 × --space-10 + 16.
+   */
+  position: absolute;
+  left: calc(var(--space-10) * -1); top: var(--node-top);
+  width: var(--node); height: var(--node); border-radius: 999px;
+  background: var(--paper); box-shadow: 0 0 0 3px var(--paper);
+  display: grid; place-items: center;
+}
 
 /* The event card is not itself a link: it holds two of them. The title's hit
    area is stretched over the whole card so the card still behaves like one
@@ -596,17 +652,9 @@ ul.events { list-style: none; margin: 0; padding: 0; }
    operate by keyboard. */
 .event-card {
   position: relative;
-  padding-right: var(--space-8);
   transition: background-color 120ms ease, border-color 120ms ease;
 }
-.event-card::after {
-  content: ''; position: absolute; right: var(--space-4); top: 50%;
-  width: 8px; height: 8px; margin-top: -5px;
-  border-right: 2px solid var(--ink-soft); border-top: 2px solid var(--ink-soft);
-  transform: rotate(45deg); opacity: 0.7;
-}
 .event-card:hover { background: var(--surface-sunk); border-color: var(--field); }
-.event-card:hover::after { border-color: var(--accent); opacity: 1; }
 
 .event-open { color: inherit; text-decoration: none; }
 .event-open::before { content: ''; position: absolute; inset: 0; border-radius: var(--radius); }
@@ -630,30 +678,30 @@ ul.events { list-style: none; margin: 0; padding: 0; }
 }
 .directions:hover { border-color: var(--accent); background: var(--accent-wash); }
 
-.event { display: flex; gap: var(--space-3); align-items: flex-start; }
-.event .when { width: 76px; flex: none; }
-.event .when .time {
+/*
+ * The meta line: when this happens, and in what zone. It wraps rather than
+ * truncating — a zone badge that clips is the failure this layout replaced.
+ */
+.event-meta {
+  display: flex; align-items: center; gap: var(--space-2);
+  flex-wrap: wrap; margin-bottom: var(--space-1);
+}
+.event-meta .time {
   font: 600 var(--text-base)/var(--lh-base) var(--sans);
   font-variant-numeric: tabular-nums;
 }
-.event .when .until {
-  font-size: var(--text-xs); line-height: var(--lh-xs);
-  color: var(--ink-soft); margin-top: 2px;
-}
-/* An end on another day gets its own line rather than wrapping mid-phrase: at
-   76px "→ 11:00 Sep 18" broke after "Sep" and read as two separate facts. */
-.event .when .endday { display: block; }
-.event .body { flex: 1; min-width: 0; }
+.event-meta .until { font-size: var(--text-sm); color: var(--ink-soft); }
+.event-card .body { min-width: 0; }
 .card .title {
   font: 600 var(--text-base)/var(--lh-base) var(--sans);
   letter-spacing: -0.01em;
 }
-/* A hue rail, low saturation: it says what kind of thing this is at a glance
-   and never competes with a warning, which is where saturation lives. */
+/*
+ * The kind's hue lives on the node alone. It used to be on the card's left edge
+ * as well, which said the same thing twice — BRAND.md §3 gives the job to the
+ * chip, where shape carries the mode alongside it.
+ */
 li.event-item { position: relative; }
-li.event-item > .card {
-  border-left: 3px solid var(--kind, var(--rule));
-}
 .kind-segment { --kind: var(--kind-segment); }
 .kind-lodging { --kind: var(--kind-lodging); }
 .kind-activity { --kind: var(--kind-activity); }

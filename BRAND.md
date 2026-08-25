@@ -122,7 +122,8 @@ phone at an airport gate at 6am, and reads as paper rather than screen.
 - **Body and UI:** the system sans stack. It is already on the device, renders natively, and adds
   no weight to a bundle that must work with no network.
 - **Times:** tabular figures, always. A column of times that shifts by a pixel per digit looks
-  broken, and this app is mostly a column of times.
+  broken, and this app is mostly a column of times — still true after the row became a spine (§7),
+  because every card's meta line begins at the same offset and the times line up down the page.
 
 ### Scale
 
@@ -213,12 +214,25 @@ administer it live behind a control rather than below the fold.**
   field whose *name* changes as you type is disorienting to anyone navigating by name.
 - **Badges** (zone labels, event kinds) are `--surface-sunk` with `--ink-soft` text. They are
   metadata; they never take the accent.
-- **The timeline row** is the one component worth getting exactly right: a fixed-width time column
-  with tabular figures, a hairline separating days, and a **round kind chip** — the kind's hue at
-  12% on a tinted disc, holding a stroked icon. **Hue is the kind, shape is the mode**: every
-  journey takes one blue, and a train is told from a flight by its icon. Four hues for four modes
-  would spend the palette on a distinction the icon already makes. It replaced a bare text glyph (`✈ ⌂ ◆`), which was
-  the other clearest tell of a to-do list: a character where an icon should be.
+- **The timeline row** is the one component worth getting exactly right, and it is **a spine, not a
+  table** (revised 2026-08-25). A hairline runs down each day and every event's **round kind chip**
+  sits on it as a node — the kind's hue at 12% on a tinted disc, holding a stroked icon. Time,
+  end time and zone lead the card on one meta line; the content takes the full width beneath it.
+
+  **Hue is the kind, shape is the mode**: every journey takes one blue, and a train is told from a
+  flight by its icon. Four hues for four modes would spend the palette on a distinction the icon
+  already makes. The chip replaced a bare text glyph (`✈ ⌂ ◆`), which was the other clearest tell of
+  a to-do list: a character where an icon should be.
+
+  **Kind is stated once.** The card used to carry a hue rail on its left edge as well as the chip,
+  which said the same thing twice; the rail is gone and the node carries it alone.
+
+  What this replaced was a fixed 76px time column with the chip floating beside it. Three defects
+  drove the change: the column carried the start, the end, the end-day *and* the zone badge, so
+  "Los Angeles" could not fit in the field that had just caused a real bug; the chip aligned to
+  nothing, being neither a node nor a leading icon; and the rail doubled the chip. **The times are
+  still a column** — every card's meta line starts at the same offset — so what was given up is
+  smaller than the mockups suggested, but it was given up deliberately and with both on screen.
 
 ## 8. Voice
 

@@ -111,24 +111,37 @@ function Event({ item, homeTimezone }: { item: TimelineItem; homeTimezone: strin
    * links, one card, nothing nested.
    */
   return (
-    <div className="card event-card">
-      <div className="event">
-        <div className="when">
-          <div className="time">{start}</div>
-          {showStartZone && (
-            <div className="zone">{item.startPlace ?? zoneLabel(item.startTimezone)}</div>
-          )}
+    <>
+      {/*
+        The chip is a node on the day's spine rather than a column between two
+        others. It sits outside the card, on the rule, and is decorative to
+        assistive tech — the kind is said in the title below, as it always was.
+      */}
+      <span className="event-node" aria-hidden="true">
+        <KindChip kind={item.kind} mode={item.mode} />
+      </span>
+      <div className="card event-card">
+        {/*
+          Times lead the row instead of occupying a fixed column. The trade is
+          deliberate and was made with the alternative on screen: the column
+          scanned better, and this gives the content its full width and gives
+          the zone badge room to say "Los Angeles" rather than clipping it.
+        */}
+        <div className="event-meta">
+          <span className="time mono">{start}</span>
           {end !== null && (
-            <div className="until mono">
+            <span className="until mono">
               → {end}
-              {endDate !== null && <span className="endday">{endDate}</span>}
-            </div>
+              {endDate !== null && <span className="endday"> {endDate}</span>}
+            </span>
+          )}
+          {showStartZone && (
+            <span className="zone">{item.startPlace ?? zoneLabel(item.startTimezone)}</span>
           )}
           {end !== null && showEndZone && (
-            <div className="zone">{item.endPlace ?? zoneLabel(item.endTimezone!)}</div>
+            <span className="zone">{item.endPlace ?? zoneLabel(item.endTimezone!)}</span>
           )}
         </div>
-        <KindChip kind={item.kind} mode={item.mode} />
         <div className="body">
           <div className="title">
             <Link className="event-open" to={`/trips/${item.tripId}/${item.kind}/${item.id}`}>
@@ -146,7 +159,7 @@ function Event({ item, homeTimezone }: { item: TimelineItem; homeTimezone: strin
           {directions !== null && <Directions href={directions} title={item.title} />}
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
