@@ -9,7 +9,7 @@ import {
   type Passenger,
   type TimelineItem,
 } from '@travel/shared';
-import { lookupAirport } from '@travel/shared/airports';
+import { cityFromAddress, lookupAirport } from '@travel/shared/airports';
 import type { Db } from '../db/client';
 import { activities, lodging, segments } from '../db/schema';
 
@@ -102,6 +102,25 @@ export async function createSegment(db: Db, tripId: string, input: SegmentInput,
  */
 function placeOf(mode: string, endpoint: string): string | null {
   return mode === 'air' ? (lookupAirport(endpoint)?.city ?? null) : endpoint;
+}
+
+/**
+ * Where a lodging or activity actually is, read out of the address.
+ *
+ * These used to send `null` and let the client label the zone instead, on the
+ * reasoning that the user picked the zone by hand so showing it back was
+ * faithful. That does not survive contact: `America/Toronto` is the correct
+ * zone for Montreal, and a Montreal dinner was labelled "Toronto" — reported
+ * 2026-08-25. The card was showing the location as its subtitle and the zone's
+ * namesake as its badge, so one row named two different cities.
+ *
+ * A name is resolved, never a zone — see `cityFromAddress`. Nothing here
+ * changes what the event is stored in or when it happens; the zone the user
+ * chose is still the source of truth and the instant derived from it is
+ * untouched.
+ */
+function placeFromAddress(address: string | null): string | null {
+  return cityFromAddress(address) ?? null;
 }
 
 /** "14C, 14D" — the seats on a stored passenger list, or '' when there are none. */
@@ -252,13 +271,14 @@ export async function getTimeline(db: Db, tripId: string): Promise<TimelineItem[
       mode: null,
       origin: null,
       destination: null,
-      // The zone was chosen by hand on the form, so showing it back is
-      // faithful — there is no separate place recorded to show instead.
-      startPlace: null,
+      // The city out of the address, when the address names one. Falls back to
+      // null, and the client labels the zone as it always did.
+      startPlace: placeFromAddress(r.address),
       endAt: r.checkOutAt,
       endLocal: r.checkOutLocal,
       endTimezone: r.checkOutTimezone,
-      endPlace: null,
+      // Check-out is the same building as check-in.
+      endPlace: placeFromAddress(r.address),
       confirmationCode: r.confirmationCode,
       notes: r.notes,
       source: r.source,
@@ -280,11 +300,11 @@ export async function getTimeline(db: Db, tripId: string): Promise<TimelineItem[
       mode: null,
       origin: null,
       destination: null,
-      startPlace: null,
+      startPlace: placeFromAddress(r.location),
       endAt: r.endAt,
       endLocal: r.endLocal,
       endTimezone: r.endTimezone,
-      endPlace: null,
+      endPlace: placeFromAddress(r.location),
       confirmationCode: r.confirmationCode,
       notes: r.notes,
       source: r.source,

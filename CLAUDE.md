@@ -254,6 +254,15 @@ Findings from building that contradict a straight port from budget-app, all enco
   exactly the data a conflict needs. The endpoint is an IATA code for air and a station *name* for
   everything else; there is no IATA for stations, so the zone is asked for rather than derived. Hue
   encodes the kind and the icon's shape encodes the mode.
+- **The zone-is-not-a-place fix stopped half way.** Flights got `startPlace`/`endPlace` from the
+  airport table; lodging and activities were left sending `null` "because the user chose the zone by
+  hand, so showing it back is faithful". It is not: `America/Toronto` is the *correct* zone for
+  Montreal, so a Montreal dinner was badged "Toronto" while the same card's subtitle said Montreal —
+  one row naming two cities (reported 2026-08-25). Both now read the city out of the address, via
+  `cityFromAddress` over the city index already in the airport table. **It resolves a name, never a
+  zone**, which is the entire safety argument: three Portlands sit in three timezones so deriving a
+  zone from free text would be a guess, while echoing the spelling back is not. Diacritics are
+  folded — the table is anglicised and the people who live in Montréal are not.
 - **An IATA code and a station name are not one namespace.** The conflict rule compared
   `destination` against `origin` as strings, and Phase 12 had made those a code for air and a
   station *name* for rail — so a flight into `YOW` followed by a train out of `Ottawa` reported a

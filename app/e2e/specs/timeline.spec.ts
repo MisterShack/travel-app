@@ -200,6 +200,52 @@ test.describe('adding to a trip', () => {
     expect(row['check_out_at']).toBe('2027-03-05T10:00:00.000Z');
   });
 
+  test('an activity is labelled with its city, not its timezone\'s namesake', async ({
+    page,
+    request,
+  }) => {
+    /**
+     * Reported 2026-08-25: a Montreal dinner read as "Toronto".
+     *
+     * `America/Toronto` is the *correct* zone for Montreal, so the zone was
+     * never wrong — the badge was labelling the zone's namesake and calling it
+     * the place. The card showed "Montreal" as its subtitle and "Toronto" as
+     * its badge, naming two cities in one row.
+     *
+     * Worth a browser test rather than only a unit one: the city is resolved on
+     * the server and rendered on the client, and neither half alone would have
+     * caught it.
+     */
+    /**
+     * A Winnipeg-based trip, which is the reporter's real situation and also
+     * what makes the badge appear at all: it is shown only when an event's zone
+     * differs from the trip's home zone, so a Toronto-zoned event on a
+     * Toronto-zoned trip would render no badge and prove nothing.
+     */
+    const trip = await createTrip(request, { homeTimezone: 'America/Winnipeg' });
+
+    await page.goto(`/trips/${trip.id}/activity/new`);
+    await page.getByLabel('What').selectOption('restaurant');
+    await page.getByLabel('Name', { exact: true }).fill('Schwartz\u2019s');
+    await page.getByLabel('Where').fill('3895 Saint-Laurent Blvd, Montr\u00e9al');
+    await page.getByLabel('Timezone').selectOption('America/Toronto');
+    await page.getByLabel('Starts', { exact: true }).fill('2027-03-04T18:30');
+    await page.getByRole('button', { name: /^Add$/ }).click();
+
+    await expect(page).toHaveURL(new RegExp(`/trips/${trip.id}$`));
+
+    const card = page.locator('.event-card').filter({ hasText: 'Schwartz' });
+    await expect(card).toBeVisible();
+    await expect(card.locator('.zone')).toHaveText('Montreal');
+    // The zone itself is untouched and still correct — only the label changed.
+    await expect(card.locator('.zone')).not.toHaveText('Toronto');
+
+    const row = await onlyRow('activities', trip.id);
+    expect(row['start_timezone'], 'the stored zone must not have moved').toBe('America/Toronto');
+    // 18:30 in Toronto on 2027-03-04 is UTC-5, before DST begins on the 14th.
+    expect(row['start_at']).toBe('2027-03-04T23:30:00.000Z');
+  });
+
   test('an activity keeps the kind it was given, and needs no end', async ({ page, request }) => {
     const trip = await createTrip(request, { homeTimezone: TRIP_ZONE });
 

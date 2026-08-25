@@ -5612,3 +5612,82 @@ export function searchAirports(query: string, limit = 12): Airport[] {
 }
 
 export const AIRPORT_COUNT = 5515;
+
+/* -------------------------------------------------------------------------- */
+/* Places                                                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * City name → the city as the table spells it.
+ *
+ * Built from the same rows as the airport index, because the table already
+ * carries a city for every airport and there is no reason to ship a second
+ * list. Lazily, alongside `airports()`, so nothing pays for it unless a lodging
+ * or activity actually needs a label.
+ */
+let cities: Map<string, string> | null = null;
+
+function cityIndex(): Map<string, string> {
+  if (cities) return cities;
+  cities = new Map();
+  for (const a of airports().values()) {
+    const key = normalizeCity(a.city);
+    if (key !== '' && !cities.has(key)) cities.set(key, a.city);
+  }
+  return cities;
+}
+
+/**
+ * Digits out, whitespace collapsed, lower-cased — so "75006 Paris" and "Paris"
+ * are the same key. Postal codes are the common reason an address component
+ * fails to match the city sitting right next to it.
+ */
+function normalizeCity(part: string): string {
+  return (
+    part
+      // Diacritics folded, so "Montréal" matches the table's "Montreal". This
+      // is not cosmetic: it is how the city is actually spelled by the people
+      // who live there, and the table is anglicised.
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\d+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase()
+  );
+}
+
+/** The canonical spelling of a city name, or `undefined` if it is not one we know. */
+export function lookupCity(name: string): string | undefined {
+  const key = normalizeCity(name);
+  // Two characters is not a city name worth trusting; it is far more likely to
+  // be a state code or a house number that survived normalisation.
+  if (key.length < 3) return undefined;
+  return cityIndex().get(key);
+}
+
+/**
+ * The city an address is in, read out of the address itself.
+ *
+ * **This resolves a name, never a zone**, and the distinction is what makes it
+ * safe. Three different Portlands sit in three different timezones, so deriving
+ * a *zone* from this text would be a guess — but all three are spelled
+ * "Portland", so echoing the name back is not. `AirportField` refuses to guess
+ * a zone for exactly this reason and that rule is untouched here.
+ *
+ * Components are tried last-first, because addresses run narrow to broad and
+ * the city is near the end: "80 Rue de Charonne, Paris" is Paris, and a street
+ * that happens to share a city's name should not win over the real one.
+ *
+ * Returns `undefined` when nothing matches — a venue name with no city in it,
+ * which is common — and the caller falls back to labelling the zone as before.
+ */
+export function cityFromAddress(address: string | null | undefined): string | undefined {
+  if (!address) return undefined;
+  const parts = address.split(',');
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const city = lookupCity(parts[i] ?? '');
+    if (city !== undefined) return city;
+  }
+  return undefined;
+}
