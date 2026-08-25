@@ -38,7 +38,9 @@ function answering(
   places: { title: string; uri: string }[],
   remaining = 24,
 ) {
-  return vi.fn(async () =>
+  // Parameters declared so `mock.calls[n]` is a typed tuple rather than `[]` —
+  // without them every read of a recorded argument is a compile error.
+  return vi.fn(async (_url: unknown, _init?: RequestInit) =>
     Response.json({
       answer: { intent: 'eat', text, places, generated: true },
       remaining,
@@ -143,9 +145,9 @@ describe('what is nearby', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Getting around' }));
 
     await screen.findByText('The nearest metro is Odeon.');
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toContain('/api/activities/a1/nearby');
-    expect(JSON.parse(String(init.body))).toEqual({ intent: 'transit' });
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toContain('/api/activities/a1/nearby');
+    expect(JSON.parse(String(init?.body))).toEqual({ intent: 'transit' });
   });
 
   it('uses the lodging path for a stay', async () => {
