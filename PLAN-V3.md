@@ -58,35 +58,73 @@ their transport preferences, offline maps if they have downloaded them, and live
 
 **Recommendation: do 1, measure whether anyone wants more, and treat 3 as unlikely to be worth it.**
 
-## 3. Suggestions
+## 3. Suggestions — "what's nearby"
 
-PLAN.md §12 already defers this as "cheapest viable option (Gemini free tier / Google Places)".
-Two things have changed since: Gemini is now on the paid tier for privacy reasons (§6.7), and
-Google restructured Maps Platform pricing in 2025, replacing the $200 monthly credit with per-SKU
-free tiers. **The old cost assumption no longer holds and must be re-checked before committing.**
+> **Decided 2026-08-25, by David, and the shape he asked for is the one this section already
+> prescribed.** He described wanting to ask, from an activity, what restaurants are nearby or where
+> the nearest metro station is. That is "pulled, never pushed" exactly. The open question below —
+> *does anyone want this?* — is answered by having been asked for, which is the test it set.
 
-### The design risk, which is larger than the cost
+### The cost, which §5 said must be priced before this is built
 
-The app's stated character is *quiet*: no upsells, no recommendations you did not ask for
-(BRAND.md §2). A suggestions feature is, definitionally, recommendations you did not ask for. It is
-the single change most likely to make Waypoint feel like every other travel app.
+Priced 2026-08-25 against **Gemini's Grounding with Google Maps**, which is the tool for this and
+needs no new vendor: `GEMINI_API_KEY` already exists and is already on the paid tier.
 
-If it is built, it should be:
+| | |
+|---|---|
+| Grounded prompts | **5,000 per month free**, shared across Gemini 3 |
+| Beyond that | **$14 / 1,000 search queries** — about 1.4¢ each |
+| Tokens (flash-lite) | $0.30 / 1M in, $2.50 / 1M out — negligible at this size |
 
-- **Pulled, never pushed.** A "what's near this?" action on a lodging row. Never a feed, never a
-  notification, never a card that appears on the timeline uninvited.
-- **Attributed and honest.** If a model generated it, say so — the import queue already does this
-  and it is the right precedent.
-- **Cached per place, not per request.** The same hotel does not need re-asking every time the
-  screen opens, and this is the difference between pennies and a bill.
+**At family scale the free allowance is effectively unreachable**: a hundred questions a month is
+2% of it. The cost objection that gated this phase, and that killed live flight status outright
+(ROADMAP §5), does not survive contact with the actual number. What survives is the *abuse* case —
+registration is open, so the cap below is about someone else spending the allowance, not about
+David spending it.
 
-### Open question the plan cannot answer
+### What was decided
 
-Does anyone want this? It was listed at the original scoping as a "later" idea and has not been
-asked for since. Building it because it is on an old list is a poor reason. The honest test is
-whether, after a real trip using the app, its absence was ever felt.
+- **Pulled, never pushed.** Unchanged, and now confirmed: no feed, no notification, no card that
+  appears on the timeline uninvited.
+- **On the event's own page**, not the timeline row. The row was cut back to two links on
+  2026-08-25 and the audit had already flagged the one action on it as under the touch target;
+  adding a second is the wrong direction. Tapping a card already opens it, and an answer needs room
+  to render anyway.
+- **Fixed intent chips**, not a free-form box — "eat nearby", "getting around", and so on. Bounded
+  cost, cacheable per place *and* intent, predictable enough to lay out, and it covers both of the
+  questions actually asked for. **A free-form question is deliberately deferred to a paid tier if
+  one ever exists** (David, 2026-08-25): it is the flexible version and it is the unbounded one, so
+  it is the natural thing to put behind a subscription rather than behind the free allowance.
+- **Cached per place, readable offline** — subject to the retention gate below. The offline half is
+  the point rather than a bonus: "nearest metro" is a question you have abroad, on a bad
+  connection, which is exactly when a live-only feature has nothing to say.
+- **A per-user daily cap**, reusing the booking import's pattern rather than inventing one. It is
+  written, tested and already bounds one account's damage.
 
-## 3a. Rail, coach and ferry — the modelling gap
+### Attribution is contractual, not a nicety
+
+Grounding with Google Maps **requires** that place citations and their Google Maps links are shown:
+the sources "must immediately follow the generated content that the sources support" and "must be
+viewable within one user interaction", and the words *Google Maps* may not be recapitalised,
+localised or wrapped onto two lines.
+
+This lands well rather than awkwardly — the section already wanted "attributed and honest", with
+the import queue's "read by AI" as precedent. But it is a **hard UI constraint**: a design that
+renders an answer without its citations is not shippable, so it cannot be left to a later polish
+pass.
+
+### The one gate left
+
+**How long may a grounded result be kept?** The API documentation is silent, and the whole cost
+strategy — cache per place, not per request — rests on the answer. Google Maps Platform terms have
+historically restricted retention of Places content, and if grounding inherits that, an indefinite
+cache is not an option and the design needs a TTL or a different shape.
+
+**Answer this against the service terms before building the cache.** Everything else above can be
+built while it is open; the cache cannot. That is the same discipline §5 applied to the cost
+question, and the cost question turned out to be the one that dissolved.
+
+## 3a. Rail, coach and ferry — the modelling gap## 3a. Rail, coach and ferry — the modelling gap
 
 Asked on 2026-08-15 whether conflict detection would cover OpenTable and Via Rail. The answers
 differ, and the difference is a gap in the data model rather than in the feature.
@@ -196,7 +234,13 @@ zone can most likely be derived from the trip or asked for, as lodging already d
   in Phase 9.
 - **Does a tile provider's free tier permit caching tiles for offline use?** Several forbid it
   outright. If none do, §2 step 3 is closed rather than merely expensive.
-- **What is the actual Places cost under the post-2025 pricing?** PLAN.md §13 already flags this as
-  unpriced; it must be answered before Phase 10, not during it.
-- **Is "quiet" worth more than "helpful"?** §3's design risk is a values question about the product,
-  not a technical one, and it belongs to David rather than to this document.
+- ~~**What is the actual Places cost under the post-2025 pricing?**~~ **Priced 2026-08-25** — and
+  the answer is that it is nearly free at this scale. Gemini's Maps grounding gives 5,000 grounded
+  prompts a month before charging, then $14/1,000. §3 has the table. The discipline was right and
+  the fear was not.
+- ~~**Is "quiet" worth more than "helpful"?**~~ **Answered 2026-08-25, by David, and not as a
+  trade.** Helpful *when asked*, quiet otherwise — which is what "pulled, never pushed" was always
+  for. The app does not volunteer anything it was not asked for, so nothing about its character is
+  spent.
+- **How long may a grounded Maps result be cached?** The new load-bearing unknown, and the only
+  thing blocking §3's cache. See §3's last section.
