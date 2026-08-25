@@ -144,19 +144,50 @@ ever sequenced. The next actually-open item is 3.
    it, which is the load-bearing unknown rather than the work.
 5. **Phase 6 step 5 — DNS to Cloudflare.** The only genuinely dangerous item on any plan, and
    nothing above depends on it. The honest default is to leave it undone until something needs it.
-6. **Phase 10 — "what's nearby". Decided 2026-08-25 and ready to build**, bar one gate. PLAN-V3 §3
-   holds the design. Asked for directly — from an activity, "what restaurants are nearby", "where
-   is the nearest metro" — which is both the answer to the values question and the test §3 set for
-   whether anyone wanted it at all.
+6. ~~**Phase 10 — "what's nearby".**~~ **SHIPPED 2026-08-25**, decided and built the same day, and
+   deployed to production. PLAN-V3 §3 holds the design and CLAUDE.md what landed. Asked for
+   directly — from an activity, "what restaurants are nearby", "where is the nearest metro" — which
+   was both the answer to the values question and the test §3 set for whether anyone wanted it.
 
    Gemini's **Grounding with Google Maps**, so no new vendor: `GEMINI_API_KEY` exists and is on the
    paid tier. **5,000 grounded prompts a month free, then $14/1,000** — the cost objection that
-   gated this phase does not survive the actual number. Fixed intent chips on the event's own page,
-   cached per place and readable offline, with the import's per-user daily cap.
+   gated this phase did not survive the actual number. Fixed intent chips on the event's own page,
+   with a per-user daily cap (`NEARBY_DAILY_CAP`, default 25).
 
-   **The gate:** how long a grounded Maps result may be cached is undocumented, and the cache *is*
-   the cost strategy. Maps attribution is also contractual — citations and their links must render
-   with the answer — so that is a design constraint rather than a polish pass.
+   **The cache did not ship, and its gate is still open** — see §4. Everything else did, which was
+   the point of separating them: the cache was the only part that could not be built while the
+   retention question stood. Offline is an honest refusal in the meantime rather than a chip that
+   spins and fails.
+
+   **Attribution turned out to be a hard constraint and is enforced in code**: the server refuses
+   to return an answer whose grounding metadata cites no places, because an uncited answer cannot
+   be rendered compliantly — and is also the one most likely to have been invented.
+
+   **What is still unproven:** every test mocks the upstream. The request shape and the response
+   path came from documentation, and two Google pages describe different API surfaces for this
+   feature, so **the first real grounded call in production is what settles it** — the bar Phase 4
+   and Phase 12 were both held to. `GEMINI_API_KEY` is set in production, so this is a matter of
+   opening a stay with an address and tapping a chip.
+
+7. **A reflow patch: the date fields force horizontal scrolling.** Small, known, and deliberately
+   not done on 2026-08-25 so it did not ride along inside a feature commit.
+
+   `input[type=datetime-local]` sizes itself from its content, so at 200% text the **Starts** and
+   **Ends** fields on every event form demand 473px and drag the whole page sideways —
+   `clientWidth: 320, scrollWidth: 489`, measured by the accessibility audit. That is a **WCAG
+   2.1 AA 1.4.10 reflow failure**, and it applies to every event form rather than to any one
+   feature.
+
+   The fix is believed to be `width: 100%; min-width: 0` on those inputs. It is one line and it is
+   *not* obviously safe to apply unlooked-at: a `datetime-local` that is narrower than its own
+   content renders differently across browsers, and this app is used on iOS Safari where that
+   control is the platform's own. **Check it in a real browser at 320px and at 200%, in both
+   themes, rather than trusting the rule.** `app/e2e/specs/accessibility.spec.ts` is where a
+   regression test for it belongs.
+
+   Found by the `web-accessibility-reviewer` agent while auditing Phase 10 — a defect on the screen
+   the feature ships on rather than in the feature, which is the second audit in a row to turn one
+   up that way (`631bc0e` found the trip name hidden behind Manage at 200%).
 
 ## 3. Standing risks
 
@@ -177,8 +208,11 @@ Each gates something above. Full context in the section named.
 
 - **The LLM spend cap** (PLAN.md §13). The per-user import cap bounds the damage but no number was
   ever chosen and no billing alert is set. On the paid tier the exposure is money, not a quota.
-  **Phase 10 adds a second metered surface** on an app anyone can register for, bounded by the same
-  per-user cap. The number is still unchosen and the alert still unset.
+  **Phase 10 shipped that second metered surface on 2026-08-25** — live, on an app anyone can
+  register for, bounded by `NEARBY_DAILY_CAP` (25/user/day). That cap is held in memory and so
+  **resets on every deploy**, which bounds sustained cost rather than a burst. The account-wide
+  number is still unchosen and the billing alert still unset, and there are now two metered
+  surfaces rather than one.
 - ~~**`railway.json` is deprecated, and it is load-bearing.**~~ **DONE 2026-08-24.** The five
   settings it supplied are now on the service itself and the file is deleted, so the 2026-12-01
   sunset no longer threatens anything. DEPLOY.md §8b records the sequence, why Infrastructure as
@@ -193,15 +227,19 @@ Each gates something above. Full context in the section named.
   months ahead.
 - ~~**Is *quiet* worth more than *helpful*?**~~ **Answered 2026-08-25: helpful when asked, quiet
   otherwise.** Nothing is volunteered, so no character is spent. PLAN-V3 §3.
-- **How long may a grounded Maps result be cached?** The new load-bearing unknown, and the only
-  thing blocking Phase 10's cache — which is the whole cost strategy. Maps Platform terms have
-  historically restricted retention of Places content. Answer it against the service terms before
+- **How long may a grounded Maps result be cached?** **Now the only unbuilt part of Phase 10**,
+  which shipped without it on 2026-08-25 — the cost strategy is still "cache per place", and there
+  is still no cache. Maps Platform terms have historically restricted retention of Places content.
+  The API documentation was read while building the phase and says nothing about retention at all,
+  so the silence is confirmed rather than assumed; the answer needs the **service terms**, not the
+  API docs. Answer it against the service terms before
   building that half; everything else in the phase can proceed while it is open.
 - **Do PLAN-V2 and PLAN-V3 still need their adversarial review?** PLAN-V2 was reviewed on
-  2026-08-17. PLAN-V3 still says "draft, not started" in its header and asks for `plan-review`
-  before anything is built from it, while phases 8, 11 and 12 have all shipped from it — and
-  Phase 10 is now decided from it too, which raises the stakes. Either run it or record that it was
-  consciously skipped.
+  2026-08-17. PLAN-V3 asks for `plan-review` before anything is built from it, and phases 8, 10, 11
+  and 12 have now all shipped from it — **four times passed over, most recently Phase 10 on
+  2026-08-25**, which was the section resting on third-party pricing and third-party terms and so
+  the one that most deserved it. Only phase 9 is left to review. Either run it or record that it
+  was consciously skipped.
 
 ## 5. Candidates, not commitments
 

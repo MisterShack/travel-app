@@ -3,11 +3,12 @@
 > **Status: partly built, and never reviewed.** Authored by Opus on 2026-08-15 from a request by David for maps
 > and restaurant/attraction suggestions.
 >
-> **Phases 8, 11 and 12 have shipped from this document and the review below was never run.**
-> That is the finding: the instruction was passed over three times, once deliberately and twice by
-> habit. Either run it against what is left — phases 9 and 10, which are the ones resting on
-> third-party pricing — or record that it was consciously skipped. ROADMAP.md §4 tracks the
-> decision.
+> **Phases 8, 10, 11 and 12 have shipped from this document and the review below was never run.**
+> That is the finding: the instruction has now been passed over **four** times, once deliberately
+> and three times by habit — Phase 10 on 2026-08-25 being the most recent, and the one that most
+> deserved it, since §3 was the section resting on third-party pricing and third-party terms. Only
+> **phase 9** is left to review. Either run it against that, or record that it was consciously
+> skipped. ROADMAP.md §4 tracks the decision.
 >
 > **Run `/review-kit:plan-review PLAN-V3.md` before building any more of it.** This plan rests on
 > third-party pricing and on a claim about what people actually need, which are the two things
@@ -60,6 +61,10 @@ their transport preferences, offline maps if they have downloaded them, and live
 
 ## 3. Suggestions — "what's nearby"
 
+> **SHIPPED 2026-08-25**, the same day it was decided — everything below except the cache, which
+> is still behind the retention gate and is the one part of this section that is not built. See
+> "What was decided" for which half landed.
+>
 > **Decided 2026-08-25, by David, and the shape he asked for is the one this section already
 > prescribed.** He described wanting to ask, from an activity, what restaurants are nearby or where
 > the nearest metro station is. That is "pulled, never pushed" exactly. The open question below —
@@ -98,8 +103,22 @@ David spending it.
 - **Cached per place, readable offline** — subject to the retention gate below. The offline half is
   the point rather than a bonus: "nearest metro" is a question you have abroad, on a bad
   connection, which is exactly when a live-only feature has nothing to say.
+
+  **This is the one thing that did not ship** (2026-08-25). Nothing is persisted, so offline is an
+  honest refusal — the chips disable and say "Offline — asking needs a connection" — rather than a
+  chip that spins and fails. Building the cache first and asking about retention afterwards would
+  have meant deciding the gate by having already built past it.
 - **A per-user daily cap**, reusing the booking import's pattern rather than inventing one. It is
   written, tested and already bounds one account's damage.
+
+  **Shipped as the pattern, not the mechanism** (`NEARBY_DAILY_CAP`, default 25). The import counts
+  rows in `booking_imports`, which exist anyway; this phase persists nothing while the cache is
+  gated, so counting that way would have meant a table whose only job is to count — and the first
+  thing this phase stores should be decided by the retention gate, not by a limiter. Nor is it the
+  `rateLimit` middleware: that charges before the handler runs, so a chip tapped on an addressless
+  event would spend a day's allowance on a question that never reached the model. It is consumed at
+  the call site, in memory, and therefore resets on deploy. That bounds sustained cost rather than a
+  burst, which is the honest description of what it buys.
 
 ### Attribution is contractual, not a nicety
 
@@ -124,7 +143,13 @@ cache is not an option and the design needs a TTL or a different shape.
 built while it is open; the cache cannot. That is the same discipline §5 applied to the cost
 question, and the cost question turned out to be the one that dissolved.
 
-## 3a. Rail, coach and ferry — the modelling gap## 3a. Rail, coach and ferry — the modelling gap
+**Still open after building the rest** (2026-08-25). The API documentation was read while
+implementing this and it carries no retention statement at all — so the silence is confirmed rather
+than assumed, which is a slightly stronger position than before: the question is not "did anyone
+look", it is "the terms do not say, and Maps Platform's separate terms historically did". Answering
+it needs the service terms, not the API docs.
+
+## 3a. Rail, coach and ferry — the modelling gap
 
 Asked on 2026-08-15 whether conflict detection would cover OpenTable and Via Rail. The answers
 differ, and the difference is a gap in the data model rather than in the feature.

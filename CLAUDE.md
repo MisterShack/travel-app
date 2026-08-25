@@ -4,8 +4,8 @@ Personal/family travel agent: flights, lodging, and activities merged into one t
 with reminders. **Start at ROADMAP.md** — it holds what is left, in what order, and the greenlight
 gate that backups are scheduled to. The specs behind it: **PLAN.md** (V1, phases 0–5, shipped),
 **PLAN-V2.md** (Terraform and Playwright — reviewed 2026-08-17, step 6.3 shipped), **PLAN-V3.md**
-(place and suggestions — phases 8, 11 and 12 shipped). Read the relevant one before implementing
-anything.
+(place and suggestions — phases 8, 10, 11 and 12 shipped). Read the relevant one before
+implementing anything.
 
 **The product is called Waypoint** (BRAND.md). The repo directory, the npm workspaces
 (`@travel/*`) still say *travel* — those are identifiers rather than the product name, and renaming
@@ -69,9 +69,9 @@ verification work against real Resend delivery.
 
 **All phases (0–5) are done**, with one stated exception: Phase 1’s acceptance criterion includes a
 Litestream restore drill, and backups are deliberately deferred until the greenlight (ROADMAP.md §1).
-PLAN.md §11 says so under Phase 1; this line used to say it without the caveat. 236 tests,
-typecheck and lint clean — 198 under vitest across the three workspaces plus 38 in `infra/` under
-`node --test`, which a vitest-only count misses. Plus 31 Playwright specs, which are not in
+PLAN.md §11 says so under Phase 1; this line used to say it without the caveat. 299 tests,
+typecheck and lint clean — 261 under vitest across the three workspaces plus 38 in `infra/` under
+`node --test`, which a vitest-only count misses. Plus 49 Playwright specs, which are not in
 `npm test` and are run separately.
 
 **Phase 4 (booking import) shipped and verified end to end against a real forwarded airline
@@ -206,6 +206,44 @@ Three things the harness found or forced, none of which a unit test could have:
   server was started with. Nothing is reused, and `API_PROXY_TARGET` lets Vite point at the
   suite's own API.
 
+**Phase 10 ("what's nearby") shipped 2026-08-25**, from PLAN-V3 §3 — decided and built the same
+day. Four fixed questions (eat, getting around, coffee, essentials) on a stay's or an activity's
+own page, answered by Gemini's **Grounding with Google Maps** over the key booking import already
+uses. No new vendor and no new credential. Pulled, never pushed: nothing runs on mount. Segments
+get no panel, the same line Phase 8 drew for Directions.
+
+**The citations are contractual, not decoration.** Grounding with Google Maps requires that place
+sources are shown, that they immediately follow the content they support, that they are reachable
+in one interaction, and that "Google Maps" is not recapitalised, localised or wrapped onto two
+lines. So the server **refuses to return an answer that cites nothing** — an uncited answer cannot
+be rendered compliantly, and it is also the one most likely to have been invented.
+
+**The cache did not ship, deliberately.** PLAN-V3 §3 wants answers cached per place and readable
+offline; how long a grounded Maps result may be kept is still the open gate in ROADMAP §4. The API
+docs were read while building this and carry no retention statement at all, so the silence is now
+confirmed rather than assumed. Offline is an honest refusal in the meantime.
+
+**Not yet proven end to end.** Every test mocks the upstream, and the request shape and the
+`groundingChunks[].maps` path came from documentation — two Google pages describe *different* API
+surfaces for this feature. The first real grounded call is still the thing that settles it, which
+is the same bar Phase 4 and Phase 12 were held to.
+
+Two defects here were found by running the real thing, not by a passing suite:
+
+- **A browser run caught the chips being disabled while loading.** Disabling the element holding
+  focus drops focus to `<body>`, so pressing a chip with a keyboard threw the user to the top of
+  the page with nothing announced. A jsdom test asserted focus stayed and passed anyway.
+- **The accessibility audit found the first question of every session was silent.** A live region
+  that is `display: none` until it has content enters the accessibility tree in the same commit as
+  its first answer, which is the one pattern a live region does not survive. From the second
+  question on it worked — so it looked fine to anyone testing by pressing a chip twice. `aria-busy`
+  was separately suppressing "Looking…", the one message whose job is to be heard during a
+  multi-second paid call. Both fixes were deletions.
+
+`role="status"` is implicitly atomic, so the citations, attribution and quota line sit **outside**
+it — still immediately beneath the prose in DOM order and on screen, still real links. Inside, every
+place name was read twice and the legal line recited on every answer.
+
 **Phase 11 (conflict and gap detection) shipped 2026-08-15**, from PLAN-V3. Pure function in
 `shared/`, run on the client, so it works offline and costs nothing per use. It is the feature that
 falls out of the timezone work rather than being bolted on — "you land at 13:00 but dinner is
@@ -296,6 +334,24 @@ Findings from building that contradict a straight port from budget-app, all enco
   mapping now lives in `app/src/features/timeline/draft.ts` — out of the component so it can be
   tested, because a field silently missing from it is invisible until someone forwards the right
   email.
+- **Disabling the element that has focus drops focus to `<body>`. This has now bitten twice.**
+  First on every form submit (`631bc0e`): the button disables itself mid-press, so a save that
+  succeeded with a DST warning left the reader standing nowhere. Then on Phase 10's chips, which
+  disabled while the request was in flight, so pressing one with a keyboard threw the user to the
+  top of the page. **A jsdom test asserted focus stayed on the chip and passed**; a real browser
+  run is what caught it, because jsdom does not blur on disable.
+
+  The rule: **do not disable a control in response to activating it.** If the point is to stop a
+  second submission, guard the handler instead — and where something must render as unavailable,
+  `aria-disabled` plus a refusing handler keeps it focusable, which is also the only way its
+  `aria-describedby` reason can ever be read.
+- **A live region that is `display: none` until it has content is never announced.** It enters the
+  accessibility tree in the same commit as its first message, and that is the one case a live
+  region does not survive. It works from the *second* message on — so it looks fine to anyone who
+  tests by triggering it twice, which is why Phase 10's first question was silent for a day.
+  Mount the region empty from first render. And `aria-busy` on it suppresses exactly the "working
+  on it" message that a slow call needs to announce; `role="status"` is also implicitly atomic, so
+  anything parked inside it is re-recited in full on every update.
 - **A whole-card link has room for exactly one link.** The timeline card was a single `<Link>`
   wrapping everything, so Phase 8's Directions action would have been an anchor inside an anchor —
   invalid HTML, and tab order and activation differ by browser. The title carries the link now and
