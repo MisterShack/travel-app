@@ -9,6 +9,7 @@ import { describeRejection } from './fieldErrors';
 import { MODE_COPY } from '@/components/kinds';
 import { PassengerFields } from './PassengerFields';
 import { storedPassengers } from './passengers';
+import { Nearby } from './Nearby';
 
 /**
  * Add/edit form for the three timeline entity types.
@@ -89,6 +90,15 @@ export function EventFormPage() {
   const [warnings, setWarnings] = useState<string[]>([]);
   /** Set once the server has stored the row, so the UI stops offering "Add". */
   const [savedId, setSavedId] = useState<string | null>(null);
+  /**
+   * The address **as the server has it**, tracked apart from the form field.
+   *
+   * "What's nearby" asks the server about the stored row, so an unsaved edit to
+   * the address field would produce an answer about somewhere the screen is no
+   * longer showing. Keeping the stored value lets the panel notice that and say
+   * so rather than answering the wrong question convincingly.
+   */
+  const [storedAddress, setStoredAddress] = useState('');
   /**
    * A draft handed over from the import review queue. It only ever *prefills*
    * the form — the user still submits through the same validated route, which
@@ -185,6 +195,7 @@ export function EventFormPage() {
           confirmationCode: item['confirmationCode'] ?? '',
           notes: item['notes'] ?? '',
         });
+        setStoredAddress(item['address'] ?? item['location'] ?? '');
       })
       .catch(() => setError('Could not load this item.'));
   }, [id, kind, isNew]);
@@ -273,6 +284,8 @@ export function EventFormPage() {
         // it does not ask for a resubmit: submitting again would create a
         // second copy. The user reads it and either goes back or edits the
         // time, which is a PATCH of the row that now exists.
+        setStoredAddress(kind === 'lodging' ? f.address.trim() : f.location.trim());
+
         if (result.warnings && result.warnings.length > 0) {
           setWarnings(result.warnings);
           setSavedId(isNew ? ((result as { id?: string }).id ?? null) : (id ?? null));
@@ -317,7 +330,16 @@ export function EventFormPage() {
       .then(() => navigate(`/trips/${tripId}`, { replace: true }));
   };
 
+  /**
+   * The event id "what's nearby" would ask about: the row the server has, which
+   * only exists once something has been saved.
+   */
+  const nearbyId = savedId ?? (isNew ? null : (id ?? null));
+  const showNearby =
+    (kind === 'lodging' || kind === 'activity') && nearbyId !== null && storedAddress !== '';
+
   return (
+    <>
     <form onSubmit={onSubmit}>
       <h2>
         {isNew ? 'Add' : 'Edit'}{' '}
@@ -537,5 +559,24 @@ export function EventFormPage() {
         )}
       </div>
     </form>
+
+    {/*
+      * Outside the <form>, deliberately. Asking what is nearby is not part of
+      * editing the event, and a button inside a form is a submit button unless
+      * every one of them remembers to say otherwise — a trap worth designing
+      * out rather than remembering.
+      *
+      * Segments get no panel, the same line Phase 8 drew for Directions: an
+      * IATA code is not an address and a station's city is not the station.
+      */}
+    {showNearby && (
+      <Nearby
+        kind={kind as 'lodging' | 'activity'}
+        id={nearbyId}
+        stored={storedAddress}
+        edited={(kind === 'lodging' ? f.address.trim() : f.location.trim()) !== storedAddress}
+      />
+    )}
+    </>
   );
 }

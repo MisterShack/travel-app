@@ -812,3 +812,111 @@ dl.extracted dd { margin: 0; min-width: 0; word-break: break-word; }
 @media (min-width: 30rem) {
   .card .title { font-size: var(--text-lg); line-height: var(--lh-lg); }
 }
+
+/* -------------------------------------------------------------- nearby --- */
+
+/*
+ * "What's nearby" (PLAN-V3 §3), on a stay's or an activity's own page.
+ *
+ * A sunk panel rather than a card: it sits below the form on the same screen,
+ * and a second bordered surface at the same elevation would read as a second
+ * screen. The kind hue is deliberately absent — this is not an event.
+ */
+.nearby {
+  margin-top: var(--space-8);
+  padding: var(--space-4);
+  background: var(--surface-sunk);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+.nearby h3 { margin: 0; font-size: var(--text-base); line-height: var(--lh-base); }
+.nearby > .muted.tiny { margin: var(--space-1) 0 0; }
+
+.nearby-chips {
+  display: flex; flex-wrap: wrap; gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+/*
+ * Quiet by default, accented when pressed. These are questions, not the reason
+ * the screen exists — four filled amber buttons would out-shout the Save action
+ * above them. 44px minimum in both dimensions, like every other button
+ * (BRAND.md §7); the padding is what carries it, not a fixed height, so the
+ * chip still grows with the text at 200%.
+ */
+.nearby-chip {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--field);
+  border-radius: 999px;
+  padding: var(--space-3) var(--space-4);
+}
+.nearby-chip:hover:not([aria-disabled='true']) {
+  border-color: var(--accent); background: var(--accent-wash);
+}
+/*
+ * The chip whose answer is showing.
+ *
+ * The tint alone was not enough, and the measurements are the argument: the
+ * pressed and unpressed fills differed by 1.10:1 in light and 1.00:1 in dark —
+ * identical by luminance, so the state was carried by hue alone (WCAG 1.4.1).
+ * Worse, --accent-line dropped the chip's own boundary against the panel from
+ * 3.06:1 to 1.37:1, so pressing a chip made it stop looking like a control
+ * (1.4.11). The full --accent edge restores that to 4.38:1, and the inset ring
+ * doubles its weight without a border-width change that would shift the layout
+ * by a pixel on every press. Weight survives a greyscale screenshot; hue does
+ * not. The answer's own heading states it in text as well.
+ */
+.nearby-chip.is-current {
+  background: var(--accent-wash);
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  color: var(--accent);
+}
+/* Refusing, but still focusable — see Nearby.tsx on why this is not `disabled`.
+   Styled to read as refused rather than as a paler shade of available. */
+.nearby-chip[aria-disabled='true'] {
+  background: var(--surface);
+  color: var(--ink-soft);
+  border-color: var(--rule);
+  cursor: not-allowed;
+}
+
+/*
+ * The live region. **Never `display: none`** — it is mounted empty from first
+ * render, because a region that appears in the same commit as its first content
+ * is not announced, and that silently cost the first question of every session.
+ * `:empty` therefore takes away the margin and nothing else.
+ */
+.nearby-live { margin-top: var(--space-3); }
+.nearby-live:empty { margin-top: 0; }
+.nearby-question {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm); line-height: var(--lh-sm);
+  color: var(--ink-soft);
+}
+.nearby-answer { margin: 0; text-wrap: pretty; }
+
+/*
+ * The citations. They follow the prose immediately and are never behind a
+ * disclosure — Grounding with Google Maps requires both, so this list is a term
+ * of use rather than a design choice (PLAN-V3 §3).
+ */
+.nearby-places {
+  list-style: none;
+  margin: var(--space-3) 0 var(--space-2);
+  padding: 0;
+  display: flex; flex-wrap: wrap; gap: var(--space-2);
+}
+.nearby-places a {
+  display: inline-flex; align-items: center;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--rule); border-radius: 999px;
+  color: var(--accent); text-decoration: none;
+  font-size: var(--text-sm); line-height: var(--lh-sm);
+}
+.nearby-places a:hover { border-color: var(--accent); background: var(--accent-wash); }
+
+/* "Google Maps" may not be wrapped onto two lines. */
+.nowrap { white-space: nowrap; }

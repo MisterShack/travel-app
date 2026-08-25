@@ -161,6 +161,16 @@ export const envSchema = z.object({
 
   /** Ceiling on imports per user per day; the inbound address is public. */
   IMPORT_DAILY_CAP: z.coerce.number().int().positive().default(50),
+
+  /**
+   * Ceiling on "what's nearby" questions per user per day (PLAN-V3 §3).
+   *
+   * Registration is open, so this bounds one account's spend rather than the
+   * app's. Sized against the free allowance: 5,000 grounded prompts a month is
+   * about 165 a day across everyone, and 25 leaves a family nowhere near it
+   * while stopping a script from walking through it in an afternoon.
+   */
+  NEARBY_DAILY_CAP: z.coerce.number().int().positive().default(25),
 });
 
 export type Env = z.infer<typeof envSchema>;

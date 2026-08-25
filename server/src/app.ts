@@ -8,6 +8,7 @@ import { createAuthRoutes } from './auth/routes';
 import { createInviteRoutes, createTripRoutes } from './trip/routes';
 import { createNotifyRoutes } from './notify/routes';
 import { createImportRoutes } from './import/routes';
+import { createNearbyRoutes } from './nearby/routes';
 import type { InboundClient } from './import/resendInbound';
 import type { Pusher } from './notify/push';
 
@@ -77,6 +78,7 @@ export function buildApp({ db, env, mailer, inbound = null, pusher = null, now }
   app.route('/api', createInviteRoutes({ db, mailer, env, now }));
   app.route('/api', createNotifyRoutes({ db, env, now }));
   app.route('/api', createImportRoutes({ db, env, inbound, pusher, now }));
+  app.route('/api', createNearbyRoutes({ db, env, now }));
 
   // Static file serving is registered *after* the API routes so it can never
   // shadow them, and only when STATIC_DIR is set — which is how one process
