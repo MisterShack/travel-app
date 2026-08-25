@@ -254,6 +254,17 @@ Findings from building that contradict a straight port from budget-app, all enco
   exactly the data a conflict needs. The endpoint is an IATA code for air and a station *name* for
   everything else; there is no IATA for stations, so the zone is asked for rather than derived. Hue
   encodes the kind and the icon's shape encodes the mode.
+- **An IATA code and a station name are not one namespace.** The conflict rule compared
+  `destination` against `origin` as strings, and Phase 12 had made those a code for air and a
+  station *name* for rail — so a flight into `YOW` followed by a train out of `Ottawa` reported a
+  change of city that was not one. Reported 2026-08-25 from a real Winnipeg–Ottawa–Montreal
+  itinerary, where it fired at *both* ends of the return trip, which is why it looked like two bugs
+  and was one. Air-to-air still compares codes, and must — `LHR` and `LGW` are both "London" and
+  telling them apart is the rule's whole purpose. Everything else compares `endPlace`/`startPlace`,
+  the airport's own city for a flight and the station name as written for a train, which is the one
+  form the two modes can meet in. The false alert was also *masking* a real one: it hit `continue`
+  before the tight-connection check, so an airport-to-station transfer with 30 minutes in it said
+  nothing.
 - **The conflict rule was parsing the subtitle.** Putting seats in it made every connection compare
   `LIS · 14C` against `LIS` and report a change of airport that was not one. Endpoints are now
   structured fields on the timeline item. A display string is not an interface.

@@ -40,8 +40,41 @@ const leg = (id: string, dep: string, arr: string, from: string, to: string) =>
     kind: 'segment',
     title: `Flight ${id}`,
     subtitle: `${from} → ${to}`,
+    mode: 'air',
     origin: from,
     destination: to,
+    // The airport's own city, as `placeOf` fills it on the server. LHR and LGW
+    // are both London on purpose — the rule must still tell them apart.
+    startPlace: AIRPORT_CITY[from] ?? null,
+    endPlace: AIRPORT_CITY[to] ?? null,
+    startAt: dep,
+    endAt: arr,
+  });
+
+const AIRPORT_CITY: Record<string, string> = {
+  LIS: 'Lisbon',
+  LHR: 'London',
+  LGW: 'London',
+  OPO: 'Porto',
+  YWG: 'Winnipeg',
+  YOW: 'Ottawa',
+};
+
+/**
+ * A train. Its endpoints are station *names*, not codes — there is no IATA for
+ * a station — so `placeOf` passes them through unchanged (PLAN-V3 §3a).
+ */
+const railLeg = (id: string, dep: string, arr: string, from: string, to: string) =>
+  item({
+    id,
+    kind: 'segment',
+    title: `Train ${id}`,
+    subtitle: `${from} → ${to}`,
+    mode: 'rail',
+    origin: from,
+    destination: to,
+    startPlace: from,
+    endPlace: to,
     startAt: dep,
     endAt: arr,
   });
@@ -141,6 +174,89 @@ describe('connections', () => {
     );
     const change = issues.find((i) => i.kind === 'airport-change');
     expect(change?.message).toMatch(/arrive at LHR .* leaves from LGW/);
+  });
+
+  /**
+   * Reported from a real Winnipeg–Ottawa–Montreal itinerary, 2026-08-25.
+   *
+   * `origin`/`destination` are an IATA code for air and a station name for
+   * rail, so comparing them as strings made "YOW" and "Ottawa" a change of
+   * city. It fired at both ends of the return trip, which is why the report
+   * showed two mirrored alerts rather than one.
+   */
+  it('does not flag flying into an airport and leaving from that city by train', () => {
+    const issues = findIssues(
+      [
+        hotel,
+        leg('f1', '2026-09-10T12:00:00.000Z', '2026-09-10T15:00:00.000Z', 'YWG', 'YOW'),
+        railLeg('r1', '2026-09-10T19:00:00.000Z', '2026-09-10T21:00:00.000Z', 'Ottawa', 'Montreal'),
+      ],
+      TRIP,
+    );
+    expect(issues.find((i) => i.kind === 'airport-change')).toBeUndefined();
+  });
+
+  it('does not flag the return leg either, which is where the second alert came from', () => {
+    const issues = findIssues(
+      [
+        hotel,
+        railLeg('r2', '2026-09-12T09:00:00.000Z', '2026-09-12T11:00:00.000Z', 'Montreal', 'Ottawa'),
+        leg('f2', '2026-09-12T15:00:00.000Z', '2026-09-12T18:00:00.000Z', 'YOW', 'YWG'),
+      ],
+      TRIP,
+    );
+    expect(issues.find((i) => i.kind === 'airport-change')).toBeUndefined();
+  });
+
+  it('still flags a genuine city change across modes', () => {
+    // The catch that must survive the fix: landing in Ottawa and boarding a
+    // train in Montreal is a real problem no amount of spare time solves.
+    const issues = findIssues(
+      [
+        hotel,
+        leg('f1', '2026-09-10T12:00:00.000Z', '2026-09-10T15:00:00.000Z', 'YWG', 'YOW'),
+        railLeg('r1', '2026-09-10T19:00:00.000Z', '2026-09-10T21:00:00.000Z', 'Montreal', 'Quebec'),
+      ],
+      TRIP,
+    );
+    const change = issues.find((i) => i.kind === 'airport-change');
+    // Named by place rather than by code, which is what the traveller reads.
+    expect(change?.message).toMatch(/arrive at Ottawa .* leaves from Montreal/);
+  });
+
+  it('treats a station name that contains the city as the same place', () => {
+    // "Ottawa" and "Ottawa Station" are one place. A person typed the second
+    // one, and only an exact comparison would disagree.
+    const issues = findIssues(
+      [
+        hotel,
+        leg('f1', '2026-09-10T12:00:00.000Z', '2026-09-10T15:00:00.000Z', 'YWG', 'YOW'),
+        railLeg(
+          'r1',
+          '2026-09-10T19:00:00.000Z',
+          '2026-09-10T21:00:00.000Z',
+          'Ottawa Station',
+          'Montreal',
+        ),
+      ],
+      TRIP,
+    );
+    expect(issues.find((i) => i.kind === 'airport-change')).toBeUndefined();
+  });
+
+  it('still reports a tight connection that the false alert used to mask', () => {
+    // The old rule hit `continue` on the bogus change-of-city, so the genuine
+    // problem underneath it was never reported. Airport to station takes time.
+    const issues = findIssues(
+      [
+        hotel,
+        leg('f1', '2026-09-10T12:00:00.000Z', '2026-09-10T15:00:00.000Z', 'YWG', 'YOW'),
+        railLeg('r1', '2026-09-10T15:30:00.000Z', '2026-09-10T17:30:00.000Z', 'Ottawa', 'Montreal'),
+      ],
+      TRIP,
+    );
+    expect(issues.find((i) => i.kind === 'airport-change')).toBeUndefined();
+    expect(issues.find((i) => i.kind === 'tight-connection')?.message).toMatch(/30 minutes/);
   });
 });
 

@@ -70,6 +70,30 @@ function overlaps(items: TimelineItem[]): Issue[] {
   return issues;
 }
 
+/**
+ * Whether two endpoints name the same place.
+ *
+ * Exact for airport codes, because they are exact identifiers and `LHR`/`LGW`
+ * differing is the whole point of the rule.
+ *
+ * Deliberately loose everywhere else. A station name is free text a person
+ * typed, so "Ottawa" and "Ottawa Station" are one place and only an exact
+ * comparison would disagree — and this rule's standing constraint is that a
+ * false positive costs more than a miss, because an app that cries wolf gets
+ * ignored and is then worse than silent. Containment errs toward quiet.
+ *
+ * Doing this properly needs both endpoints resolved to coordinates, which is
+ * Phase 9 and is not built. Until then this is a heuristic and is written to
+ * fail in the harmless direction.
+ */
+function samePlace(a: string, b: string, exact: boolean): boolean {
+  if (exact) return a === b;
+  const x = a.trim().toLowerCase();
+  const y = b.trim().toLowerCase();
+  if (x === '' || y === '') return true;
+  return x === y || x.includes(y) || y.includes(x);
+}
+
 /** Consecutive journeys: too little time between them, or a different place entirely. */
 function connections(items: TimelineItem[]): Issue[] {
   const legs = items.filter((i) => i.kind === 'segment').sort((x, y) => at(x) - at(y));
@@ -92,11 +116,27 @@ function connections(items: TimelineItem[]): Issue[] {
      * subtitle worked only while it was exactly "LHR → LIS"; adding seats to it
      * made every connection compare "LIS · 14C" against "LIS" and report a
      * change of airport that was not one.
+     *
+     * **Which pair of fields depends on the modes, because they are not one
+     * namespace.** Phase 12 made `origin`/`destination` an IATA code for air and
+     * a station *name* for everything else, so a flight into `YOW` followed by a
+     * train out of `Ottawa` compared `"YOW" !== "Ottawa"` and reported a change
+     * of city that was not one — reported from a real Winnipeg–Ottawa–Montreal
+     * itinerary, where it fired at both ends of the return trip.
+     *
+     * Air against air stays on the codes, and must: `LHR` and `LGW` are both
+     * "London" and a connection between them is exactly what this rule exists
+     * to catch. Anything else compares `endPlace`/`startPlace`, which is the
+     * airport's own city for a flight and the station name as written for a
+     * train — the one form the two modes can meet in.
      */
-    const landsAt = arriving.destination;
-    const leavesFrom = departing.origin;
+    const bothAir = arriving.mode === 'air' && departing.mode === 'air';
+    // Falls back to the raw endpoint when no place was resolved — an unknown
+    // airport code has no city, and comparing something beats comparing null.
+    const landsAt = bothAir ? arriving.destination : (arriving.endPlace ?? arriving.destination);
+    const leavesFrom = bothAir ? departing.origin : (departing.startPlace ?? departing.origin);
 
-    if (landsAt && leavesFrom && landsAt !== leavesFrom) {
+    if (landsAt && leavesFrom && !samePlace(landsAt, leavesFrom, bothAir)) {
       issues.push({
         kind: 'airport-change',
         severity: 'warning',
