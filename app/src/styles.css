@@ -492,10 +492,40 @@ a.btn.backlink span, a.btn.backlink { overflow: hidden; text-overflow: ellipsis;
   font-size: var(--text-xs); line-height: var(--lh-xs); margin-top: 2px;
 }
 
+/*
+ * Closing is animated too, and it is not symmetric with opening on purpose.
+ *
+ * An exit is shorter and accelerates away — the entry decelerates into place
+ * because the user is waiting to read it, while on the way out they have
+ * already decided and the animation is only there to say where it went. Equal
+ * durations make a dismissal feel slow.
+ *
+ * `forwards` matters: without it the sheet snaps back to its resting position
+ * for the frame between the animation ending and React unmounting it.
+ */
+.sheet-backdrop.closing {
+  animation: fade-out 180ms ease forwards;
+  /* Nothing is clickable on the way out, so a second click cannot land on an
+     option the user is watching leave. */
+  pointer-events: none;
+}
+.sheet-backdrop.closing .sheet {
+  animation: sheet-out 180ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
 @keyframes fade-in { from { opacity: 0; } }
 @keyframes sheet-in { from { transform: translateY(100%); } }
+@keyframes fade-out { to { opacity: 0; } }
+@keyframes sheet-out { to { transform: translateY(100%); } }
+/*
+ * `Sheet` also reads this preference in JavaScript and closes immediately
+ * rather than waiting for an `animationend` that will never fire here. Turning
+ * the animation off without that would make the sheet impossible to dismiss —
+ * a motion preference becoming a trap.
+ */
 @media (prefers-reduced-motion: reduce) {
-  .sheet, .sheet-backdrop { animation: none; }
+  .sheet, .sheet-backdrop,
+  .sheet-backdrop.closing, .sheet-backdrop.closing .sheet { animation: none; }
 }
 
 /* ------------------------------------------------------------- skeleton -- */

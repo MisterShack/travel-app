@@ -1,9 +1,11 @@
 import {
   cloneElement,
   isValidElement,
+  useCallback,
   useEffect,
   useId,
   useRef,
+  useState,
   type ReactElement,
   type ReactNode,
 } from 'react';
@@ -123,6 +125,36 @@ export function Sheet({
   const panel = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
+  /**
+   * The sheet slid in and vanished on close, because it is mounted
+   * conditionally — React removes the node the moment the state says it is
+   * gone, so an exit animation has nothing left to run on.
+   *
+   * So closing is a state of the sheet rather than an instant: `closing` plays
+   * the exit, and `onClose` — which unmounts it — is called when the animation
+   * finishes. Kept inside `Sheet` so that every caller stays a plain boolean
+   * and cannot forget to wait.
+   */
+  const [closing, setClosing] = useState(false);
+
+  /**
+   * **`animation: none` under `prefers-reduced-motion` means `animationend`
+   * never fires.** Gating the unmount on that event alone would leave those
+   * users unable to close the sheet at all — a motion preference turning into
+   * a trap. So the preference is read directly and closes immediately, and the
+   * animation path is only for people who asked for animation.
+   */
+  const requestClose = useCallback(() => {
+    const still =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (still) {
+      onClose();
+      return;
+    }
+    setClosing(true);
+  }, [onClose]);
+
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
     const previousOverflow = document.body.style.overflow;
@@ -130,7 +162,7 @@ export function Sheet({
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        requestClose();
         return;
       }
       if (e.key !== 'Tab' || panel.current === null) return;
@@ -163,26 +195,40 @@ export function Sheet({
       document.body.style.overflow = previousOverflow;
       opener?.focus();
     };
-  }, [onClose]);
+  }, [requestClose]);
 
   return (
     <div
-      className="sheet-backdrop"
+      className={`sheet-backdrop${closing ? ' closing' : ''}`}
       // Only a click that both starts and ends on the backdrop dismisses;
       // otherwise a drag that begins on a sheet control and releases outside it
       // closes the sheet under the user's finger.
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) requestClose();
       }}
     >
-      <div className="sheet" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={panel}>
+      <div
+        className="sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        ref={panel}
+        /*
+         * `animationend` bubbles, so a child animating would otherwise unmount
+         * the sheet under the user. Only this element's own exit counts, and
+         * only while closing — the entry animation fires this too.
+         */
+        onAnimationEnd={(e) => {
+          if (closing && e.target === e.currentTarget) onClose();
+        }}
+      >
         <div className="grabber" aria-hidden="true" />
         <h2 id={titleId}>{title}</h2>
         {children}
         {/* Backdrop and Esc are not discoverable on a phone; a labelled way out
             is the only one some people will find. */}
         <div className="actions">
-          <button type="button" className="secondary block" onClick={onClose}>
+          <button type="button" className="secondary block" onClick={requestClose}>
             Cancel
           </button>
         </div>
