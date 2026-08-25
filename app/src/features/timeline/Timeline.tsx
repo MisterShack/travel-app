@@ -135,11 +135,9 @@ function Event({ item, homeTimezone }: { item: TimelineItem; homeTimezone: strin
               {endDate !== null && <span className="endday"> {endDate}</span>}
             </span>
           )}
-          {showStartZone && (
-            <span className="zone">{item.startPlace ?? zoneLabel(item.startTimezone)}</span>
-          )}
+          {showStartZone && <Zone place={item.startPlace ?? zoneLabel(item.startTimezone)} />}
           {end !== null && showEndZone && (
-            <span className="zone">{item.endPlace ?? zoneLabel(item.endTimezone!)}</span>
+            <Zone place={item.endPlace ?? zoneLabel(item.endTimezone!)} />
           )}
         </div>
         <div className="body">
@@ -160,6 +158,32 @@ function Event({ item, homeTimezone }: { item: TimelineItem; homeTimezone: strin
         </div>
       </div>
     </>
+  );
+}
+
+/**
+ * The badge says which clock a time is on, and it is shown only when that zone
+ * differs from the trip's.
+ *
+ * The pill's shape and its position beside the time carry that for a sighted
+ * reader; in the accessibility tree it was a bare place name with no such cue.
+ * Since today's change resolves a *city*, a stay in Paris announced as
+ * "15:00 → 11:00 Mar 6 Paris. Stay: Hotel Lutetia. 45 Boulevard Raspail,
+ * Paris" — the same word twice, once meaning the clock and once the address,
+ * with nothing to tell them apart.
+ *
+ * The qualifier is hidden text rather than an `aria-label` deliberately. This
+ * is rendered content, not an accessible name, so element boundaries give a
+ * pause and it reads as "Paris time" — it is not the case where a
+ * visually-hidden suffix collapsed into "Directionsto Hotel Lutetia", which
+ * happens only in name computation.
+ */
+function Zone({ place }: { place: string }) {
+  return (
+    <span className="zone">
+      {place}
+      <span className="visually-hidden"> time</span>
+    </span>
   );
 }
 

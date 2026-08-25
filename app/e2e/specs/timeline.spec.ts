@@ -236,9 +236,24 @@ test.describe('adding to a trip', () => {
 
     const card = page.locator('.event-card').filter({ hasText: 'Schwartz' });
     await expect(card).toBeVisible();
-    await expect(card.locator('.zone')).toHaveText('Montreal');
-    // The zone itself is untouched and still correct — only the label changed.
-    await expect(card.locator('.zone')).not.toHaveText('Toronto');
+
+    /**
+     * "Montreal time", not "Montreal": the badge carries a visually-hidden
+     * qualifier so the accessibility tree says what the place *means*. Without
+     * it a stay in Paris announced as "…Paris. Stay: Hotel Lutetia. 45
+     * Boulevard Raspail, Paris" — the same word twice, once the clock and once
+     * the address, with no way to tell them apart.
+     *
+     * `toHaveText` reads text content, which includes the hidden span, so this
+     * asserts what is announced. The visible half is checked separately below.
+     */
+    await expect(card.locator('.zone')).toHaveText('Montreal time');
+    await expect(card.locator('.zone')).not.toContainText('Toronto');
+    // What a sighted reader sees is still just the city — the qualifier is
+    // clipped, not laid out.
+    expect(await card.locator('.zone').evaluate((el) => el.firstChild?.textContent)).toBe(
+      'Montreal',
+    );
 
     const row = await onlyRow('activities', trip.id);
     expect(row['start_timezone'], 'the stored zone must not have moved').toBe('America/Toronto');

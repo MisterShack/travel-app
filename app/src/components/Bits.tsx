@@ -49,20 +49,32 @@ export function Field({
   label,
   children,
   hint,
+  describedBy,
 }: {
   label: string;
   children: ReactNode;
   hint?: string;
+  /** An extra element describing this field — a form-level error, typically. */
+  describedBy?: string;
 }) {
   const id = useId();
   const hintId = `${id}-hint`;
+
+  /**
+   * Combined, not replaced. Injecting `aria-describedby` here used to overwrite
+   * anything the caller had set, so a field with both a hint and an error
+   * silently lost one of them — no live instance yet, but it is exactly the
+   * trap the next person to associate an error would fall into.
+   */
+  const described =
+    [hint !== undefined ? hintId : null, describedBy ?? null].filter(Boolean).join(' ') || undefined;
 
   // Every call site passes exactly one control, so injecting the ids here keeps
   // the association correct without every form having to plumb them by hand.
   const control = isValidElement(children)
     ? cloneElement(children as ReactElement<Record<string, unknown>>, {
         id,
-        ...(hint !== undefined ? { 'aria-describedby': hintId } : {}),
+        ...(described !== undefined ? { 'aria-describedby': described } : {}),
       })
     : children;
 
@@ -81,19 +93,63 @@ export function Field({
   );
 }
 
+/**
+ * Moves focus to a message the moment it appears.
+ *
+ * **Submitting a form left focus on `<body>`.** The submit button disables
+ * itself mid-press, so the focused element stops being focusable and the
+ * document takes over — and the next Tab starts again from the skip link at the
+ * top of the page. That is worst on exactly the path the form deliberately
+ * stays put for: a save that succeeded with a DST warning leaves the reader
+ * standing nowhere, with the thing they need to read somewhere above them.
+ *
+ * Focusing the message fixes the focus order *and* guarantees it is read. The
+ * live region alone is not enough: `role="alert"` is announced reliably when
+ * text is written into a region that already existed, and these are mounted
+ * along with their content, which screen readers treat inconsistently. Both are
+ * kept — the role for the case where focus does not move, the focus for when it
+ * does.
+ *
+ * Only on the transition into having a message, so a re-render with the same
+ * error does not yank focus back from wherever the user has moved to.
+ */
+function useFocusOnAppear(active: boolean) {
+  const ref = useRef<HTMLElement | null>(null);
+  const was = useRef(false);
+  useEffect(() => {
+    if (active && !was.current) ref.current?.focus();
+    was.current = active;
+  }, [active]);
+  return ref;
+}
+
 export function ErrorText({ children, id }: { children: ReactNode; id?: string }) {
+  const ref = useFocusOnAppear(Boolean(children));
   if (!children) return null;
   return (
-    <p className="error" role="alert" id={id}>
+    <p
+      className="error"
+      role="alert"
+      id={id}
+      ref={ref as React.RefObject<HTMLParagraphElement>}
+      /* Focusable by script, never by Tab: it is a destination, not a stop. */
+      tabIndex={-1}
+    >
       {children}
     </p>
   );
 }
 
 export function Warnings({ items }: { items: string[] }) {
+  const ref = useFocusOnAppear(items.length > 0);
   if (items.length === 0) return null;
   return (
-    <div className="banner" role="status">
+    <div
+      className="banner"
+      role="status"
+      ref={ref as React.RefObject<HTMLDivElement>}
+      tabIndex={-1}
+    >
       {items.map((w) => (
         <div key={w}>{w}</div>
       ))}

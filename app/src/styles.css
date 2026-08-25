@@ -16,7 +16,10 @@
   --paper: #faf9f7;
   --surface: #ffffff;
   --surface-sunk: #f1efec;
-  --rule: #dcd8d2;          /* decorative: card edges, dividers */
+  /* Carries no text, so it is free to darken — at the old #dcd8d2 the spine
+     and card edges sat at 1.35:1, below the point a hairline is visible at
+     all to a low-vision reader. */
+  --rule: #c4beb4;          /* decorative: card edges, dividers */
   --field: #8f887c;         /* the only thing showing where a control is */
   --accent: #b45309;
   --accent-ink: #ffffff;
@@ -65,7 +68,7 @@
     --paper: #101216;
     --surface: #191c22;
     --surface-sunk: #22262e;
-    --rule: #2c313a;
+    --rule: #3a414d;
     --field: #6b7280;
     --accent: #f0a03c;
     --accent-ink: #1a1204;
@@ -346,6 +349,9 @@ a.btn.backlink {
 }
 a.btn.backlink span, a.btn.backlink { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+.error:focus-visible, .banner:focus-visible {
+  outline: 2px solid var(--focus); outline-offset: 2px;
+}
 .error { color: var(--alert); font-size: var(--text-sm); margin-top: var(--space-3); }
 
 .banner {
@@ -377,8 +383,15 @@ a.btn.backlink span, a.btn.backlink { overflow: hidden; text-overflow: ellipsis;
 }
 .screen-head .top {
   display: flex; align-items: flex-start; gap: var(--space-3);
+  /* At 200% text the trip name and Manage cannot both fit on any phone width,
+     and without this the button sits on top of the name — the one thing on the
+     screen you cannot afford to lose. Wrapping drops the button below it. */
+  flex-wrap: wrap;
 }
-.screen-head .top .grow { flex: 1; min-width: 0; }
+/* `min-width: 0` lets it shrink; `overflow-wrap` is what actually breaks the
+   string. Same pair as `.row .grow`, and for the same reason: a long unbroken
+   word runs under whatever sits beside it. "Paris" clipped to "Par" at 320px. */
+.screen-head .top .grow { flex: 1 1 60%; min-width: 0; overflow-wrap: anywhere; }
 .screen-head .meta {
   margin: var(--space-1) 0 0;
   color: var(--ink-soft); font-size: var(--text-sm); line-height: var(--lh-sm);

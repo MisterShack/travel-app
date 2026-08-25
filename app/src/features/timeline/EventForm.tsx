@@ -5,6 +5,7 @@ import { api, ApiError } from '@/api/client';
 import { ErrorText, Field, Warnings } from '@/components/Bits';
 import { AirportField, TimezoneField } from './AirportField';
 import { ACTIVITY_KINDS, applyDraft, type ActivityKind } from './draft';
+import { describeRejection } from './fieldErrors';
 import { MODE_COPY } from '@/components/kinds';
 import { PassengerFields } from './PassengerFields';
 import { storedPassengers } from './passengers';
@@ -188,6 +189,33 @@ export function EventFormPage() {
       .catch(() => setError('Could not load this item.'));
   }, [id, kind, isNew]);
 
+  /**
+   * What each schema path is called on this screen — the label the user is
+   * actually looking at, not the field's name in the model. The segment labels
+   * follow the mode, so a Via Rail booking is told to look at "Operator" rather
+   * than at "Airline".
+   */
+  const fieldLabels = (): Record<string, string> => {
+    const common = { confirmationCode: 'Confirmation code', notes: 'Notes' };
+    if (kind === 'segment') {
+      return {
+        ...common,
+        mode: 'How',
+        carrier: MODE_COPY[f.mode].carrier,
+        service: MODE_COPY[f.mode].service,
+        origin: MODE_COPY[f.mode].origin,
+        departure: 'Departs',
+        destination: MODE_COPY[f.mode].destination,
+        arrival: 'Arrives',
+        passengers: 'Who is travelling',
+      };
+    }
+    if (kind === 'lodging') {
+      return { ...common, name: 'Name', address: 'Address', checkIn: 'Check in', checkOut: 'Check out' };
+    }
+    return { ...common, kind: 'What', name: 'Name', location: 'Where', start: 'Starts', end: 'Ends' };
+  };
+
   const payload = (): Record<string, unknown> => {
     const common = { confirmationCode: opt(f.confirmationCode), notes: opt(f.notes) };
     if (kind === 'segment') {
@@ -264,7 +292,18 @@ export function EventFormPage() {
         }
         navigate(`/trips/${tripId}`, { replace: true });
       } catch (err) {
-        setError(err instanceof ApiError ? err.message : 'Could not reach the server.');
+        /**
+         * Name the fields. The server sends the Zod issues with the message,
+         * and each carries the path it failed at, so "Check the journey
+         * details." can become "…Look at From and Arrives." — which is the
+         * difference between an error a listener can act on and one they have
+         * to hunt for (WCAG 3.3.1).
+         */
+        setError(
+          err instanceof ApiError
+            ? describeRejection(err.message, err.issues, fieldLabels())
+            : 'Could not reach the server.',
+        );
         setBusy(false);
       }
     })();
