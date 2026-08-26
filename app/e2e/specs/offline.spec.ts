@@ -59,7 +59,7 @@ test.describe('with no network', () => {
     // the design rather than a gap.
     await page.goto(`/trips/${trip.id}`);
     await expect(page.getByRole('link', { name: 'Journey: TAP TP442' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Stay: Hotel Lutetia' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Stay: Check in — Hotel Lutetia' })).toBeVisible();
 
     // Back to the list, still online, so the list is cached too.
     await page.getByRole('link', { name: 'Waypoint' }).click();
@@ -85,7 +85,7 @@ test.describe('with no network', () => {
 
     // The itinerary itself, which is the whole point.
     await expect(page.getByRole('link', { name: 'Journey: TAP TP442' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Stay: Hotel Lutetia' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Stay: Check in — Hotel Lutetia' })).toBeVisible();
 
     /**
      * Phase 8's directions survive too, and this is the case that makes the

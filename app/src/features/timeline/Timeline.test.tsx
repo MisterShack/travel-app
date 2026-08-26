@@ -109,17 +109,19 @@ describe('Timeline', () => {
   });
 
   it('shows the date on an end that falls on another day', () => {
-    // "15:00 -> 11:00" reads as a six-hour hotel stay when it is eight nights.
+    // "15:00 -> 11:00" reads as a six-hour flight when it lands the next day.
+    // Segments are not split, so the end date is still carried on the one row.
     draw([
       item({
-        kind: 'lodging',
-        title: 'Hotel Bairro Alto',
-        startAt: '2026-09-10T14:00:00.000Z',
-        endAt: '2026-09-18T10:00:00.000Z',
+        kind: 'segment',
+        title: 'TAP TP442',
+        mode: 'air',
+        startAt: '2026-09-10T22:00:00.000Z',
+        endAt: '2026-09-11T06:00:00.000Z',
         endTimezone: 'Europe/Lisbon',
       }),
     ]);
-    expect(screen.getByText(/18 Sep|Sep 18/)).toBeInTheDocument();
+    expect(screen.getByText(/11 Sep|Sep 11/)).toBeInTheDocument();
   });
 
   it('groups events under the day of their own zone', () => {
@@ -228,5 +230,134 @@ describe('Directions (PLAN-V3 §2, Phase 8)', () => {
     const link = screen.getByRole('link', { name: /Directions to/ });
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+});
+
+/**
+ * A stay is one booking but two things to do, and they can be a week apart.
+ * Rendered as one row it appeared only under the check-in day — on the morning
+ * the traveller actually had to be out of the room, the timeline said nothing.
+ */
+describe('a stay splits into check-in and check-out', () => {
+  const stay = (over: Partial<TimelineItem> = {}) =>
+    item({
+      kind: 'lodging',
+      id: 'l1',
+      title: 'Hotel Bairro Alto',
+      address: 'Praça Luís de Camões, Lisboa',
+      startAt: '2026-09-10T14:00:00.000Z',
+      startLocal: '2026-09-10T15:00',
+      startTimezone: 'Europe/Lisbon',
+      endAt: '2026-09-18T10:00:00.000Z',
+      endLocal: '2026-09-18T11:00',
+      endTimezone: 'Europe/Lisbon',
+      ...over,
+    });
+
+  it('renders a row at each end, under its own day', () => {
+    draw([stay()]);
+
+    expect(screen.getByRole('link', { name: /Check in — Hotel Bairro Alto/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Check out — Hotel Bairro Alto/ })).toBeInTheDocument();
+
+    // Two day headings, eight days apart, from a single booking.
+    const days = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+    expect(days).toHaveLength(2);
+    expect(days[0]).toMatch(/10 September|September 10/);
+    expect(days[1]).toMatch(/18 September|September 18/);
+  });
+
+  it('shows each row at its own end of the booking, not the whole span', () => {
+    draw([stay()]);
+    // Check-in at 15:00 Lisbon, check-out at 11:00 — and neither row carries the
+    // "→ 11:00" that made an eight-night stay read as a six-hour one.
+    expect(screen.getByText('15:00')).toBeInTheDocument();
+    expect(screen.getByText('11:00')).toBeInTheDocument();
+    expect(screen.queryByText(/→/)).toBeNull();
+  });
+
+  /** Splitting moves the check-out away, so the length is stated where it went. */
+  it('states the length on the check-in row', () => {
+    draw([stay()]);
+    expect(screen.getByText('8 nights')).toBeInTheDocument();
+  });
+
+  it('says "night" rather than "nights" for a single night', () => {
+    draw([
+      stay({
+        endAt: '2026-09-11T10:00:00.000Z',
+        endLocal: '2026-09-11T11:00',
+      }),
+    ]);
+    expect(screen.getByText('1 night')).toBeInTheDocument();
+  });
+
+  /**
+   * A day-use booking is one row. Two rows on a single afternoon is noise — the
+   * split exists to put a reminder on a *later* day.
+   */
+  it('does not split a stay that checks out the day it checked in', () => {
+    draw([
+      stay({
+        endAt: '2026-09-10T20:00:00.000Z',
+        endLocal: '2026-09-10T21:00',
+      }),
+    ]);
+    expect(screen.getByRole('link', { name: /^Stay:s*Hotel Bairro Alto$/ })).toBeInTheDocument();
+    expect(screen.queryByText(/Check in|Check out/)).toBeNull();
+  });
+
+  /**
+   * The cache can hold a row written by an older build. A stay with no
+   * check-out must render as one row rather than throwing.
+   */
+  it('does not split a stay with no recorded check-out', () => {
+    draw([stay({ endAt: null, endLocal: null, endTimezone: null })]);
+    expect(screen.getByRole('link', { name: /^Stay:s*Hotel Bairro Alto$/ })).toBeInTheDocument();
+  });
+
+  /**
+   * One Directions link per stay, on the row where it is any use. At check-out
+   * the traveller is standing in the building, and two identical links days
+   * apart is what a screen reader's list of links would have to read out.
+   */
+  it('offers directions on the check-in row only', () => {
+    draw([stay()]);
+    const links = screen.getAllByRole('link', { name: /Directions to Hotel Bairro Alto/ });
+    expect(links).toHaveLength(1);
+  });
+
+  it('badges each row with its own zone', () => {
+    // Checked in in Lisbon, checked out after the booking's zone was corrected
+    // to Madrid: each row is on its own clock, and home is neither.
+    draw(
+      [stay({ endTimezone: 'Europe/Madrid', endPlace: null })],
+      'America/Toronto',
+    );
+    expect(screen.getByText('Lisbon')).toBeInTheDocument();
+    expect(screen.getByText('Madrid')).toBeInTheDocument();
+  });
+
+  it('sorts the check-out row by its own instant, not the booking\'s start', () => {
+    // An activity on the 12th falls between the two ends of the stay, so a
+    // check-out left sorted beside its check-in would render before it.
+    draw([
+      stay(),
+      item({
+        id: 'a9',
+        kind: 'activity',
+        title: 'Museum',
+        startAt: '2026-09-12T09:00:00.000Z',
+        startLocal: '2026-09-12T10:00',
+      }),
+    ]);
+    const titles = screen
+      .getAllByRole('link', { name: /^(Stay|Activity):/ })
+      .map((a) => a.textContent);
+    expect(titles).toEqual([
+      'Stay: Check in — Hotel Bairro Alto',
+      'Activity: Museum',
+      'Stay: Check out — Hotel Bairro Alto',
+    ]);
   });
 });

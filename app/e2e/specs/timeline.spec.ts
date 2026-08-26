@@ -167,14 +167,32 @@ test.describe('adding to a trip', () => {
 
     await page.getByRole('button', { name: /^Add$/ }).click();
     await expect(page).toHaveURL(new RegExp(`/trips/${trip.id}$`));
-    await expect(page.getByRole('link', { name: 'Stay: Hotel Lutetia' })).toBeVisible();
+    /**
+     * A stay is two rows, not one: check-in on the 2nd and check-out on the 5th.
+     * Rendered as a single row it appeared only under the check-in day, so on
+     * the morning the traveller actually had to be out of the room the timeline
+     * said nothing. The length moves to the check-in row, because splitting
+     * takes the check-out time away from it.
+     */
+    await expect(
+      page.getByRole('link', { name: 'Stay: Check in — Hotel Lutetia' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'Stay: Check out — Hotel Lutetia' }),
+    ).toBeVisible();
+    await expect(page.getByText('3 nights')).toBeVisible();
 
     /**
      * Phase 8's hand-off (PLAN-V3 §2). A stay with an address gets a Directions
      * action; the accessible name is the whole phrase, because a
      * visually-hidden suffix computes as "Directionsto Hotel Lutetia" — name
      * computation collapses the leading space.
+     *
+     * Exactly one, on the check-in row. At check-out you are standing in the
+     * building, and two identical links days apart is what a screen reader's
+     * list of links would have to read out.
      */
+    await expect(page.getByRole('link', { name: /Directions to Hotel Lutetia/ })).toHaveCount(1);
     const directions = page.getByRole('link', { name: 'Directions to Hotel Lutetia' });
     await expect(directions).toBeVisible();
     await expect(directions).toHaveAttribute(
