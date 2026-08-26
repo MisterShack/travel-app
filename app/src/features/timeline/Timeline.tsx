@@ -1,4 +1,4 @@
-import { instantToLocal, zoneLabel, type TimelineItem } from '@travel/shared';
+import { formatCalendarDate, instantToLocal, zoneLabel, type TimelineItem } from '@travel/shared';
 import { Link } from 'react-router-dom';
 import { KindChip } from '@/components/Icons';
 import { KIND_LABEL } from '@/components/kinds';
@@ -38,11 +38,7 @@ export function Timeline({ items, homeTimezone }: { items: TimelineItem[]; homeT
       {[...days.entries()].map(([day, dayItems]) => (
         <section className="day" key={day}>
           <h3>
-            {new Date(`${day}T12:00:00Z`).toLocaleDateString(undefined, {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'long',
-            })}
+            {formatCalendarDate(day, { weekday: 'long', day: 'numeric', month: 'long' })}
           </h3>
           {/* A list, so assistive tech can say how many events the day holds
               and let the user move between them as items. */}
@@ -93,10 +89,7 @@ function Event({ item, homeTimezone }: { item: TimelineItem; homeTimezone: strin
   const endOnAnotherDay = endLocal !== null && endLocal.slice(0, 10) !== startLocal.slice(0, 10);
   const endDate =
     endOnAnotherDay && endLocal !== null
-      ? new Date(`${endLocal.slice(0, 10)}T12:00:00Z`).toLocaleDateString(undefined, {
-          day: 'numeric',
-          month: 'short',
-        })
+      ? formatCalendarDate(endLocal.slice(0, 10), { day: 'numeric', month: 'short' })
       : null;
 
   const directions = directionsUrl(item.address, PLATFORM);

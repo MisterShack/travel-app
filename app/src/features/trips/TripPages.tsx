@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import type { TimelineItem, TripSummary } from '@travel/shared';
+import { formatCalendarDate, type TimelineItem, type TripSummary } from '@travel/shared';
 import { api, ApiError } from '@/api/client';
 import { useAuth } from '@/auth/useAuth';
 import { ErrorText, Field, Sheet, Skeleton, StaleBanner } from '@/components/Bits';
 import { BackIcon, KindChip, ManageIcon, PlusIcon } from '@/components/Icons';
-import { KIND_LABEL } from '@/components/kinds';
-import { tripStatus } from '@/features/trips/status';
+import { countedKindLabel } from '@/components/kinds';
+import { hasEnded, tripStatus } from '@/features/trips/status';
 import { loadTimeline, loadTrip, loadTrips, type Loaded } from '@/data/repository';
 import { Timeline } from '@/features/timeline/Timeline';
 import { Issues } from '@/features/timeline/Issues';
@@ -57,14 +57,10 @@ const ADD_OPTIONS = [
   },
 ];
 
-/**
- * A date range, rendered in the reader's locale. Noon UTC avoids the classic
- * off-by-one where parsing a bare date as midnight UTC shows the previous day
- * to anyone west of Greenwich.
- */
+/** A date range, rendered in the reader's locale. */
 function formatRange(startDate: string, endDate: string): string {
   const fmt = (d: string, withYear: boolean) =>
-    new Date(`${d}T12:00:00Z`).toLocaleDateString(undefined, {
+    formatCalendarDate(d, {
       day: 'numeric',
       month: 'short',
       ...(withYear ? { year: 'numeric' } : {}),
@@ -83,7 +79,7 @@ function Tallies({ items }: { items: TimelineItem[] }) {
       {counts.map(([kind, n]) => (
         <span className={`tally kind-${kind}`} key={kind}>
           <span className="dot" aria-hidden="true" />
-          <b>{n}</b> {n === 1 ? KIND_LABEL[kind].toLowerCase() : `${KIND_LABEL[kind].toLowerCase()}s`}
+          <b>{n}</b> {countedKindLabel(kind, n)}
         </span>
       ))}
     </div>
@@ -107,9 +103,10 @@ export function TripListPage() {
   if (error) return <p className="error">{error}</p>;
   if (!state) return <Skeleton rows={3} label="Loading your trips" />;
 
-  const now = new Date().toISOString().slice(0, 10);
-  const upcoming = state.data.filter((t) => t.endDate >= now);
-  const past = state.data.filter((t) => t.endDate < now);
+  // "Ended" is asked of each trip in its *own* home zone — the same question the
+  // status badge on the card answers, so the two cannot disagree.
+  const upcoming = state.data.filter((t) => !hasEnded(t));
+  const past = state.data.filter((t) => hasEnded(t));
 
   return (
     <>

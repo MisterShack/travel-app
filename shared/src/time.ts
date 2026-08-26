@@ -172,3 +172,32 @@ export function zoneLabel(timeZone: string): string {
 export function minutesBetween(from: string, to: string): number {
   return Math.round((Date.parse(to) - Date.parse(from)) / 60_000);
 }
+
+/**
+ * Renders a bare `YYYY-MM-DD` calendar date in the reader's locale.
+ *
+ * A trip's dates, and the heading over a day of the timeline, are *calendar
+ * dates* rather than instants — the 3rd is the 3rd wherever you read it from.
+ * The trap is that `new Date('2026-09-03')` parses as midnight **UTC**, and
+ * `toLocaleDateString` then renders that instant in the reader's own zone,
+ * showing the 2nd to everyone west of Greenwich.
+ *
+ * Four call sites worked around that by parsing at noon UTC instead, which moves
+ * the instant far enough from midnight that most offsets cannot drag it across a
+ * date boundary. *Most.* Pacific/Kiritimati is UTC+14, where noon UTC is 02:00
+ * the following day — so the workaround reintroduced the very off-by-one it was
+ * there to prevent, in the other direction.
+ *
+ * Formatting in UTC explicitly is exact for every zone, which is why the caller
+ * does not get to choose one: `timeZone` is overridden rather than merged. A
+ * calendar date has no zone to be rendered in, and offering the option would
+ * only let a caller reopen the bug.
+ */
+export function formatCalendarDate(
+  date: string,
+  options: Intl.DateTimeFormatOptions,
+  locale?: string,
+): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new RangeError(`Not a calendar date: ${date}`);
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString(locale, { ...options, timeZone: 'UTC' });
+}

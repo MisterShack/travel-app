@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { TripSummary } from '@travel/shared';
+import { formatCalendarDate, type TripSummary } from '@travel/shared';
 import { api, ApiError } from '@/api/client';
 import { ErrorText, Skeleton } from '@/components/Bits';
 import { useInbox } from '@/data/useInbox';
@@ -104,10 +104,7 @@ function pretty(key: string, value: unknown): string {
   const text = String(value);
   if (/Local$/.test(key) && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(text)) {
     const [date, time] = text.split('T') as [string, string];
-    const shown = new Date(`${date}T12:00:00Z`).toLocaleDateString(undefined, {
-      day: 'numeric',
-      month: 'short',
-    });
+    const shown = formatCalendarDate(date, { day: 'numeric', month: 'short' });
     return `${shown}, ${time}`;
   }
   return text;

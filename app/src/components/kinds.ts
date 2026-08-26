@@ -8,6 +8,26 @@ export const KIND_LABEL: Record<TimelineItem['kind'], string> = {
 };
 
 /**
+ * The plural of each, written down rather than derived.
+ *
+ * English does not pluralise by appending `s`, and the tally row on the trips
+ * list proved it by rendering **"3 activitys"**. Any rule short enough to be
+ * worth inlining is wrong for some noun; this set is three long and closed, so
+ * the honest form is a table. A new kind gets its plural typed in, and the
+ * `Record` will not let it be forgotten.
+ */
+export const KIND_LABEL_PLURAL: Record<TimelineItem['kind'], string> = {
+  segment: 'Journeys',
+  lodging: 'Stays',
+  activity: 'Activities',
+};
+
+/** `3` and `activity` → `activities`, lowercased for use mid-sentence. */
+export function countedKindLabel(kind: TimelineItem['kind'], count: number): string {
+  return (count === 1 ? KIND_LABEL[kind] : KIND_LABEL_PLURAL[kind]).toLowerCase();
+}
+
+/**
  * What each mode is called, and what its operator and service number are called.
  *
  * A train has an operator and a number just as a flight does, but calling them

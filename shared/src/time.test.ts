@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { instantToLocal, localToInstant, minutesBetween, zoneAbbreviation } from './time';
+import {
+  formatCalendarDate,
+  instantToLocal,
+  localToInstant,
+  minutesBetween,
+  zoneAbbreviation,
+} from './time';
 
 describe('localToInstant', () => {
   it('converts a plain winter time', () => {
@@ -116,5 +122,50 @@ describe('zoneAbbreviation', () => {
     const summer = zoneAbbreviation('2026-07-15T12:00:00.000Z', 'Europe/London');
     const winter = zoneAbbreviation('2026-01-15T12:00:00.000Z', 'Europe/London');
     expect(summer).not.toBe(winter);
+  });
+});
+
+describe('formatCalendarDate', () => {
+  // Numeric parts in `en-CA`, which renders them as `YYYY-MM-DD`. Month *names*
+  // move with the platform's ICU version — `en-GB` says both "Sep" and "Sept"
+  // depending on the build — and what is under test here is the date arithmetic,
+  // not the CLDR data underneath it.
+  const DMY = { day: '2-digit', month: '2-digit', year: 'numeric' } as const;
+
+  it('renders the date it was given', () => {
+    expect(formatCalendarDate('2026-09-03', DMY, 'en-CA')).toBe('2026-09-03');
+  });
+
+  it('renders the first of a month, where an off-by-one crosses into another month', () => {
+    expect(formatCalendarDate('2026-09-01', DMY, 'en-CA')).toBe('2026-09-01');
+  });
+
+  it('renders new year, where an off-by-one crosses into another year', () => {
+    expect(formatCalendarDate('2026-01-01', DMY, 'en-CA')).toBe('2026-01-01');
+  });
+
+  /**
+   * The guarantee that makes this safe to share. A calendar date has no zone to
+   * be rendered in, so the caller does not get to supply one — and Kiritimati at
+   * UTC+14 is precisely the zone that broke the noon-UTC workaround this
+   * replaced, with Midway at UTC-11 the other end of the range.
+   */
+  it('ignores a caller-supplied timeZone rather than merging it', () => {
+    expect(
+      formatCalendarDate('2026-09-03', { ...DMY, timeZone: 'Pacific/Kiritimati' }, 'en-CA'),
+    ).toBe('2026-09-03');
+    expect(formatCalendarDate('2026-09-03', { ...DMY, timeZone: 'Pacific/Midway' }, 'en-CA')).toBe(
+      '2026-09-03',
+    );
+  });
+
+  it('carries the weekday through, which the timeline day heading asks for', () => {
+    expect(formatCalendarDate('2026-09-03', { weekday: 'long' }, 'en-CA')).toBe('Thursday');
+  });
+
+  it('rejects anything that is not a bare calendar date', () => {
+    expect(() => formatCalendarDate('2026-09-03T10:00', DMY)).toThrow(RangeError);
+    expect(() => formatCalendarDate('2026-9-3', DMY)).toThrow(RangeError);
+    expect(() => formatCalendarDate('not a date', DMY)).toThrow(RangeError);
   });
 });
