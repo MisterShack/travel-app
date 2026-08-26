@@ -3,7 +3,7 @@ import type { PreferencesPatch } from '@travel/shared';
 import { api, ApiError, OfflineError } from '@/api/client';
 import { AuthContext, type AuthState, type User } from './context';
 import { clearCache } from '@/data/cache';
-import { followSystemTheme, paintTheme, rememberTheme } from '@/theme';
+import { followSystemTheme, paintTheme, rememberTheme, storedTheme } from '@/theme';
 
 
 
@@ -66,17 +66,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * this is the correction rather than the first paint — it matters on the
    * first sign-in on a device, and when the setting is changed on another one.
    *
-   * While the preference is `system` the OS is followed live, so flipping the
-   * phone to dark at sunset repaints a page that is already open. An explicit
-   * choice drops the listener rather than letting it repaint over the choice.
+   * While the theme is `system` the OS is followed live, so flipping the phone
+   * to dark at sunset repaints a page that is already open. An explicit choice
+   * drops the listener rather than letting it repaint over the choice.
    */
-  const theme = user?.preferences.theme ?? 'system';
+  const accountTheme = user?.preferences.theme ?? null;
   useEffect(() => {
+    /*
+     * `null` is "no account answer", which is **not** the same as `system`.
+     * Conflating them meant signing out of an account set to light snapped the
+     * sign-in screen back to the browser default — and, worse, wrote `system`
+     * over the mirror on the way out, so the next cold start lost the
+     * preference too and the flash the boot script exists to prevent came back.
+     *
+     * Signed out, and in the moment before `/me` lands, the device's own memory
+     * is the better answer: it is what the boot script already painted, so this
+     * effect agrees with the first frame instead of fighting it.
+     */
+    const theme = accountTheme ?? storedTheme();
     paintTheme(theme);
-    rememberTheme(theme);
+    // Only an account answer updates the mirror. Nothing else knows better.
+    if (accountTheme !== null) rememberTheme(accountTheme);
     if (theme !== 'system') return;
     return followSystemTheme(() => paintTheme('system'));
-  }, [theme]);
+  }, [accountTheme]);
 
   const value = useMemo<AuthState>(
     () => ({ user, status, offline, signIn, signOut, refresh, updatePreferences }),

@@ -48,6 +48,24 @@ export function paintTheme(theme: Theme): void {
   meta?.setAttribute('content', resolved === 'dark' ? '#101216' : '#faf9f7');
 }
 
+/**
+ * What this device was last told to paint, as the boot script reads it.
+ *
+ * Signed out there is no account answer, and `system` is the wrong stand-in for
+ * one: it repaints the sign-in screen to the browser default the moment someone
+ * signs out of an account set to light. This is the **device's** memory, and it
+ * outlives the session deliberately — a theme is a look, not something the next
+ * person at a shared browser learns anything from.
+ */
+export function storedTheme(): Theme {
+  try {
+    const value = localStorage.getItem(THEME_KEY);
+    return value === 'light' || value === 'dark' || value === 'system' ? value : 'system';
+  } catch {
+    return 'system';
+  }
+}
+
 /** Mirrors the account's answer for the next cold start. */
 export function rememberTheme(theme: Theme): void {
   try {

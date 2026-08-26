@@ -1,4 +1,11 @@
-import { test, expect, createTrip } from '../fixtures/test';
+import {
+  test,
+  expect,
+  createTrip,
+  freshEmail,
+  registerAndVerify,
+  storageStateFor,
+} from '../fixtures/test';
 
 /**
  * Account-level display preferences: the theme and the time format.
@@ -131,5 +138,44 @@ test.describe('the time format preference', () => {
      * file the event under the wrong day — or under none.
      */
     await expect(page.locator('.day > h3')).toHaveText(/March 3|3 March/);
+  });
+});
+
+/**
+ * Signing out must not undo the theme.
+ *
+ * Its own account, because the assertion is about signing out and the worker's
+ * shared session is revoked server-side when it does — every later spec in the
+ * worker would fail on a session this one ended.
+ */
+test.describe('signing out', () => {
+  test('leaves the theme this device was set to', async ({ browser, request, playwright, baseURL }) => {
+    const account = await registerAndVerify(request, freshEmail('signout'));
+    const statePath = await storageStateFor(playwright, baseURL, account, 'signout');
+
+    // A dark device, so "reverted to the browser default" is visible as dark.
+    const context = await browser.newContext({
+      storageState: statePath,
+      colorScheme: 'dark',
+      locale: 'en-US',
+    });
+    const page = await context.newPage();
+
+    await page.goto('/account');
+    await page.getByLabel('Theme').selectOption({ label: 'Light' });
+    await expect.poll(async () => (await painted(page)).background).toBe(PAPER_LIGHT);
+
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible();
+
+    // The sign-in screen keeps the look the device was set to, rather than
+    // snapping back to the browser default the moment the account goes away.
+    expect(await painted(page)).toEqual({ attribute: 'light', background: PAPER_LIGHT });
+
+    // And the mirror survives, or the next cold start paints dark before /me
+    // answers and the reader sees the flash the boot script exists to prevent.
+    expect(await page.evaluate(() => localStorage.getItem('waypoint.theme'))).toBe('light');
+
+    await context.close();
   });
 });
