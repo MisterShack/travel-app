@@ -5,10 +5,18 @@
  * The light palette is defined on bare :root so it is never conditional; dark
  * only overrides the tokens. A page whose only colour definition lives inside a
  * media query renders unstyled wherever that query does not match.
+ *
+ * Which palette applies is chosen by [data-theme], set before the first frame
+ * by the boot script in index.html and kept current by src/theme.ts. That
+ * attribute is always a concrete light or dark — never "system", never absent —
+ * so each token is defined exactly once per palette and there is no
+ * prefers-color-scheme block to drift out of sync with a selector saying the
+ * same thing. Safe to rely on because this is a React SPA: without the script
+ * that sets the attribute there is nothing to paint at all.
  */
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
   /* Colour — BRAND.md §3. Saturation is reserved for meaning. */
   --ink: #16181d;
@@ -61,9 +69,9 @@
   --measure: 34rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ink: #eceef2;
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --ink: #eceef2;
     --ink-soft: #98a2b3;
     --paper: #101216;
     --surface: #191c22;
@@ -78,10 +86,9 @@
     --warn-bg: #2a1f10;
     --alert: #ff8a8a;
     --focus: #f0a03c;
-    --kind-segment: #7fb3e0;
-    --kind-lodging: #7fc9a3;
-    --kind-activity: #bda1e0;
-  }
+  --kind-segment: #7fb3e0;
+  --kind-lodging: #7fc9a3;
+  --kind-activity: #bda1e0;
 }
 
 * { box-sizing: border-box; }

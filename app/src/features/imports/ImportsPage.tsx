@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { formatCalendarDate, type TripSummary } from '@travel/shared';
+import { formatCalendarDate, formatTimeOfDay, type TripSummary } from '@travel/shared';
 import { api, ApiError } from '@/api/client';
 import { ErrorText, Skeleton } from '@/components/Bits';
 import { useInbox } from '@/data/useInbox';
+import { useHour12 } from '@/prefs/useHour12';
 
 /**
  * The booking-import review queue (PLAN.md §4, §6.8).
@@ -54,7 +55,7 @@ const appliedOf = (row: ImportRow): number[] => {
 };
 
 /** "YWG → YOW, 10 Sep 07:15" — enough to tell an outbound from a return. */
-function legLabel(leg: Leg, index: number): string {
+function legLabel(leg: Leg, index: number, hour12: boolean): string {
   const text = (key: string) => (typeof leg[key] === 'string' ? (leg[key] as string) : '');
   const from = text('origin');
   const to = text('destination');
@@ -66,7 +67,7 @@ function legLabel(leg: Leg, index: number): string {
   const number = text('service');
   return (
     `${number === '' ? '' : `${number} `}${from || '?'} → ${to || '?'}` +
-    (when === '' ? '' : `, ${pretty('departureLocal', when)}`)
+    (when === '' ? '' : `, ${pretty('departureLocal', when, hour12)}`)
   );
 }
 
@@ -100,12 +101,12 @@ const LABEL: Record<string, string> = {
 };
 
 /** `2026-09-10T10:00` → a readable local date and time. */
-function pretty(key: string, value: unknown): string {
+function pretty(key: string, value: unknown, hour12: boolean): string {
   const text = String(value);
   if (/Local$/.test(key) && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(text)) {
-    const [date, time] = text.split('T') as [string, string];
+    const [date] = text.split('T') as [string, string];
     const shown = formatCalendarDate(date, { day: 'numeric', month: 'short' });
-    return `${shown}, ${time}`;
+    return `${shown}, ${formatTimeOfDay(text, hour12)}`;
   }
   return text;
 }
@@ -168,6 +169,7 @@ function ImportCard({
   trips: TripSummary[];
   onChange: () => void;
 }) {
+  const hour12 = useHour12();
   const navigate = useNavigate();
   const [source, setSource] = useState<string | null>(null);
   const [sourceError, setSourceError] = useState('');
@@ -254,7 +256,7 @@ function ImportCard({
             .map(([k, v]) => (
               <div key={k}>
                 <dt>{LABEL[k] ?? k}</dt>
-                <dd>{pretty(k, v)}</dd>
+                <dd>{pretty(k, v, hour12)}</dd>
               </div>
             ))}
           {people.length > 0 && (
@@ -276,7 +278,7 @@ function ImportCard({
         <ul className="legs">
           {legs.map((leg, i) => (
             <li key={i}>
-              <span className="grow">{legLabel(leg, i)}</span>
+              <span className="grow">{legLabel(leg, i, hour12)}</span>
               {applied.includes(i) ? (
                 <span className="zone">Added</span>
               ) : (

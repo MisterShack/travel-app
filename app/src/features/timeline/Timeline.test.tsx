@@ -30,10 +30,15 @@ function item(over: Partial<TimelineItem>): TimelineItem {
   };
 }
 
-const draw = (items: TimelineItem[], home = 'Europe/Lisbon') =>
+/**
+ * `hour12` defaults to false because 24-hour is what the app has always shown
+ * and what every assertion below was written against. The preference has its
+ * own tests rather than being threaded through all of these.
+ */
+const draw = (items: TimelineItem[], home = 'Europe/Lisbon', hour12 = false) =>
   render(
     <MemoryRouter>
-      <Timeline items={items} homeTimezone={home} />
+      <Timeline items={items} homeTimezone={home} hour12={hour12} />
     </MemoryRouter>,
   );
 
@@ -359,5 +364,59 @@ describe('a stay splits into check-in and check-out', () => {
       'Activity: Museum',
       'Stay: Check out — Hotel Bairro Alto',
     ]);
+  });
+});
+
+describe('the time format preference', () => {
+  const at19 = () =>
+    item({
+      title: 'Dinner',
+      startAt: '2026-09-10T18:30:00.000Z',
+      startLocal: '2026-09-10T19:30',
+      startTimezone: 'Europe/Lisbon',
+    });
+
+  it('writes 24-hour by default, which is what the app has always shown', () => {
+    draw([at19()]);
+    expect(screen.getByText('19:30')).toBeInTheDocument();
+  });
+
+  it('writes 12-hour when the reader asked for it', () => {
+    draw([at19()], 'Europe/Lisbon', true);
+    expect(screen.getByText(/7:30\s*(PM|p\.m\.)/i)).toBeInTheDocument();
+    expect(screen.queryByText('19:30')).toBeNull();
+  });
+
+  /**
+   * The preference is display only. Grouping reads the first ten characters of
+   * the canonical string, so a formatted time leaking into it would file the
+   * event under the wrong day — or under no day at all.
+   */
+  it('does not disturb the day the event is grouped under', () => {
+    draw([at19()], 'Europe/Lisbon', true);
+    const days = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+    expect(days).toHaveLength(1);
+    expect(days[0]).toMatch(/10 September|September 10/);
+  });
+
+  it('formats both ends of a journey, not just the departure', () => {
+    draw(
+      [
+        item({
+          kind: 'segment',
+          title: 'TAP TP442',
+          mode: 'air',
+          startAt: '2026-09-10T18:30:00.000Z',
+          startLocal: '2026-09-10T19:30',
+          endAt: '2026-09-10T20:00:00.000Z',
+          endLocal: '2026-09-10T21:00',
+          endTimezone: 'Europe/Lisbon',
+        }),
+      ],
+      'Europe/Lisbon',
+      true,
+    );
+    expect(screen.getByText(/7:30\s*(PM|p\.m\.)/i)).toBeInTheDocument();
+    expect(screen.getByText(/9:00\s*(PM|p\.m\.)/i)).toBeInTheDocument();
   });
 });

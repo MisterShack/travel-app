@@ -6,8 +6,11 @@ import { z } from 'zod';
 import {
   forgotInputSchema,
   loginInputSchema,
+  preferencesPatchSchema,
   registerInputSchema,
   resetInputSchema,
+  type TimeFormat,
+  type Theme,
 } from '@travel/shared';
 import type { Db } from '../db/client';
 import { authTokens, users } from '../db/schema';
@@ -232,15 +235,57 @@ export function createAuthRoutes(deps: AuthDeps) {
     return c.json({ ok: true });
   });
 
+  /**
+   * The account as the client may see it: never the password hash, and never a
+   * column added later that nobody thought about. Written once so `/me`, login
+   * and a preference change cannot answer with three different shapes.
+   */
+  const publicUser = (user: {
+    id: string;
+    email: string;
+    emailVerifiedAt: string | null;
+    timeFormat: TimeFormat;
+    theme: Theme;
+  }) => ({
+    id: user.id,
+    email: user.email,
+    emailVerifiedAt: user.emailVerifiedAt,
+    preferences: { timeFormat: user.timeFormat, theme: user.theme },
+  });
+
   /* -- me ---------------------------------------------------------------- */
 
   app.get('/me', async (c) => {
     const token = getCookie(c, env.SESSION_COOKIE_NAME);
     const user = token ? await resolveSession(db, token, now()) : null;
     if (!user) return c.json({ error: 'unauthenticated' }, 401);
-    return c.json({
-      user: { id: user.id, email: user.email, emailVerifiedAt: user.emailVerifiedAt },
-    });
+    return c.json({ user: publicUser(user) });
+  });
+
+  /**
+   * Display preferences (PLAN.md §4 — the server never trusts the client).
+   *
+   * A patch rather than a put: the two settings are independent and the Account
+   * screen changes one at a time, so requiring both would make each control
+   * capable of silently reverting the other.
+   */
+  app.patch('/me/preferences', async (c) => {
+    const token = getCookie(c, env.SESSION_COOKIE_NAME);
+    const user = token ? await resolveSession(db, token, now()) : null;
+    if (!user) return c.json({ error: 'unauthenticated' }, 401);
+
+    const body = preferencesPatchSchema.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) {
+      return c.json(badRequest('That is not a display preference this app has.'), 400);
+    }
+
+    const [updated] = await db
+      .update(users)
+      .set({ ...body.data, updatedAt: now().toISOString() })
+      .where(eq(users.id, user.id))
+      .returning();
+
+    return c.json({ user: publicUser(updated ?? user) });
   });
 
   /* -- forgot ------------------------------------------------------------ */

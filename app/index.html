@@ -3,8 +3,46 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#faf9f7" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#101216" media="(prefers-color-scheme: dark)" />
+    <!-- One tag, set by the boot script below: the account may force a theme
+         the OS disagrees with, and a media-scoped pair cannot express that. -->
+    <meta name="theme-color" content="#faf9f7" />
+    <script>
+      /*
+       * Paints the theme before the first frame.
+       *
+       * The account's preference does not arrive until /me answers, so the last
+       * known answer is mirrored into localStorage and read here. Inline and in
+       * the head deliberately: a module script is deferred, so by the time it
+       * runs the page has already painted and a reader who forces light on a
+       * dark phone has seen a dark flash on every cold start.
+       *
+       * data-theme is always concrete — light or dark, never "system" and never
+       * absent — which is what lets styles.css define each token once. See
+       * src/theme.ts, which owns the same rule for the running app.
+       */
+      (function () {
+        var resolved = 'light';
+        try {
+          var stored = localStorage.getItem('waypoint.theme');
+          resolved =
+            stored === 'light' || stored === 'dark'
+              ? stored
+              : window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light';
+        } catch (e) {
+          /* Storage blocked. The OS answer is what "system" would have given. */
+          try {
+            resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          } catch (e2) {
+            /* Nothing left to ask; light is the bare :root palette. */
+          }
+        }
+        document.documentElement.setAttribute('data-theme', resolved);
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', resolved === 'dark' ? '#101216' : '#faf9f7');
+      })();
+    </script>
     <!-- iOS needs this to run standalone from the Home Screen, which is also
          the only way Web Push works there at all (PLAN.md §7). -->
     <meta name="apple-mobile-web-app-capable" content="yes" />

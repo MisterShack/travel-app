@@ -1,4 +1,10 @@
-import { formatCalendarDate, instantToLocal, zoneLabel, type TimelineItem } from '@travel/shared';
+import {
+  formatCalendarDate,
+  formatTimeOfDay,
+  instantToLocal,
+  zoneLabel,
+  type TimelineItem,
+} from '@travel/shared';
 import { Link } from 'react-router-dom';
 import { KindChip } from '@/components/Icons';
 import { KIND_LABEL } from '@/components/kinds';
@@ -100,7 +106,16 @@ const TITLE_PREFIX: Record<Occurrence, string> = {
   'check-out': 'Check out — ',
 };
 
-export function Timeline({ items, homeTimezone }: { items: TimelineItem[]; homeTimezone: string }) {
+export function Timeline({
+  items,
+  homeTimezone,
+  hour12,
+}: {
+  items: TimelineItem[];
+  homeTimezone: string;
+  /** Written as 12-hour, per the reader's account preference. */
+  hour12: boolean;
+}) {
   if (items.length === 0) {
     return <p className="empty">Nothing on this trip yet. Add a flight, somewhere to stay, or something to do.</p>;
   }
@@ -143,7 +158,7 @@ export function Timeline({ items, homeTimezone }: { items: TimelineItem[]; homeT
                 className={`event-item kind-${row.item.kind}`}
                 key={`${row.item.kind}:${row.item.id}:${row.occurrence}`}
               >
-                <Event row={row} homeTimezone={homeTimezone} />
+                <Event row={row} homeTimezone={homeTimezone} hour12={hour12} />
               </li>
             ))}
           </ul>
@@ -153,7 +168,15 @@ export function Timeline({ items, homeTimezone }: { items: TimelineItem[]; homeT
   );
 }
 
-function Event({ row, homeTimezone }: { row: Row; homeTimezone: string }) {
+function Event({
+  row,
+  homeTimezone,
+  hour12,
+}: {
+  row: Row;
+  homeTimezone: string;
+  hour12: boolean;
+}) {
   const { item, occurrence } = row;
   /** A split row shows one end of the booking; the other end has a row of its own. */
   const split = occurrence !== 'whole';
@@ -164,8 +187,8 @@ function Event({ row, homeTimezone }: { row: Row; homeTimezone: string }) {
 
   // For a whole row this is the start, unchanged: `row.at` and `row.timezone`
   // are the item's own start unless the row was split off the other end.
-  const start = instantToLocal(row.at, row.timezone).slice(11);
-  const end = split ? null : (endLocal?.slice(11) ?? null);
+  const start = formatTimeOfDay(instantToLocal(row.at, row.timezone), hour12);
+  const end = split || endLocal === null ? null : formatTimeOfDay(endLocal, hour12);
 
   /**
    * How long the stay runs, shown on the check-in row.

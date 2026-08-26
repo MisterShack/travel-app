@@ -7,6 +7,7 @@ import { ErrorText, Field, Sheet, Skeleton, StaleBanner } from '@/components/Bit
 import { BackIcon, KindChip, ManageIcon, PlusIcon } from '@/components/Icons';
 import { countedKindLabel } from '@/components/kinds';
 import { hasEnded, tripStatus } from '@/features/trips/status';
+import { useHour12 } from '@/prefs/useHour12';
 import { loadTimeline, loadTrip, loadTrips, type Loaded } from '@/data/repository';
 import { Timeline } from '@/features/timeline/Timeline';
 import { Issues } from '@/features/timeline/Issues';
@@ -286,6 +287,7 @@ export function TripDetailPage() {
   const { detail, timeline, error } = useTrip(tripId);
   const [adding, setAdding] = useState(false);
   const closeSheet = useCallback(() => setAdding(false), []);
+  const hour12 = useHour12();
 
   if (error) return <p className="error">{error}</p>;
   if (!detail || !timeline) return <Skeleton rows={4} label="Loading this trip" />;
@@ -325,7 +327,7 @@ export function TripDetailPage() {
 
       <Issues items={timeline.data} trip={trip} />
 
-      <Timeline items={timeline.data} homeTimezone={trip.homeTimezone} />
+      <Timeline items={timeline.data} homeTimezone={trip.homeTimezone} hour12={hour12} />
 
       {adding && (
         <Sheet title="Add to trip" onClose={closeSheet}>

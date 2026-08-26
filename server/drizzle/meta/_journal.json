@@ -57,6 +57,13 @@
       "when": 1786931305070,
       "tag": "0007_wandering_segments",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1787777003439,
+      "tag": "0008_overrated_snowbird",
+      "breakpoints": true
     }
   ]
 }

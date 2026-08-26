@@ -201,3 +201,51 @@ export function formatCalendarDate(
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new RangeError(`Not a calendar date: ${date}`);
   return new Date(`${date}T00:00:00Z`).toLocaleDateString(locale, { ...options, timeZone: 'UTC' });
 }
+
+/**
+ * Whether this device writes times as 12-hour.
+ *
+ * **Client-side only.** On the server this reads the container's locale, which
+ * is not the traveller's — `resolveHour12` documents why the server passes
+ * `false` instead of calling this.
+ *
+ * Read from `hourCycle` rather than `hour12`: `resolvedOptions().hour12` is
+ * `undefined` unless it was passed in, so testing it directly reports every
+ * locale as 24-hour.
+ */
+export function deviceUses12Hour(locale?: string): boolean {
+  const cycle = new Intl.DateTimeFormat(locale, { hour: 'numeric' }).resolvedOptions().hourCycle;
+  return cycle === 'h11' || cycle === 'h12';
+}
+
+/**
+ * The time of day out of a `YYYY-MM-DDTHH:mm` local wall-clock string.
+ *
+ * **Kept apart from `instantToLocal` on purpose.** That function's output is
+ * not a display string: it is the storage format, the shape
+ * `localDateTimeSchema` validates, and what day-grouping slices its first ten
+ * characters out of. A display preference reaching it would turn "07:30 PM"
+ * into a value the schema rejects and the timeline groups under the wrong day.
+ * So the canonical form stays 24-hour and this renders from it.
+ *
+ * 24-hour is returned as the digits already in the string rather than through
+ * `Intl`, because that is what every reader sees today and a locale-formatted
+ * round trip could only change it.
+ */
+export function formatTimeOfDay(local: string, hour12: boolean, locale?: string): string {
+  const parts = /^\d{4}-\d{2}-\d{2}T(\d{2}):(\d{2})$/.exec(local);
+  if (parts === null) throw new RangeError(`Not a local date-time: ${local}`);
+
+  const hour = parts[1]!;
+  const minute = parts[2]!;
+  if (!hour12) return `${hour}:${minute}`;
+
+  // A fixed date, because only the clock face is being rendered. Formatted in
+  // UTC so the host's own zone cannot shift the hour that was asked for.
+  return new Date(Date.UTC(2000, 0, 1, Number(hour), Number(minute))).toLocaleTimeString(locale, {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'UTC',
+  });
+}

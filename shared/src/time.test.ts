@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  deviceUses12Hour,
   formatCalendarDate,
+  formatTimeOfDay,
   instantToLocal,
   localToInstant,
   minutesBetween,
@@ -167,5 +169,55 @@ describe('formatCalendarDate', () => {
     expect(() => formatCalendarDate('2026-09-03T10:00', DMY)).toThrow(RangeError);
     expect(() => formatCalendarDate('2026-9-3', DMY)).toThrow(RangeError);
     expect(() => formatCalendarDate('not a date', DMY)).toThrow(RangeError);
+  });
+});
+
+describe('formatTimeOfDay', () => {
+  it('writes 24-hour exactly as the canonical string already has it', () => {
+    expect(formatTimeOfDay('2026-09-10T19:30', false)).toBe('19:30');
+    expect(formatTimeOfDay('2026-09-10T00:05', false)).toBe('00:05');
+  });
+
+  it('writes 12-hour with a meridiem', () => {
+    expect(formatTimeOfDay('2026-09-10T19:30', true, 'en-US')).toMatch(/^7:30\s*PM$/);
+    expect(formatTimeOfDay('2026-09-10T07:30', true, 'en-US')).toMatch(/^7:30\s*AM$/);
+  });
+
+  /* The two ends of the clock, where 12-hour conversion usually goes wrong. */
+  it('calls midnight 12 AM and noon 12 PM, not 0 and 12', () => {
+    expect(formatTimeOfDay('2026-09-10T00:00', true, 'en-US')).toMatch(/^12:00\s*AM$/);
+    expect(formatTimeOfDay('2026-09-10T12:00', true, 'en-US')).toMatch(/^12:00\s*PM$/);
+  });
+
+  /**
+   * The reason this is not folded into `instantToLocal`. That function's output
+   * is the storage format, the shape `localDateTimeSchema` validates, and what
+   * day-grouping takes its first ten characters from — a display preference
+   * reaching it would produce a value the schema rejects.
+   */
+  it('leaves the canonical form alone', () => {
+    const canonical = instantToLocal('2026-09-10T18:30:00.000Z', 'Europe/Lisbon');
+    expect(canonical).toBe('2026-09-10T19:30');
+    expect(formatTimeOfDay(canonical, true, 'en-US')).toMatch(/PM$/);
+    // Still parseable as the canonical string it was.
+    expect(instantToLocal('2026-09-10T18:30:00.000Z', 'Europe/Lisbon')).toBe(canonical);
+  });
+
+  it('rejects anything that is not a local date-time', () => {
+    expect(() => formatTimeOfDay('2026-09-10', false)).toThrow(RangeError);
+    expect(() => formatTimeOfDay('19:30', false)).toThrow(RangeError);
+  });
+});
+
+describe('deviceUses12Hour', () => {
+  /*
+   * Read from `hourCycle`, not `hour12`: `resolvedOptions().hour12` is
+   * undefined unless it was passed in, so testing it directly reports every
+   * locale as 24-hour and the preference silently never fires.
+   */
+  it('reads the locale rather than reporting everything as 24-hour', () => {
+    expect(deviceUses12Hour('en-US')).toBe(true);
+    expect(deviceUses12Hour('en-GB')).toBe(false);
+    expect(deviceUses12Hour('fr-FR')).toBe(false);
   });
 });

@@ -1,6 +1,13 @@
 import { createContext } from 'react';
+import type { Preferences, PreferencesPatch } from '@travel/shared';
 
-export type User = { id: string; email: string; emailVerifiedAt: string | null };
+export type User = {
+  id: string;
+  email: string;
+  emailVerifiedAt: string | null;
+  /** Display preferences, stored on the account so they follow the person. */
+  preferences: Preferences;
+};
 
 export type AuthState = {
   user: User | null;
@@ -11,6 +18,8 @@ export type AuthState = {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
+  /** Saves a display preference and adopts the account's answer as returned. */
+  updatePreferences: (patch: PreferencesPatch) => Promise<void>;
 };
 
 /**

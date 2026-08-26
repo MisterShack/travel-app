@@ -10,11 +10,17 @@ afterEach(() => {
 });
 
 const auth = (offline = false): AuthState => ({
-  user: { id: 'u1', email: 'a@example.com', emailVerifiedAt: '2026-08-01T00:00:00.000Z' },
+  user: {
+    id: 'u1',
+    email: 'a@example.com',
+    emailVerifiedAt: '2026-08-01T00:00:00.000Z',
+    preferences: { timeFormat: 'auto' as const, theme: 'system' as const },
+  },
   status: 'ready',
   offline,
   signIn: async () => {},
   signOut: async () => {},
+  updatePreferences: async () => {},
   refresh: async () => {},
 });
 

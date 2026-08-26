@@ -19,6 +19,21 @@ export const users = sqliteTable(
     passwordHash: text('password_hash').notNull(),
     /** Null until the emailed verification link is used. */
     emailVerifiedAt: text('email_verified_at'),
+
+    /*
+     * Display preferences live on the account rather than the device, so they
+     * follow the person between their phone and their laptop. Both default to
+     * following the device, which is what the app did before they existed —
+     * every row that already exists is therefore correct with the default, and
+     * migration 0008 adds no data, only columns.
+     */
+    timeFormat: text('time_format', { enum: ['auto', '12', '24'] })
+      .notNull()
+      .default('auto'),
+    theme: text('theme', { enum: ['system', 'light', 'dark'] })
+      .notNull()
+      .default('system'),
+
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
   },

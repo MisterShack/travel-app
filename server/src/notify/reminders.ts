@@ -1,8 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
-import { instantToLocal, zoneLabel } from '@travel/shared';
+import {
+  formatTimeOfDay,
+  instantToLocal,
+  resolveHour12,
+  zoneLabel,
+  type TimeFormat,
+} from '@travel/shared';
 import type { Db } from '../db/client';
-import { pushSubscriptions, reminders, tripMembers } from '../db/schema';
+import { pushSubscriptions, reminders, tripMembers, users } from '../db/schema';
 
 /**
  * Reminder generation and fan-out (PLAN.md §7).
@@ -51,9 +57,25 @@ export type ReminderSubject = {
  * was scheduled; deriving the text later would let an edit rewrite the history
  * of what was said.
  */
-function compose(subject: ReminderSubject): { title: string; body: string } {
+function compose(
+  subject: ReminderSubject,
+  timeFormat: TimeFormat,
+): { title: string; body: string } {
   const local = instantToLocal(subject.startAt, subject.timezone);
-  const time = local.slice(11);
+  /*
+   * `false` is what `auto` means here. The client resolves it from the reader's
+   * own device; this runs in a datacentre, whose locale is nobody's. So a
+   * reminder is 24-hour unless the traveller asked for 12 by name — which is
+   * also exactly what these messages said before the preference existed.
+   */
+  /*
+   * The locale is pinned rather than left to the host. Unpinned, this reads the
+   * container's default: the same reminder rendered "7:30 p.m." on a Windows
+   * development machine and would have rendered something else again on the
+   * Railway image, so what a traveller reads would have depended on an accident
+   * of the base image. The app's copy is English (BRAND.md), so it says so.
+   */
+  const time = formatTimeOfDay(local, resolveHour12(timeFormat, false), 'en-US');
   const where = subject.place ?? zoneLabel(subject.timezone);
   const noun =
     subject.relatedType === 'segment' ? 'departs' : subject.relatedType === 'lodging' ? 'check-in' : 'starts';
@@ -84,9 +106,15 @@ export async function generateReminders(
   const remindAt = new Date(Date.parse(subject.startAt) - lead * 60_000);
   if (remindAt.getTime() <= now.getTime()) return 0;
 
+  /*
+   * The member's own time format comes back with them, because the body is
+   * written per recipient: one traveller reads "departs at 7:30 PM" and another
+   * on the same booking reads "departs at 19:30".
+   */
   const members = await db
-    .select({ userId: tripMembers.userId })
+    .select({ userId: tripMembers.userId, timeFormat: users.timeFormat })
     .from(tripMembers)
+    .innerJoin(users, eq(users.id, tripMembers.userId))
     .where(and(eq(tripMembers.tripId, subject.tripId), eq(tripMembers.remindersEnabled, 'true')));
   if (members.length === 0) return 0;
 
@@ -99,8 +127,15 @@ export async function generateReminders(
     ).map((r) => r.userId),
   );
 
-  const { title, body } = compose(subject);
   const rows = members.flatMap((m) => {
+    /*
+     * Composed inside the fan-out rather than once above it, so each row carries
+     * the recipient's own wording. Still rendered *now* and stored: a reminder
+     * that has already gone out should read the same as when it was scheduled,
+     * so changing the preference later moves the ones not yet written, not the
+     * ones already queued.
+     */
+    const { title, body } = compose(subject, m.timeFormat);
     const channels: ('email' | 'push')[] = subscribed.has(m.userId) ? ['email', 'push'] : ['email'];
     return channels.map((channel) => ({
       id: `rem_${randomUUID()}`,

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import type { PreferencesPatch } from '@travel/shared';
 import { api, ApiError, OfflineError } from '@/api/client';
 import { AuthContext, type AuthState, type User } from './context';
 import { clearCache } from '@/data/cache';
+import { followSystemTheme, paintTheme, rememberTheme } from '@/theme';
 
 
 
@@ -52,9 +54,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const updatePreferences = useCallback(async (patch: PreferencesPatch) => {
+    const { user: me } = await api.patch<{ user: User }>('/auth/me/preferences', patch);
+    setUser(me);
+  }, []);
+
+  /**
+   * The account's theme, painted whenever it arrives or changes.
+   *
+   * The boot script has already painted whatever the last cold start knew, so
+   * this is the correction rather than the first paint — it matters on the
+   * first sign-in on a device, and when the setting is changed on another one.
+   *
+   * While the preference is `system` the OS is followed live, so flipping the
+   * phone to dark at sunset repaints a page that is already open. An explicit
+   * choice drops the listener rather than letting it repaint over the choice.
+   */
+  const theme = user?.preferences.theme ?? 'system';
+  useEffect(() => {
+    paintTheme(theme);
+    rememberTheme(theme);
+    if (theme !== 'system') return;
+    return followSystemTheme(() => paintTheme('system'));
+  }, [theme]);
+
   const value = useMemo<AuthState>(
-    () => ({ user, status, offline, signIn, signOut, refresh }),
-    [user, status, offline, signIn, signOut, refresh],
+    () => ({ user, status, offline, signIn, signOut, refresh, updatePreferences }),
+    [user, status, offline, signIn, signOut, refresh, updatePreferences],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
