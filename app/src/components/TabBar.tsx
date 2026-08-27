@@ -29,7 +29,17 @@ export function TabBar({ pending }: { pending: number }) {
             </span>
           )}
         </span>
-        <span>Inbox{pending > 0 ? ` (${pending} awaiting review)` : ''}</span>
+        <span>
+          Inbox
+          {/*
+            The count is announced, not drawn twice. The badge riding the icon
+            is `aria-hidden`, so without this a screen reader hears only
+            "Inbox" and the one number on the screen that matters is the one it
+            cannot say. Visually hidden rather than inline: rendered, this read
+            "Inbox (3 awaiting review)" inside a tab a third of a phone wide.
+          */}
+          {pending > 0 && <span className="visually-hidden"> — {pending} awaiting review</span>}
+        </span>
       </NavLink>
       <NavLink to="/account">
         <span className="tabicon-wrap">

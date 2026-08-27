@@ -72,14 +72,23 @@ export function App() {
               Waypoint
             </Link>
           </h1>
-          {/* Navigation lives in the tab bar. The header is a title bar and an
-              offline indicator, nothing else — two navigations competing is how
-              a web page looks. */}
           {offline && (
             <span className="offline-chip" role="status">
               Offline
             </span>
           )}
+          {/*
+            One navigation, in the header, in the DOM — and `position: fixed`
+            takes it out of the header's flow on a phone, where it becomes the
+            bottom bar. That is why it can move without being written twice:
+            two `<nav>`s toggled by a media query would be two things for
+            assistive tech to read and two places to keep a link in step.
+
+            It sits after the offline chip so a keyboard user reaches the
+            wordmark, then the status, then the destinations — and the skip link
+            is there for anyone who wants none of it.
+          */}
+          <TabBar pending={pending} />
         </header>
       )}
 
@@ -151,7 +160,6 @@ export function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
-      {user !== null && <TabBar pending={pending} />}
     </div>
   );
 }
