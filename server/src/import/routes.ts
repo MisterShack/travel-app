@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Db } from '../db/client';
 import { bookingImports, pushSubscriptions, tripMembers, trips, users } from '../db/schema';
+import { storePass } from '../passes/routes';
 import type { Env } from '../env';
 import { rateLimit } from '../middleware/rateLimit';
 import { requireUser, type AuthedVars } from '../middleware/requireUser';
@@ -193,6 +194,45 @@ export function createImportRoutes(deps: ImportDeps) {
         processedAt: at,
         createdAt: at,
       });
+
+      /**
+       * A pass that arrived as an attachment is kept — but only once we know
+       * which trip it belongs to.
+       *
+       * `passes.tripId` is not nullable, and the trip is only known here when
+       * the sender had exactly one candidate (above). That is a real limit
+       * rather than an oversight: an attachment on an email that matched no
+       * trip, or two, is *not* stored, and the review screen still fetches the
+       * original from Resend on demand as it always did. Storing it would mean
+       * a pass belonging to nothing, and a second unowned state to reason about
+       * in the one part of the app that handles files a stranger can send.
+       *
+       * Everything here goes through the same `storePass` the upload route
+       * uses, so an emailed attachment meets the same allowlist, the same
+       * ceiling and the same proof-of-PKPASS. This is the *less* trusted of the
+       * two paths — the inbound address is reachable by anyone (PLAN.md §4) —
+       * so it must not be the one with the weaker check. A refusal is logged
+       * and skipped: one unreadable attachment must not lose the import.
+       */
+      if (tripId !== null) {
+        for (const attachment of attachments) {
+          const stored = await storePass({
+            db,
+            tripId,
+            userId: sender.id,
+            bytes: Buffer.from(attachment.data, 'base64'),
+            filename: attachment.filename,
+            source: 'email',
+            binding: null,
+            at,
+          });
+          if ('error' in stored) {
+            console.info(
+              `Inbound webhook: not keeping ${attachment.filename} — ${stored.body.error}`,
+            );
+          }
+        }
+      }
 
       /**
        * Tell them now, not next time they open the app.

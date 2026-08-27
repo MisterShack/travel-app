@@ -1,4 +1,4 @@
-import { index, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { blob, index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 /**
  * Timestamps are ISO-8601 UTC strings, matching the convention `shared/` uses.
@@ -433,3 +433,67 @@ export const bookingImports = sqliteTable(
 );
 
 export type BookingImportRow = typeof bookingImports.$inferSelect;
+
+/**
+ * Stored boarding passes and tickets.
+ *
+ * **The bytes live in the database, not on the volume**, and that is the whole
+ * reason to prefer a blob to a file here: Litestream replicates SQLite and
+ * knows nothing about the rest of the disk. Passes written beside the database
+ * would be the one thing in the app with no backup path even after the
+ * greenlight turns backups on (ROADMAP.md §1) — and a pass you cannot produce
+ * at a gate is the thing you least want to be the exception. It also means the
+ * file and its row are written in one transaction, so there is no orphan to
+ * reconcile, and there is no path on disk for a filename to be talked into.
+ *
+ * The cost is a database that grows with every pass, which is what
+ * `MAX_PASS_BYTES` and `MAX_PASSES_PER_TRIP` are for.
+ */
+export const passes = sqliteTable(
+  'passes',
+  {
+    id: text('id').primaryKey(),
+    tripId: text('trip_id')
+      .notNull()
+      .references(() => trips.id, { onDelete: 'cascade' }),
+    /** Who put it here. Kept for the audit trail, not for authorisation —
+     *  any member of the trip may read any pass on it. */
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+
+    /**
+     * Polymorphic, exactly as `reminders` is, and for the same reason: three
+     * tables cannot share a foreign key. Both null means the pass belongs to
+     * the trip but to no event yet — the honest state for a ticket that arrived
+     * before anyone added the flight.
+     */
+    relatedType: text('related_type', { enum: ['segment', 'lodging', 'activity'] }),
+    relatedId: text('related_id'),
+
+    filename: text('filename').notNull(),
+    /** Sniffed from the bytes on the way in, never taken from the uploader. */
+    contentType: text('content_type', {
+      enum: ['application/pdf', 'application/vnd.apple.pkpass', 'image/png', 'image/jpeg'],
+    }).notNull(),
+    byteSize: integer('byte_size').notNull(),
+    data: blob('data', { mode: 'buffer' }).notNull(),
+
+    /** Read out of a PKPASS's `pass.json` where there is one. */
+    label: text('label'),
+    barcodeMessage: text('barcode_message'),
+    barcodeFormat: text('barcode_format'),
+
+    source: text('source', { enum: ['upload', 'email'] })
+      .notNull()
+      .default('upload'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    index('passes_trip_idx').on(table.tripId),
+    index('passes_related_idx').on(table.relatedType, table.relatedId),
+  ],
+);
+
+export type PassRow = typeof passes.$inferSelect;

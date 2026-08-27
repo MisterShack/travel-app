@@ -33,9 +33,18 @@ See PLAN.md §4 for the full list and rationale. In short:
   at least one owner enforced in the membership module, single-use hashed invite tokens bound to
   an email, redemption checked against the *verified* email of the redeeming account.
 - **The server never trusts the client** — every write is re-validated against `shared/` schemas.
-- **No document or attachment is persisted _by this app_.** Booking import extracts fields in
-  memory; the review screen fetches the source from Resend on demand. Resend retains its own copy
-  — the rule is about our storage, and saying so honestly is part of the rule.
+- ~~**No document or attachment is persisted _by this app_.**~~ **REVERSED 2026-08-27, by David**
+  (PLAN.md §4). Passes — boarding passes, tickets — are now stored, because a pass you cannot
+  produce at a gate is not a feature. Everything else still holds: a booking import still extracts
+  fields in memory, the raw email is still never written, and the review screen still fetches the
+  source from Resend on demand. **What changed is passes and only passes.**
+
+  The rule named its own escape hatch ("a reversal of this decision, not a workaround"), and this
+  is that. What it costs, stated because it was decided with these on the table: a pass carries a
+  full name, a booking reference and a barcode that will often check someone in or move their
+  seat; the Railway volume is still the only copy of anything; and the app now serves files from
+  its own origin, which is a class of risk it did not previously have. See `server/src/passes/`
+  for what that last one is defended with.
 - **Single Railway instance, file-based DB** — the reminder sweep and any other periodic work runs
   in-process, there is nowhere else for a scheduler to live. But it claims rows before sending and
   drops stale work; budget-app's boot-time `purgeExpired` is the same *location*, not the same
@@ -243,6 +252,32 @@ Two defects here were found by running the real thing, not by a passing suite:
 `role="status"` is implicitly atomic, so the citations, attribution and quota line sit **outside**
 it — still immediately beneath the prose in DOM order and on screen, still real links. Inside, every
 place name was read twice and the legal line recited on every answer.
+
+**Passes shipped 2026-08-27** — the server half. Boarding passes and tickets are stored as
+documents, bound to a timeline event or to the trip, and reachable from an event or from a Passes
+page across every trip. Two ways in: an attachment on a forwarded confirmation, and a direct
+upload.
+
+Three decisions worth carrying:
+
+- **The bytes live in the database, not on the volume.** Litestream replicates SQLite and knows
+  nothing about the rest of the disk, so a pass written beside the database would be the one thing
+  in the app with no backup path even after the greenlight turns backups on — and the thing you
+  least want to be that exception. It also puts the file and its row in one transaction, and
+  leaves no path on disk for a filename to be talked into.
+- **The uploader's `Content-Type` is never believed.** The bytes are sniffed, and a zip has to
+  prove it is a PKPASS by containing a readable `pass.json` — magic bytes cannot tell one from a
+  `.docx`. `server/src/passes/pkpass.ts` reads just enough zip to do that, dependency-free, the
+  same way the Svix verification was written by hand.
+- **The danger is serving a file back, not accepting one.** Anything rendered from our own origin
+  is script holding the reader's session cookie, so the download route pins
+  `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff` and a `sandbox` CSP, and
+  reads the content type from our own sniffed column.
+
+**One stated limit:** an emailed attachment is kept only when the import already resolved to
+exactly one trip, because `passes.tripId` is not nullable. An attachment on an email matching no
+trip, or two, is not stored and the review screen still fetches the original from Resend as
+before.
 
 **Phase 11 (conflict and gap detection) shipped 2026-08-15**, from PLAN-V3. Pure function in
 `shared/`, run on the client, so it works offline and costs nothing per use. It is the feature that

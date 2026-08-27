@@ -13,6 +13,7 @@ export * from './time';
 export * from './timeline';
 export * from './conflicts';
 export * from './nearby';
+export * from './passes';
 export * from './prefs';
 
 // `./airports` is deliberately NOT re-exported here: it is a 280 KB table that

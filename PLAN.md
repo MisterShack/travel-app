@@ -185,12 +185,26 @@ reminders {
   disagree about it (§5).
 - **The server never trusts the client:** every write is re-validated against the `shared/` Zod
   schemas before touching the database, regardless of what the client already validated.
-- **No document or attachment is persisted _by this app_.** Booking import extracts structured
-  fields; the raw email is parsed in memory and never written to our database or disk. The scope
-  of this rule is our storage, not the world: Resend retains the received message on their side
-  and shows it in their dashboard, which is what makes on-demand source fetching possible at all
-  (§6). Say that honestly rather than implying the mail evaporates. If parsing quality turns out
-  to need *our own* copy for reprocessing, that is a reversal of this decision, not a workaround.
+- **No document or attachment is persisted _by this app_ — except a pass.** Booking import
+  extracts structured fields; the raw email is parsed in memory and never written to our database
+  or disk. The scope of this rule is our storage, not the world: Resend retains the received
+  message on their side and shows it in their dashboard, which is what makes on-demand source
+  fetching possible at all (§6). Say that honestly rather than implying the mail evaporates. If
+  parsing quality turns out to need *our own* copy for reprocessing, that is a reversal of this
+  decision, not a workaround.
+
+  **The exception was taken on 2026-08-27, by David, and it is a reversal rather than a
+  workaround — which is what this line asked for.** Boarding passes and tickets are stored as
+  documents, because the feature people actually want is producing one at a gate, and nothing
+  short of the file does that offline. It was decided with the costs named: a pass carries a full
+  name, a booking reference and a barcode that will often check someone in or move their seat; the
+  Railway volume is still the only copy of anything (ROADMAP.md §1); and serving files from our
+  own origin is a class of risk this app did not previously carry.
+
+  **The exception is narrow and the rest of the rule stands.** A raw email is still never written.
+  A booking import still extracts fields in memory. The review screen still fetches the source
+  from Resend on demand. Only a pass is kept, only through one validated path, and only in a
+  format on a closed allowlist.
 - **Single Railway instance, file-based DB:** there is nowhere for a job queue or scheduler to
   live but the process itself. Note that budget-app's boot-time `purgeExpired` is *not* precedent
   for the reliability this needs — its own comment says missing a run costs nothing because
@@ -498,8 +512,9 @@ verified Resend domain.
   VAPID web push with a custom service worker, and the iOS install prompt. Verified end to end
   against a running server: a due reminder is delivered once and not re-sent.
 
-**Deferred / explicitly out of scope for v1** (from §12): expense/budget tracking, document or
-photo attachments, offline *writes* (§8), AI-generated restaurant/attraction recommendations
+**Deferred / explicitly out of scope for v1** (from §12): expense/budget tracking, ~~document or
+photo attachments~~ (**passes only, 2026-08-27** — see §4; photos and general documents remain out),
+offline *writes* (§8), AI-generated restaurant/attraction recommendations
 (would reuse the Gemini call already built for import parsing, if it happens), SSO with
 budget-app, native mobile app.
 
