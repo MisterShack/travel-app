@@ -181,7 +181,9 @@ body {
      chrome is what gives way. */
   .tabbar a {
     flex-direction: row; gap: var(--space-1);
-    min-height: 40px; padding: 0 var(--space-2);
+    /* In rem with real vertical padding, so the pill still reads as a pill at
+       200% text instead of closing to within a few pixels of the glyph box. */
+    min-height: 2.5rem; padding: var(--space-1) var(--space-2);
     border: 1px solid transparent; border-radius: 999px;
     font-size: var(--text-sm); white-space: nowrap;
   }
@@ -1014,10 +1016,16 @@ ul.passes > li.card { margin-bottom: var(--space-3); }
 /* The row's own flex needs to allow the wrap the actions rely on. */
 .pass-row > .row { flex-wrap: wrap; row-gap: var(--space-2); }
 
-/* "Are you sure?" sits inline with the two answers, so the question and the
-   controls that answer it are read together and nothing moves the row's
-   height. */
-.pass-actions > .muted.tiny { white-space: nowrap; }
+/*
+ * "Are you sure?" takes a line of its own rather than sharing one with the
+ * name. Held on the same line it could not wrap, so between 360px and 430px —
+ * which is every current phone — the name column collapsed to 33px and
+ * `overflow-wrap: anywhere` shattered it into "boardin / g / pass. / pdf".
+ * The label of the thing about to be destroyed was least readable at the exact
+ * moment it had to be read. `.pass-confirm` in the event panel already did
+ * this correctly.
+ */
+.pass-actions > .muted.tiny { flex-basis: 100%; margin: 0; }
 
 /* ------------------------------------------------------- event passes -- */
 
@@ -1037,7 +1045,19 @@ ul.passes > li.card { margin-bottom: var(--space-3); }
 .event-passes {
   margin-top: var(--space-8);
   padding: var(--space-4);
-  background: var(--surface-sunk);
+  /*
+   * --surface, not --surface-sunk, and this is a contrast fix rather than a
+   * preference. The pass's own name is the control that opens it and it is
+   * drawn in --accent: on sunk paper that measured 4.37:1, under the 4.5:1
+   * that 1.4.3 asks for, on the primary action of the panel. On --surface it
+   * is 5.02:1 — the same move `.nearby-places a` already makes.
+   *
+   * It also gives `button.secondary` its edge back. That button paints itself
+   * --surface-sunk, so on a sunk panel its fill was identical to its
+   * background and the only boundary was a 1.61:1 hairline: legible, but
+   * nothing said it was pressable.
+   */
+  background: var(--surface);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
 }

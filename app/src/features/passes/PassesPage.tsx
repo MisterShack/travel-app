@@ -94,8 +94,17 @@ export function PassesPage() {
         const filename =
           typeof pass.filename === 'string' && pass.filename !== '' ? pass.filename : 'pass';
         handOff(blob, filename);
+        /*
+         * Success is announced, not only failure. Nothing on screen changes
+         * when a pass opens — focus stays on the button and the hand-off goes
+         * to the browser — so a screen-reader user at a gate got silence and
+         * pressed again, which downloads it twice. `focus: false` stands: the
+         * message is worth saying, not worth taking focus off the button for.
+         */
         setNotice({
-          text: stale ? `Offline — opening the copy of ${name} saved on this device.` : '',
+          text: stale
+            ? `Offline — opening the copy of ${name} saved on this device.`
+            : `Opened ${name}.`,
           focus: false,
         });
       } catch {
@@ -270,7 +279,17 @@ function PassRow({
         the browser leaking through.
       */}
       {confirming ? (
-        <div className="pass-actions">
+        /* Escape answers the question the same way Cancel does — it is the
+           first key anyone tries, and reusing the handler means the focus
+           restore that already works is what runs. */
+        <div
+          className="pass-actions"
+          onKeyDown={(event) => {
+            if (event.key !== 'Escape') return;
+            event.stopPropagation();
+            setConfirming(false);
+          }}
+        >
           <span className="muted tiny" id={promptId}>
             Are you sure?
           </span>
@@ -283,9 +302,18 @@ function PassRow({
           >
             Remove
           </button>
+          {/*
+            The name has to contain the visible word. "Keep …" read well and was
+            wrong: someone driving the phone by voice says "tap Cancel" and
+            nothing answers, because no control is called that — and on a phone
+            there is no Escape key to fall back on. WCAG 2.5.3 asks for the
+            visible label to be *in* the name, and this is the case it exists
+            for. It carries the question too, so both answers are read with it.
+          */}
           <button
             className="secondary"
-            aria-label={`Keep ${on}`}
+            aria-label={`Cancel removing ${on}`}
+            aria-describedby={promptId}
             onClick={() => setConfirming(false)}
           >
             Cancel

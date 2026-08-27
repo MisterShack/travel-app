@@ -249,12 +249,39 @@ describe('removing a pass', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Removed TAP TP1233.');
   });
 
+  /**
+   * WCAG 2.5.3, asserted rather than assumed.
+   *
+   * A control's accessible name has to contain the words written on it, or
+   * voice control cannot reach it: someone says "tap Cancel" and nothing is
+   * called that. This shipped broken — the Cancel button answered to "Keep TAP
+   * TP1233, Lisbon in spring", which reads well and is unusable by voice, and
+   * an audit found it rather than a test. Now a test would.
+   */
+  it('names every control with the word written on it', async () => {
+    const user = userEvent.setup();
+    draw();
+
+    // With the confirmation open, so Remove and Cancel are both on screen —
+    // the state the broken one lived in.
+    await user.click(await screen.findByRole('button', { name: /^Remove / }));
+
+    for (const button of screen.getAllByRole('button')) {
+      const visible = (button.textContent ?? '').trim().toLowerCase();
+      if (visible === '') continue;
+      const name = (button.getAttribute('aria-label') ?? visible).toLowerCase();
+      expect(name, `"${visible}" is missing from its own name "${name}"`).toContain(visible);
+    }
+  });
+
   it('leaves the pass alone when the reader backs out', async () => {
     const user = userEvent.setup();
     draw();
 
     await user.click(await screen.findByRole('button', { name: 'Remove TAP TP1233, Lisbon in spring' }));
-    await user.click(screen.getByRole('button', { name: 'Keep TAP TP1233, Lisbon in spring' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Cancel removing TAP TP1233, Lisbon in spring' }),
+    );
 
     expect(deletePass).not.toHaveBeenCalled();
     expect(screen.queryByText('Are you sure?')).toBeNull();

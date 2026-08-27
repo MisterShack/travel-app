@@ -69,9 +69,15 @@ function passName(pass: Pass): string {
 /** A refusal the reader can act on. Never a status code, and never an id. */
 function refusalOf(error: unknown, fallback: string): string {
   if (error instanceof OfflineError) return 'No connection — this needs one.';
-  // 413, 415 and 409 each arrive with a sentence already written for a person:
-  // what the ceiling is, which kinds of file are kept, that the trip is full.
-  if (error instanceof ApiError) return error.message;
+  /*
+   * 413, 415 and 409 each arrive with a sentence already written for a person:
+   * what the ceiling is, which kinds of file are kept, that the trip is full.
+   *
+   * A 5xx does not. Its message is the generic "Something went wrong.", which
+   * names neither the action nor the pass — useless to anyone who cannot see
+   * which row is still there. The caller's own fallback says what failed.
+   */
+  if (error instanceof ApiError && error.status < 500) return error.message;
   return fallback;
 }
 
@@ -362,7 +368,17 @@ export function EventPasses({ tripId, relatedType, relatedId }: Props) {
                    * while it is up, cannot be styled, and on an installed PWA
                    * reads as the browser breaking through the app.
                    */
-                  <div className="pass-confirm">
+                  /* Escape answers it the same way Cancel does; see the same
+                     handler below, which owns the focus restore. */
+                  <div
+                    className="pass-confirm"
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Escape') return;
+                      event.stopPropagation();
+                      setConfirming(null);
+                      setRestore(pass.id);
+                    }}
+                  >
                     <span className="muted tiny" id={questionId}>
                       Remove this pass?
                     </span>
