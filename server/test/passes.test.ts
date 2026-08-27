@@ -419,3 +419,32 @@ describe('deleting a pass', () => {
     expect(((await list.json()) as { passes: unknown[] }).passes).toHaveLength(0);
   });
 });
+
+describe('cross-origin', () => {
+  /**
+   * A multipart POST is a CORS *simple* request: no preflight, so an attacker's
+   * page can send one and the browser will attach the session cookie. Nothing
+   * stops it reaching the server — `originGuard` is what stops it being obeyed,
+   * and this is the first route where the consequence of getting that wrong is
+   * a file of the attacker's choosing stored under someone else's account.
+   */
+  it('refuses an upload announcing a foreign origin', async () => {
+    h = await createHarness();
+    const cookie = await signUp(h, 'a@example.com');
+    const tripId = await newTrip(cookie);
+
+    const form = new FormData();
+    form.set('file', new File([new Uint8Array(pdf())], 'evil.pdf'));
+    const res = await h.app.request(
+      new Request(`http://localhost/api/trips/${tripId}/passes`, {
+        method: 'POST',
+        headers: { cookie, origin: 'https://evil.example' },
+        body: form,
+      }),
+    );
+
+    expect(res.status).toBe(403);
+    const list = await h.app.request(jsonRequest(`/trips/${tripId}/passes`, 'GET', undefined, cookie));
+    expect(((await list.json()) as { passes: unknown[] }).passes).toHaveLength(0);
+  });
+});

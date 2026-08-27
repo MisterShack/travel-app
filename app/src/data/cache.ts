@@ -73,4 +73,6 @@ export const cacheKeys = {
   trips: 'trips',
   timeline: (tripId: string) => `timeline:${tripId}`,
   trip: (tripId: string) => `trip:${tripId}`,
+  passes: 'passes',
+  tripPasses: (tripId: string) => `passes:${tripId}`,
 };

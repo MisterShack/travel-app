@@ -10,6 +10,7 @@ import { MODE_COPY } from '@/components/kinds';
 import { PassengerFields } from './PassengerFields';
 import { storedPassengers } from './passengers';
 import { Nearby } from './Nearby';
+import { EventPasses } from '@/features/passes/EventPasses';
 
 /**
  * Add/edit form for the three timeline entity types.
@@ -331,12 +332,13 @@ export function EventFormPage() {
   };
 
   /**
-   * The event id "what's nearby" would ask about: the row the server has, which
-   * only exists once something has been saved.
+   * The row the server has, which only exists once something has been saved.
+   * Both panels below need it: "what's nearby" asks the server about this id,
+   * and a pass is stored bound to it.
    */
-  const nearbyId = savedId ?? (isNew ? null : (id ?? null));
+  const savedEventId = savedId ?? (isNew ? null : (id ?? null));
   const showNearby =
-    (kind === 'lodging' || kind === 'activity') && nearbyId !== null && storedAddress !== '';
+    (kind === 'lodging' || kind === 'activity') && savedEventId !== null && storedAddress !== '';
 
   return (
     <>
@@ -561,6 +563,15 @@ export function EventFormPage() {
     </form>
 
     {/*
+      * Also outside the <form>, and for the same reason as the panel below it.
+      * Only for a row the server already has: a pass binds to an id, and until
+      * something is saved there is nothing to bind to.
+      */}
+    {savedEventId !== null && (
+      <EventPasses tripId={tripId} relatedType={kind as Kind} relatedId={savedEventId} />
+    )}
+
+    {/*
       * Outside the <form>, deliberately. Asking what is nearby is not part of
       * editing the event, and a button inside a form is a submit button unless
       * every one of them remembers to say otherwise — a trap worth designing
@@ -572,7 +583,7 @@ export function EventFormPage() {
     {showNearby && (
       <Nearby
         kind={kind as 'lodging' | 'activity'}
-        id={nearbyId}
+        id={savedEventId}
         stored={storedAddress}
         edited={(kind === 'lodging' ? f.address.trim() : f.location.trim()) !== storedAddress}
       />

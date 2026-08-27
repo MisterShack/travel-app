@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { AccountIcon, InboxIcon, TripsIcon } from '@/components/Icons';
+import { AccountIcon, InboxIcon, PassesIcon, TripsIcon } from '@/components/Icons';
 
 /**
  * Bottom tab bar.
@@ -40,6 +40,17 @@ export function TabBar({ pending }: { pending: number }) {
           */}
           {pending > 0 && <span className="visually-hidden"> — {pending} awaiting review</span>}
         </span>
+      </NavLink>
+      {/*
+        Passes earn a destination of their own rather than living only under a
+        trip. The moment one is needed is at a gate, in a hurry, and "which trip
+        was that flight on" is not a question worth asking then.
+      */}
+      <NavLink to="/passes">
+        <span className="tabicon-wrap">
+          <PassesIcon />
+        </span>
+        <span>Passes</span>
       </NavLink>
       <NavLink to="/account">
         <span className="tabicon-wrap">

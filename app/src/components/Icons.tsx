@@ -62,6 +62,16 @@ export function InboxIcon() {
   );
 }
 
+/** A ticket: a rectangle notched on both sides, which is what a pass looks like. */
+export function PassesIcon() {
+  return (
+    <svg {...stroked}>
+      <path d="M3 8.5V6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2.5a2 2 0 0 0 0 7V18a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2.5a2 2 0 0 0 0-7Z" />
+      <path d="M15 5v14" strokeDasharray="2 2.5" />
+    </svg>
+  );
+}
+
 export function AccountIcon() {
   return (
     <svg {...stroked}>

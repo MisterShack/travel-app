@@ -67,8 +67,72 @@ async function request<T>(method: string, path: string, body?: Body): Promise<T>
   return payload as T;
 }
 
+/**
+ * A multipart upload.
+ *
+ * Apart from `post` because the body is not JSON and the `content-type` must
+ * be left to the browser: it appends the multipart boundary, and setting the
+ * header by hand omits it, which the server then cannot parse.
+ */
+async function upload<T>(path: string, form: FormData): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${API_PREFIX}${path}`.replace(/^\/\//, '/'), {
+      method: 'POST',
+      credentials: 'include',
+      body: form,
+    });
+  } catch {
+    throw new OfflineError();
+  }
+
+  const text = await response.text();
+  const payload = text === '' ? {} : (JSON.parse(text) as Record<string, unknown>);
+  if (!response.ok) {
+    throw new ApiError(
+      response.status,
+      typeof payload['error'] === 'string' ? payload['error'] : 'error',
+      typeof payload['message'] === 'string' ? payload['message'] : 'Something went wrong.',
+      payload['issues'],
+    );
+  }
+  return payload as T;
+}
+
+/**
+ * A binary read.
+ *
+ * The error body is JSON like every other route's, so a failure is parsed the
+ * same way — but a *success* must not be, and `request` would have tried.
+ */
+async function blob(path: string): Promise<Blob> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${API_PREFIX}${path}`.replace(/^\/\//, '/'), {
+      credentials: 'include',
+    });
+  } catch {
+    throw new OfflineError();
+  }
+
+  if (!response.ok) {
+    const text = await response.text();
+    const payload = text === '' ? {} : (JSON.parse(text) as Record<string, unknown>);
+    throw new ApiError(
+      response.status,
+      typeof payload['error'] === 'string' ? payload['error'] : 'error',
+      typeof payload['message'] === 'string' ? payload['message'] : 'Something went wrong.',
+      payload['issues'],
+    );
+  }
+
+  return response.blob();
+}
+
 export const api = {
   get: <T>(path: string) => request<T>('GET', path),
+  upload,
+  blob,
   post: <T>(path: string, body?: Body) => request<T>('POST', path, body),
   patch: <T>(path: string, body?: Body) => request<T>('PATCH', path, body),
   delete: <T>(path: string) => request<T>('DELETE', path),

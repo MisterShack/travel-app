@@ -19,6 +19,7 @@ import {
 } from '@/features/trips/TripPages';
 import { ImportsPage } from '@/features/imports/ImportsPage';
 import { AccountPage } from '@/features/account/AccountPage';
+import { PassesPage } from '@/features/passes/PassesPage';
 import { TabBar } from '@/components/TabBar';
 import { EventFormPage } from '@/features/timeline/EventForm';
 
@@ -154,6 +155,14 @@ export function App() {
             element={
               <RequireUser>
                 <AccountPage />
+              </RequireUser>
+            }
+          />
+          <Route
+            path="/passes"
+            element={
+              <RequireUser>
+                <PassesPage />
               </RequireUser>
             }
           />

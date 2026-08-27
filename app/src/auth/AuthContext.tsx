@@ -3,6 +3,7 @@ import type { PreferencesPatch } from '@travel/shared';
 import { api, ApiError, OfflineError } from '@/api/client';
 import { AuthContext, type AuthState, type User } from './context';
 import { clearCache } from '@/data/cache';
+import { clearPassBlobs } from '@/data/blobs';
 import { followSystemTheme, paintTheme, rememberTheme, storedTheme } from '@/theme';
 
 
@@ -50,7 +51,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // session on a shared device.
       if (!(error instanceof ApiError) && !(error instanceof OfflineError)) throw error;
     }
+    // Both stores, for the same reason: a shared device must not keep the last
+    // reader's itinerary, and a stored boarding pass is the most personal thing
+    // in it — a full name, a booking reference, and a barcode that will often
+    // check someone in.
     await clearCache();
+    await clearPassBlobs();
     setUser(null);
   }, []);
 
