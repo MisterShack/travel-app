@@ -61,9 +61,27 @@ test.describe('with no network', () => {
     await expect(page.getByRole('link', { name: 'Journey: TAP TP442' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Stay: Check in — Hotel Lutetia' })).toBeVisible();
 
-    // Back to the list, still online, so the list is cached too.
+    /**
+     * Back to the list, still online — and the list has to be *proved* on screen
+     * before the network is cut, because the cache is only written by a read
+     * that succeeded.
+     *
+     * `getByText(trip.name)` did not prove it. The trip detail page this
+     * navigates away from carries the same text in its own
+     * `<h2 class="screen-title">`, so the first poll after the click could match
+     * the page being *left* — a window of a frame or two, which never opened on
+     * a developer's machine and opened on every run in CI. The network was then
+     * cut while the list's own fetch was still in flight; that fetch failed, so
+     * nothing was cached, and the offline half of this test sat waiting for a
+     * list that had only ever rendered "Could not load your trips".
+     *
+     * The heading pins which screen this is, and the card is a *link*, which the
+     * heading it was colliding with is not.
+     */
     await page.getByRole('link', { name: 'Waypoint' }).click();
-    await expect(page.getByText(trip.name).first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Trips' })).toBeVisible();
+    const card = page.getByRole('link', { name: trip.name });
+    await expect(card).toBeVisible();
 
     await context.setOffline(true);
 
@@ -72,7 +90,7 @@ test.describe('with no network', () => {
      * network cut, anything that renders below can only have come from
      * IndexedDB.
      */
-    await page.getByText(trip.name).first().click();
+    await card.click();
     await expect(page).toHaveURL(new RegExp(`/trips/${trip.id}$`));
 
     /**
