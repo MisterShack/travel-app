@@ -118,7 +118,21 @@ phone at an airport gate at 6am, and reads as paper rather than screen.
   to find in an app. Familiarity in the interface is worth more than distinctiveness; be different
   in what the product does, not in how the headings are set.
 - **The serif survives in one place: the wordmark** — and now carries the identity alone (§9). It
-  is set in `--serif` at 600 with `-0.02em` tracking, and it is the only serif on any screen.
+  is **Newsreader 600 at `-0.02em`**, and it is the only serif on any screen.
+
+  **It is drawn, not set** (2026-08-29). Until then it was `ui-serif, Georgia, "Iowan Old Style"`,
+  which meant the identity was not one shape: Georgia on Windows, Iowan on an iPhone, something
+  else again on Android. A product whose case for Capacitor is that there is only one UI cannot
+  have its wordmark change with the device — and the wordmark is the whole identity, because there
+  is no mark. So it ships as a single SVG path: about 1.6KB over the wire, no request, identical
+  everywhere, and it cannot fail to load, which is exactly the moment a wordmark is doing its job.
+  `scripts/build-wordmark.mjs` regenerates it and holds the reasoning for every constant, including
+  why the outline is frozen at **optical size 20** — Newsreader's `opsz` axis follows the size it
+  is set at, and 20px is the header, which is seen thousands of times more often than the 31px on
+  the sign-in card.
+
+  There is no `--serif` token any more. The wordmark was the only thing that ever used one, and a
+  token nothing references is a rule waiting to be applied by mistake.
 - **Body and UI:** the system sans stack. It is already on the device, renders natively, and adds
   no weight to a bundle that must work with no network.
 - **Times:** tabular figures, always. A column of times that shifts by a pixel per digit looks
@@ -320,7 +334,8 @@ Plain, specific, and never cheerful about a problem.
 
 ## 9. The mark — and why there is not one
 
-**Waypoint has no pictorial mark. The identity is the wordmark**, set in `--serif` in `--accent`.
+**Waypoint has no pictorial mark. The identity is the wordmark** — Newsreader 600, drawn as
+outlines, in `--accent` (§4).
 
 There was one: an outlined triangle with a filled dot at the centroid, which is how a named waypoint
 is drawn on an aeronautical chart. It had real provenance and it was not an aeroplane. It was also,

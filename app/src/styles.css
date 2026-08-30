@@ -57,7 +57,9 @@
   --text-xl: 1.5625rem;  --lh-xl: 2rem;
   --text-2xl: 1.9375rem; --lh-2xl: 2.375rem;
 
-  --serif: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
+  /* No --serif. The wordmark was the only thing that ever used one and it is
+     outlines now (components/Wordmark.tsx), so a serif token left standing here
+     is a rule waiting to be applied to something by mistake. BRAND.md §4. */
   --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
 
   /* Space — 4px base, multiples of 4 only. */
@@ -255,15 +257,23 @@ header.bar {
   background: var(--warn-bg); color: var(--warn);
   border-radius: 999px; font-size: var(--text-xs); font-weight: 600;
 }
-/* The wordmark stands alone — there is no pictorial mark (BRAND.md §9), so the
-   serif and the accent are the whole identity and they carry it together. */
+/*
+ * The wordmark stands alone — there is no pictorial mark (BRAND.md §9), so the
+ * serif and the accent are the whole identity and they carry it together.
+ *
+ * It is outlines now, not text (`components/Wordmark.tsx`), so the face and the
+ * tracking are baked into the path and there is nothing here to set them with.
+ * What stays is the font-size: the mark sizes itself in `em`, so this rule and
+ * the `--text-2xl` override on the sign-in card still govern how big it is, and
+ * `color` still reaches it through `currentColor`.
+ */
 .wordmark {
   display: inline-flex; align-items: center;
-  font: 600 var(--text-lg)/var(--lh-lg) var(--serif);
-  letter-spacing: -0.02em;
+  font-size: var(--text-lg); line-height: var(--lh-lg);
   color: var(--accent); text-decoration: none;
   padding: var(--space-2) var(--space-1); margin: calc(var(--space-2) * -1) 0;
 }
+.wordmark-mark { display: block; }
 header.bar h1 { margin: 0; flex: 1; font-size: inherit; }
 /* Chips, not bare links. Underlined text in a header reads as prose, and the
    first version's affordances were too quiet to find. */

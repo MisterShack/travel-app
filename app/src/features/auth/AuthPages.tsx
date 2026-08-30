@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { Wordmark } from '@/components/Wordmark';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '@/api/client';
 import { useAuth } from '@/auth/useAuth';
@@ -16,7 +17,9 @@ function AuthShell({ title, children }: { title: string; children: ReactNode }) 
   return (
     <div className="auth">
       <p className="brandline">
-        <span className="wordmark">Waypoint</span>
+        <span className="wordmark">
+          <Wordmark />
+        </span>
       </p>
       <div className="panel">
         <h2>{title}</h2>
