@@ -103,15 +103,30 @@ function Tallies({ items }: { items: TimelineItem[] }) {
 
 export function TripListPage() {
   const { user } = useAuth();
+  const { pathname } = useLocation();
   const [state, setState] = useState<Loaded<TripSummary[]> | null>(null);
   const [error, setError] = useState('');
 
+  /*
+   * Re-read on every navigation, not only on mount.
+   *
+   * At desktop width this list is a permanent pane and never unmounts, so a
+   * mount-only fetch left it showing trips that no longer existed: deleting one
+   * navigated to `/` and the row stayed until a reload, and creating one
+   * navigated to the new trip without ever adding it. On a phone the same code
+   * looked correct only because the screen was being rebuilt each time.
+   *
+   * This is the lesson `InboxProvider` already records, one screen over: a value
+   * that must change without its component being rebuilt has to be told to, and
+   * a route change is the cheapest honest signal available. Both mutations
+   * navigate, so there is nothing left to catch.
+   */
   useEffect(() => {
     if (!user) return;
     void loadTrips(user.id)
       .then(setState)
       .catch(() => setError('Could not load your trips, and nothing is saved on this device yet.'));
-  }, [user]);
+  }, [user, pathname]);
 
   if (error) return <p className="error">{error}</p>;
   if (!state) return <Skeleton rows={3} label="Loading your trips" />;

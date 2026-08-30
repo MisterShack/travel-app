@@ -77,3 +77,53 @@ test.describe('at desktop width', () => {
     await expect(page.getByRole('dialog').getByRole('link', { name: 'Flight' })).toBeVisible();
   });
 });
+
+/**
+ * The pane is permanent, which is the point of it and also its hazard: it never
+ * unmounts, so anything that changes the set of trips has to reach it without
+ * the component being rebuilt. On a phone this class of bug is invisible —
+ * every navigation rebuilds the screen — which is exactly why it belongs here.
+ *
+ * Reported from the running app on 2026-08-29: a deleted trip stayed in the
+ * side panel until a reload.
+ */
+test.describe('the trips pane keeps up', () => {
+  test('a deleted trip leaves the pane without a reload', async ({ page, request }) => {
+    const doomed = await createTrip(request, { name: `Doomed ${Date.now()}` });
+    const keeper = await createTrip(request, { name: `Keeper ${Date.now()}` });
+
+    await page.goto(`/trips/${doomed.id}/settings`);
+
+    const list = page.getByRole('navigation', { name: 'Trips' });
+    await expect(list.getByRole('link', { name: doomed.name })).toBeVisible();
+
+    // The delete is behind a native confirm, which blocks everything until it
+    // is answered — so it is accepted rather than triggered and abandoned.
+    page.once('dialog', (dialog) => void dialog.accept());
+    await page.getByRole('button', { name: 'Delete trip' }).click();
+
+    await expect(page).toHaveURL(/\/$/);
+
+    // The assertion this test exists for. No reload anywhere above.
+    await expect(list.getByRole('link', { name: doomed.name })).toHaveCount(0);
+    await expect(list.getByRole('link', { name: keeper.name })).toBeVisible();
+  });
+
+  test('a newly created trip appears in the pane', async ({ page }) => {
+    const name = `Created ${Date.now()}`;
+
+    await page.goto('/trips/new');
+    await page.getByLabel('Name', { exact: true }).fill(name);
+    await page.getByLabel('Start', { exact: true }).fill('2027-05-01');
+    await page.getByLabel('End', { exact: true }).fill('2027-05-08');
+    await page.getByRole('button', { name: 'Create trip' }).click();
+
+    await expect(page).toHaveURL(/\/trips\/trp_/);
+
+    // The other half of the same defect: the pane is beside the trip that was
+    // just made, and said nothing about it.
+    await expect(
+      page.getByRole('navigation', { name: 'Trips' }).getByRole('link', { name }),
+    ).toBeVisible();
+  });
+});
