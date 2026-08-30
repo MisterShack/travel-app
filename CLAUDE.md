@@ -78,10 +78,77 @@ verification work against real Resend delivery.
 
 **All phases (0–5) are done**, with one stated exception: Phase 1’s acceptance criterion includes a
 Litestream restore drill, and backups are deliberately deferred until the greenlight (ROADMAP.md §1).
-PLAN.md §11 says so under Phase 1; this line used to say it without the caveat. 299 tests,
-typecheck and lint clean — 261 under vitest across the three workspaces plus 38 in `infra/` under
-`node --test`, which a vitest-only count misses. Plus 49 Playwright specs, which are not in
-`npm test` and are run separately.
+PLAN.md §11 says so under Phase 1; this line used to say it without the caveat. 421 tests,
+typecheck and lint clean — 383 under vitest across the three workspaces plus 38 in `infra/` under
+`node --test`, which a vitest-only count misses. Plus 69 Playwright specs, which are not in
+`npm test` and are run separately (66 at the single-column width, 3 in the `desktop` project).
+
+**Phase 13 (the frame) shipped 2026-08-28**, from a UI review driven at 390, 834 and 1440.
+BRAND.md §6c owns the rules and ROADMAP §2 item 8 owns the sequencing. The app stops being a phone
+layout centred in a desktop window: above 72rem the tab bar becomes a left rail and the trips list
+stands permanently beside the open trip. Below it, the phone gained a screen bar, a floating Add, and
+form actions pinned to the bottom edge.
+
+Five things worth carrying forward, three of which are traps:
+
+- **`devices['Desktop Chrome']` is 1280×720, which is 80rem, which is now *desktop*.** The e2e
+  suite inherited that preset, so the two-pane breakpoint would have put all of its specs into a
+  navigation model none of them was written for — and they would have gone on *passing*, which is
+  the dangerous direction. The viewport is pinned at 900px and said out loud in the config, and the
+  two-pane layout has its own project at 1440. **Any future breakpoint has to be checked against
+  that number before it is chosen.**
+- **The layout is CSS; the navigation model is JavaScript.** `useWide()` exists because CSS cannot
+  answer "should the list render into the detail pane at all" — at desktop width `/` renders a
+  *choose a trip* placeholder, because the list is already on screen and rendering it twice would
+  put every trip's link in the tab order twice. A media query can hide a thing; it cannot decide
+  not to build it.
+- **A task screen is not rendered with a hidden tab bar; it has no tab bar.** `display: none` on
+  the bar leaves four stops in the keyboard tab order leading to destinations the screen is
+  deliberately not offering. And hiding it is only safe *because* the screen bar landed in the same
+  change — either alone is a screen with no exit.
+- **Hover was the only press feedback in 1,135 lines of CSS, and hover does not exist on a phone.**
+  A tap on a trip card produced nothing at all until the next screen painted. `grep ":active"`
+  returned nothing. This is the cheapest large improvement the app has had and it took no new
+  dependency.
+- **`scripts/check-contrast.py` cannot run on the Windows machine** — there is no Python on it, and
+  BRAND.md §10 calls that script a gate. It is a gate that only one of the two development machines
+  can operate, which is worth knowing before anyone relies on it having been run. The arithmetic was
+  re-derived in node to evaluate candidate palettes and validated against two numbers the repo had
+  already measured (`--accent` on `--surface`, 5.02:1; on `--surface-sunk`, 4.38 against a recorded
+  4.37).
+
+**The `web-accessibility-reviewer` audit ran against all of it on 2026-08-28** and returned
+fix-first. Everything it raised that this phase introduced is fixed and re-measured; the three
+serious ones are worth recording because two were invisible to every automated layer the repo has:
+
+- **The selected trip card was distinguished by hue alone.** `--accent-wash` against `--surface`
+  measured 1.10:1 in light and **1.00:1 in dark** — identical relative luminance, so the two-pane
+  layout's central affordance did not exist for anyone who cannot separate warm from cool at the
+  same lightness (WCAG 1.4.1, 1.4.11). The lesson generalises: `--accent-wash` was tuned to *carry
+  `--ink` at 4.5:1*, which is a different job from *being distinguishable from `--surface`*, and a
+  token that passes the contrast gate can still fail as a state indicator. It now takes an inset
+  `--accent` leading edge: 4.58:1 light, 7.98:1 dark, measured.
+- **`role="status"` is a page-wide namespace.** Adding a "Saving…" region to the event form broke
+  two `nearby.spec.ts` tests that located `[role="status"]` document-wide — an incidental assumption
+  that had been true only because there had been exactly one live region in the whole app. Both
+  specs are now scoped to `.nearby`, which is what they were always about.
+- **`aria-disabled`, never `disabled`, on a control that is being pressed.** This was the *third*
+  occurrence of the rule in BRAND.md §6, and the first two are recorded below. Focus stays on the
+  button through the request and a live region mounted empty from first render says "Saving…";
+  verified against a 1.5s save.
+
+**The `signup.spec.ts` intermittency is explained, and it is not the server.** "A used token is
+refused the second time" failed in 3 of 5 full runs on 2026-08-28. **Single-use is intact** — a
+second redemption of a real token returns `400 invalid_token`, checked directly against the running
+API. The race is in what the spec asserts. `VerifyPage` deliberately treats *"the token was
+rejected but `/auth/me` says this account is verified and I have a session"* as success, because
+mail scanners prefetch links and people click twice (the rationale is in the component). The spec
+removes that session with `context.clearCookies()` and then navigates — and when the failure
+happens, the snapshot shows the app **signed in on the trips list**, i.e. the session was still
+there when the page asked. So the spec is racing its own cookie clearing to assert a client
+consequence, while the property it names lives in the server. Asserting the API's 400 directly, or
+using a fresh browser context rather than clearing cookies on the live one, removes the race.
+CI failed this same spec on 2026-08-25, before any of this work.
 
 **Phase 4 (booking import) shipped and verified end to end against a real forwarded airline
 confirmation, 2026-08-15** — including two per-passenger PDF tickets, read correctly.

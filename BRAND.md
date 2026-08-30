@@ -167,20 +167,45 @@ constant at every breakpoint so the text column never shifts under the reader.
   action row were the single clearest tell that this was a web page with a form on it.
 - **Tappable rows say so** — a chevron at the trailing edge, and a surface shift on hover and
   focus.
+- **Everything pressable answers a press**, within a frame, and this is not the same rule as the
+  one above it. Hover and focus are a pointer's and a keyboard's feedback; a phone has neither, so
+  for the first year of this app a tap on a trip card produced *nothing at all* until the next
+  screen painted. Every control takes a surface shift plus `scale(0.985)` on `:active`, and
+  `-webkit-tap-highlight-color` is cleared so the platform's own grey box is not fighting it.
+  Under `prefers-reduced-motion` the shift stays and only the movement goes: the feedback is the
+  point, the travel is not.
+
+  A chevron and a press state are also the *only* things that may say "pressable". Nothing is
+  disabled in response to being activated — that drops focus to `<body>` and has cost this app two
+  separate bugs (see the note in CLAUDE.md).
 
 ## 6a. Navigation
 
-**Primary destinations live in a bottom tab bar**, within thumb reach. This is the single change
-that stops a PWA feeling like a website, and it is the convention every consumer app has already
-taught people — differing here costs familiarity and buys nothing.
+**Primary destinations live in a bottom tab bar on a phone**, within thumb reach. This is the
+single change that stops a PWA feeling like a website, and it is the convention every consumer app
+has already taught people — differing here costs familiarity and buys nothing.
 
-- Three destinations: Trips, Inbox, Account. A tab bar with more than five is a menu wearing a
-  disguise.
+It is a *phone* convention, and it stops being one twice as the window grows (§6c): at 48rem the
+bar leaves the bottom edge and becomes chips in the header, and at 72rem it becomes a left rail.
+One element, one `aria-label`, one set of links at every width — two `<nav>`s toggled by a media
+query would be two things for assistive tech to read and two places to keep a destination in step.
+
+- Four destinations: Trips, Inbox, Passes, Account. A tab bar with more than five is a menu
+  wearing a disguise. (Passes joined when passes shipped, because the moment one is needed is at a
+  gate, in a hurry — this list said three until 2026-08-28 and was simply out of date.)
 - The active tab takes the accent **and** an `--accent-wash` pill behind its icon. Colour alone is
   not enough of a difference to find at a glance on a moving bus.
 - The header is a title bar, not a second navigation. Two navigations competing is how a web page
-  looks.
-- Counts ride the tab icon, as they do everywhere else, and are absent at zero.
+  looks. Above 72rem the header *is* the navigation — it has become the rail — and there is no
+  second one.
+- Counts ride the tab icon, as they do everywhere else, and are absent at zero. In the rail the
+  count moves to the end of the row instead, which is where a vertical list of destinations puts a
+  number.
+- **A screen that is a task shows no destinations at all.** The add and edit forms, and *New
+  trip*, hide the bar: leaving a half-typed flight by tapping another tab is not something worth
+  making easy. Not rendered rather than hidden — a `display: none` tab bar is still four stops in
+  the tab order, leading somewhere the screen is deliberately not offering. The way out is §6c's
+  screen bar, and neither may ship without the other.
 
 ## 6b. Screen anatomy
 
@@ -196,6 +221,18 @@ administer it live behind a control rather than below the fold.**
 - **Creation is one primary action, not a row of them.** Three side-by-side *+ Flight / + Stay /
   + Activity* buttons made the user choose a type before they had decided to add anything. One
   **Add to trip** button opens an action sheet with the three kinds, each carrying its hue.
+- **That action does not take a screen's width to say so.** On a phone it is a floating button over
+  the timeline; in a header with room in it, it is a button in the header. It used to be a
+  full-width block between the trip header and the first event, which put the itinerary at the fold
+  on a 390px screen — on the one screen whose entire job is the itinerary. Adding is frequent, which
+  is why it stays reachable from anywhere on the page; it is not the screen's subject, which is why
+  it stopped looking like it. The two are never both on screen, and the floating one is last in the
+  DOM so a keyboard user reaches the itinerary first.
+- **A form's own actions sit at the bottom edge of a phone, not at the bottom of the form.** Add
+  flight is about 1,460px of scrolling — 1.7 screens — and *Add* was underneath two optional
+  fields at the end of it. Anything a booking does not need is folded into a **More details**
+  disclosure, and the save row is pinned. Destructive actions stay out of that row: a pinned bar is
+  built to be easy to hit by feel, which is the last place an irreversible action belongs.
 - **The action sheet** slides from the bottom, is dismissed by backdrop, `Esc` or Cancel, traps
   focus while open, and restores focus to the button that opened it. It is the only floating layer
   in the app.
@@ -204,6 +241,42 @@ administer it live behind a control rather than below the fold.**
   thing an app can do.
 - **Signed-out screens are a centred card** under the wordmark, at a narrower measure than the app.
   A sign-in form running the full width of a desktop window is a form on a web page.
+- **Every pushed screen opens with a screen bar**: a way back on the left, and what it goes back
+  to named on it. This was true of exactly one screen until 2026-08-28 — the add forms opened with
+  a heading and no top-left affordance at all, and the only exit was a *Cancel* most of a screen
+  further down. The back control names a destination rather than calling `history.back()`, because
+  a form is reachable by deep link, reload and notification, and on those the browser's history has
+  somewhere else entirely behind it. Hidden above 72rem, where the list pane never left.
+
+## 6c. Frames
+
+**One design language, three frames.** Consistency across widths and platforms is not one layout
+everywhere — that is what produces a phone app in the middle of a laptop window, which is what this
+app was until 2026-08-28: a 34rem column using 38% of a 1440px display, with a row of nav chips
+floating in the middle of the empty rest.
+
+What is identical at every width: the tokens, the type scale, the card, the timeline spine, the
+voice, and every string. What changes is the frame around them.
+
+| Frame | Navigation | Content | Primary action |
+|---|---|---|---|
+| Phone, `< 48rem` | Bottom tab bar | One screen at a time, pushed | Floating button |
+| Tablet, `48–72rem` | Chips in the header | One column, wider gutters | Header button |
+| Desktop, `≥ 72rem` | Left rail, icon and label | Two panes: list beside detail | Header button |
+
+- **72rem, not lower.** Below it two panes squeeze the itinerary's own measure, which is the one
+  thing the extra width is *not* for. The reading column stays a phone's width at every size; what
+  the width buys is context, not longer lines.
+- **Above 72rem, opening a trip is a selection rather than a push.** The list stands permanently
+  beside it and marks the open row with `aria-current`. A master list that does not say which of
+  its rows the pane beside it is showing is a list of links to nowhere in particular — and the
+  chevron goes, because it promised a push that no longer happens.
+- **The URL does not change shape with the frame.** `/trips/:id` is the trip at every width, so a
+  deep link, a reload and a reminder's link all land in the same place. Two panes is a layout, not
+  a second application.
+- **This is the layout the native shells will inherit**, so it is settled before they are built
+  (ROADMAP §5). The phone frame keeps its pushed screens for the same reason: an edge-swipe back
+  gesture reads as correct only where there is something to go back from.
 
 ## 7. Components
 

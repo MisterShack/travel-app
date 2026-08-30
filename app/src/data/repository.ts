@@ -66,3 +66,27 @@ export function loadTimeline(tripId: string, userId: string): Promise<Loaded<Tim
     return items;
   });
 }
+
+/**
+ * The next event on a trip, read **only** from what is already cached.
+ *
+ * Deliberately not a fetch. This exists to put "what is actually next" on the
+ * trips list, and that screen is worth nothing if it costs a request per trip
+ * — or if it spins on a plane. The timeline is in IndexedDB from the last time
+ * the trip was opened, so the honest behaviour when it is not is to say
+ * nothing rather than to guess or to load.
+ *
+ * Items arrive ordered by `startAt`, so the first one not yet past is the
+ * answer. Comparing UTC instants rather than local times is the whole reason
+ * this is correct across zones: "next" for someone in Lisbon and someone in
+ * Ottawa is the same event.
+ */
+export async function cachedNextEvent(
+  tripId: string,
+  userId: string,
+  now: number,
+): Promise<TimelineItem | null> {
+  const cached = await readCache<TimelineItem[]>(cacheKeys.timeline(tripId), userId);
+  if (cached === null) return null;
+  return cached.data.find((item) => Date.parse(item.startAt) >= now) ?? null;
+}

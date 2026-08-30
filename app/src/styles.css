@@ -129,6 +129,13 @@ body {
 }
 .tabbar a {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
+  /* Lets a track shrink below the pill's own width. Without it the bar has a
+     hard 256px floor — four 64px tracks — and at 195 CSS px (a 390px phone at
+     200% browser zoom) the fourth destination is clipped off-screen entirely.
+     Account is where signing out lives, so that is functionality lost, not
+     chrome lost. 1.4.10 only asks for 320px, where this already fitted; 1.4.4
+     is the argument, and people really do zoom a phone. */
+  min-width: 0;
   gap: 3px; min-height: 60px; padding: var(--space-2) var(--space-1);
   color: var(--ink-soft); text-decoration: none;
   font: 600 var(--text-xs)/1 var(--sans);
@@ -145,6 +152,13 @@ body {
 .tabbar a[aria-current='page'] .tabicon-wrap {
   background: var(--accent-wash); border-color: var(--accent-line);
 }
+/* Below this the pill's padding is what is keeping the fourth tab off the
+   screen, and a tighter pill is worth more than a roomier one nobody can
+   reach. */
+@media (max-width: 22rem) {
+  .tabbar .tabicon-wrap { padding-left: var(--space-2); padding-right: var(--space-2); }
+}
+
 /* The count rides the icon, as it does in every app people already use. */
 .tabbar .count {
   position: absolute; top: -5px; right: 6px;
@@ -748,6 +762,16 @@ li.event-item:last-child::before { content: none; }
   font-size: var(--text-xs); line-height: 1.25rem;
 }
 .directions:hover { border-color: var(--accent); background: var(--accent-wash); }
+/*
+ * Its own surface, so it keeps its contrast when the card beneath it changes.
+ *
+ * `--accent` is 5.02:1 on `--surface` and 4.38:1 on `--surface-sunk`, and the
+ * card goes sunk on hover — and now, since press states shipped, on every tap.
+ * Before that a phone never reached this state at all; the failure is old and
+ * the exposure is new. Giving the pill a surface fixes both without touching
+ * the accent, which everything else in the app is calibrated against.
+ */
+.directions { background: var(--surface); }
 
 /*
  * The meta line: when this happens, and in what zone. It wraps rather than
@@ -861,7 +885,26 @@ dl.extracted dd { margin: 0; min-width: 0; word-break: break-word; }
 
 .suggestions { list-style: none; margin: var(--space-1) 0 0; padding: 0; }
 
+/*
+ * A grid item's automatic minimum size is its *min-content* width, so `1fr`
+ * cannot shrink a track below the widest thing in it and the `width: 100%` on
+ * the input never gets a chance. `input[type=datetime-local]` has a min-content
+ * width of ~437px at 200% text, which is what dragged every lodging and
+ * activity form sideways at *every* viewport width — 1526px of scroll in a
+ * 1440px window, and the roadmap had it recorded as a phone-width problem
+ * (ROADMAP §2 item 7, WCAG 1.4.10).
+ *
+ * `min-width: 0` on the items rather than the roadmap's proposed `width: 100%;
+ * min-width: 0` on the input itself: the control's own rendering is left alone,
+ * which is what made that fix look risky on iOS Safari. It was never the
+ * control that was too wide — it was the track.
+ *
+ * Note the single-column fallback below does not cover this on its own: media
+ * query `rem` is relative to the *initial* 16px font, so 30rem is 480px at
+ * every text size, and one 439px column still overflows a 320px screen.
+ */
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--space-3); }
+.grid2 > * { min-width: 0; }
 @media (max-width: 30rem) { .grid2 { grid-template-columns: 1fr; } }
 
 /* Card titles take the larger step only where there is room for it. At 390px
@@ -1133,3 +1176,368 @@ ul.passes > li.card { margin-bottom: var(--space-3); }
   gap: var(--space-2);
 }
 .event-passes .pass-confirm > .muted.tiny { margin: 0; flex-basis: 100%; }
+
+/* ------------------------------------------------------------- pressed -- */
+
+/*
+ * Press feedback, which this stylesheet had none of.
+ *
+ * Every affordance here was a `:hover` rule, and hover does not exist on a
+ * phone — so a tap on a trip card produced nothing at all until the next screen
+ * painted. On a slow connection that is a second of a person wondering whether
+ * the app heard them, and it is the clearest tell that a thing is a web page
+ * rather than an app.
+ *
+ * The transform is small on purpose: 1.5% is felt rather than seen, which is
+ * what a press should be. It is also the one motion here that must survive
+ * `prefers-reduced-motion` as *colour only* — the feedback is the point, the
+ * movement is not.
+ */
+html { -webkit-tap-highlight-color: transparent; }
+
+/* Removes the 300ms wait a browser keeps in case a tap becomes a double-tap.
+   Not `none`: that would also kill pinch-zoom, which is an accessibility
+   feature and not ours to take away. */
+a, button, .card.link, .event-card, .sheet-option, .tabbar a, .fab {
+  touch-action: manipulation;
+}
+
+button:active:not(:disabled),
+a.btn:active,
+.card.link:active,
+.event-card:active,
+.sheet-option:active,
+.fab:active {
+  transform: scale(0.985);
+}
+button:active:not(:disabled), a.btn:active { filter: brightness(0.94); }
+.card.link:active, .event-card:active, .sheet-option:active {
+  background: var(--surface-sunk);
+  border-color: var(--field);
+}
+.tabbar a:active .tabicon-wrap { background: var(--surface-sunk); }
+
+button, a.btn, .card.link, .event-card, .sheet-option, .fab {
+  transition: transform 90ms ease, background-color 120ms ease, border-color 120ms ease,
+    filter 90ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The surface shift stays — it is the feedback. Only the movement goes. */
+  button:active:not(:disabled), a.btn:active, .card.link:active,
+  .event-card:active, .sheet-option:active, .fab:active { transform: none; }
+  button, a.btn, .card.link, .event-card, .sheet-option, .fab { transition: none; }
+}
+
+/* ---------------------------------------------------------- screen bar -- */
+
+/*
+ * One bar for every pushed screen: a way back on the left, the screen's name
+ * beside it.
+ *
+ * `.backlink` existed and was used on exactly one screen, so Add flight, Add
+ * stay and Add activity opened with no top-left affordance at all and the only
+ * way out was a Cancel button most of a screen further down. It is also what
+ * makes the platform's own edge-swipe read as correct rather than accidental
+ * once this runs inside a native shell.
+ */
+.screen-bar {
+  display: flex; align-items: center; gap: var(--space-1);
+  margin: calc(var(--space-2) * -1) calc(var(--space-4) * -1) var(--space-3);
+  padding: 0 var(--space-2);
+  border-bottom: 1px solid var(--rule);
+  min-height: 44px;
+}
+.screen-bar .back {
+  display: inline-flex; align-items: center; gap: 2px;
+  min-height: 44px; padding: 0 var(--space-2);
+  color: var(--accent); text-decoration: none;
+  font: 600 var(--text-sm)/var(--lh-sm) var(--sans);
+  background: none; border: 0; cursor: pointer;
+}
+.screen-bar .back:hover { text-decoration: underline; text-underline-offset: 3px; }
+.screen-bar .bar-title {
+  font: 600 var(--text-base)/var(--lh-base) var(--sans);
+  margin: 0; flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.screen-bar .bar-actions { display: flex; gap: var(--space-2); flex: none; }
+
+/* ----------------------------------------------------------------- fab -- */
+
+/*
+ * Adding is demoted from a full-width block above the itinerary to a button
+ * over it.
+ *
+ * The trip screen exists to show the timeline, and the timeline was starting
+ * below a header panel, a full-width primary action and a warning banner — so
+ * on a phone the first event sat at the fold. Adding is frequent, which is why
+ * it stays reachable at all times; it is not the screen's subject, which is why
+ * it stops taking the width of one.
+ *
+ * Phone only: on a desktop there is no thumb, the pointer is wherever the
+ * person left it, and a circle floating over the corner of a window is a phone
+ * idiom borrowed into a place that has a header with room in it.
+ */
+.fab {
+  position: fixed; right: var(--space-4); z-index: 4;
+  bottom: calc(72px + var(--space-3) + env(safe-area-inset-bottom));
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  min-height: 52px; padding: 0 var(--space-5);
+  /* Not 15px: a hard-coded size does not answer text zoom, so at 200% the app
+     doubled around a button whose word stayed put. Tokens are the contract
+     (BRAND.md §3). */
+  border: 1px solid transparent; border-radius: 999px;
+  background: var(--accent); color: var(--accent-ink);
+  font: 600 var(--text-sm)/1 var(--sans);
+  text-decoration: none; cursor: pointer;
+  /* The sheet is the only other thing in the app that floats, and it is the
+     precedent: a layer genuinely above the page reads as one. */
+  box-shadow: 0 6px 20px rgb(24 16 4 / 0.28);
+}
+/* No tab bar to clear on a screen that hides it. */
+.app.no-tabs .fab { bottom: calc(var(--space-4) + env(safe-area-inset-bottom)); }
+
+/* ------------------------------------------------------- sticky days -- */
+
+/*
+ * The day you are reading stays on screen.
+ *
+ * A trip is a column of events under date headings, and the heading scrolled
+ * away with them — so halfway down day three the answer to "what day is this"
+ * was above the viewport. Sticky is per-section, so each date holds until its
+ * own day has passed rather than one heading following the whole page.
+ */
+.day > h3 {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--paper);
+  padding-top: var(--space-2);
+}
+
+/* ------------------------------------------------------- pinned actions -- */
+
+/*
+ * A form's own action row, pinned to the bottom of a phone screen.
+ *
+ * Add flight is about 1,460px tall on a 390px phone — 1.7 screens — and Add sat
+ * at the bottom of it, under two optional fields. A person who has typed
+ * everything the flight needs should not have to scroll past what it does not.
+ */
+@media (max-width: 47.999rem) {
+  .actions.pinned {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 4;
+    margin: 0;
+    display: flex; gap: var(--space-2);
+    padding: var(--space-3) var(--space-4) calc(var(--space-5) + env(safe-area-inset-bottom));
+    background: color-mix(in srgb, var(--paper) 94%, transparent);
+    backdrop-filter: saturate(1.4) blur(12px);
+    border-top: 1px solid var(--rule);
+  }
+  .actions.pinned > button:first-child, .actions.pinned > a.btn:first-child { flex: 1; }
+  /* Room for it, so the last field is never trapped underneath. */
+  /*
+   * In `rem`, so the reserve grows with the thing it is reserving for: the bar
+   * is a button whose text scales, measuring 79px at 100% and 99px at 200%,
+   * against a flat 96px that was already 3px short at the top of that range.
+   * A repeated constant cannot track a height it does not know about.
+   */
+  .app.has-pinned-actions { padding-bottom: calc(7rem + env(safe-area-inset-bottom)); }
+}
+
+/* ------------------------------------------------------------ optional -- */
+
+/*
+ * The fields a booking does not need, folded away.
+ *
+ * `<details>` rather than state in the component: it is one element, it is
+ * keyboard operable and announced as expandable for free, and the browser
+ * already knows how to open it when someone searches the page for a word
+ * inside it.
+ */
+.optional-fields {
+  margin-top: var(--space-5);
+  border: 1px solid var(--rule); border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.optional-fields > summary {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  min-height: 44px; padding: 0 var(--space-4);
+  font: 600 var(--text-sm)/var(--lh-sm) var(--sans);
+  cursor: pointer; list-style: none;
+}
+.optional-fields > summary::-webkit-details-marker { display: none; }
+.optional-fields > summary .hint {
+  color: var(--ink-soft); font-weight: 400;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.optional-fields > summary .caret { flex: none; color: var(--ink-soft); transition: transform 140ms ease; }
+.optional-fields[open] > summary .caret { transform: rotate(180deg); }
+.optional-fields[open] > summary { border-bottom: 1px solid var(--rule); }
+.optional-fields .inner { padding: 0 var(--space-4) var(--space-4); }
+@media (prefers-reduced-motion: reduce) {
+  .optional-fields > summary .caret { transition: none; }
+}
+
+/* --------------------------------------------------------- next event -- */
+
+/*
+ * What is actually about to happen, on the card for the trip it belongs to.
+ *
+ * The trips screen listed name, dates and a status and stopped there, so the
+ * one question a traveller opens this app to answer — what is next, and when —
+ * was two taps away on the only screen that had room to say it. It costs no
+ * request: the timeline is already in IndexedDB from the last time the trip was
+ * opened, which is also why it is absent rather than wrong when it has not been.
+ */
+.next-up {
+  display: flex; align-items: center; gap: var(--space-2);
+  margin-top: var(--space-2);
+  color: var(--accent);
+  font-size: var(--text-sm); line-height: var(--lh-sm);
+}
+.next-up svg { flex: none; }
+.next-up .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ------------------------------------------------------------ desktop -- */
+
+/*
+ * Above this width the app stops being a phone in the middle of a window.
+ *
+ * At 1440 the 34rem column used 38% of the width and left the rest as paper,
+ * with a row of nav chips anchored to nothing in the middle of it. There is
+ * room for the list and the open trip at once, and a trip list beside a trip is
+ * how every mail, notes and calendar app has taught people to read exactly this
+ * shape of data.
+ *
+ * 72rem, not lower: below it the two panes squeeze the itinerary's own measure,
+ * which is the one thing the width is *not* for. The reading column stays the
+ * same width it is on a phone — what the extra width buys is context, not
+ * longer lines.
+ */
+@media (min-width: 72rem) {
+  .app.wide {
+    max-width: none; width: 100%;
+    padding: 0;
+    display: grid;
+    grid-template-columns: 232px 372px minmax(0, 1fr);
+    min-height: 100vh;
+    align-items: start;
+  }
+
+  /* The tab bar becomes the rail: same element, same links, same aria-label. */
+  .app.wide .rail {
+    grid-column: 1; position: sticky; top: 0;
+    height: 100vh; padding: var(--space-5) var(--space-3);
+    border-right: 1px solid var(--rule);
+    display: flex; flex-direction: column; gap: var(--space-5);
+  }
+  .app.wide .rail .wordmark { padding: 0 var(--space-3); }
+  .app.wide .rail .tabbar {
+    position: static; display: flex; flex-direction: column; gap: var(--space-1);
+    background: none; backdrop-filter: none; border-top: 0; padding: 0;
+  }
+  .app.wide .rail .tabbar a {
+    flex-direction: row; justify-content: flex-start; gap: var(--space-3);
+    min-height: 44px; padding: 0 var(--space-3);
+    border: 1px solid transparent; border-radius: 999px;
+    font: 600 var(--text-base)/1 var(--sans);
+  }
+  .app.wide .rail .tabbar a:hover { border-color: var(--field); }
+  .app.wide .rail .tabbar a[aria-current='page'] {
+    background: var(--accent-wash); border-color: var(--accent-line);
+  }
+  .app.wide .rail .tabbar .tabicon-wrap { padding: 0; background: none; border-color: transparent; }
+  .app.wide .rail .tabbar a[aria-current='page'] .tabicon-wrap { background: none; border-color: transparent; }
+  /* The count leaves the icon and takes the end of the row, which is where a
+     list of destinations puts a number. */
+  .app.wide .rail .tabbar .count { position: static; margin-left: auto; }
+
+  .app.wide .list-pane {
+    grid-column: 2; position: sticky; top: 0;
+    height: 100vh; overflow-y: auto;
+    padding: var(--space-5) var(--space-4);
+    border-right: 1px solid var(--rule);
+  }
+  .app.wide main { grid-column: 3; padding: var(--space-5) var(--space-8); }
+  /* The itinerary keeps a phone's measure; the surplus is gutter, not line
+     length. */
+  .app.wide main > * { max-width: 38rem; }
+
+  /* The list's own header sits above the cards rather than beside a screen
+     title that is now in the other pane. */
+  .list-pane .section-head { margin-bottom: var(--space-4); }
+  .list-pane h2.screen-title { font-size: var(--text-xl); line-height: var(--lh-xl); }
+
+  /*
+   * Selected, because two panes means the list has to say which trip the pane
+   * beside it is showing.
+   *
+   * The wash alone could not carry it. `--accent-wash` was tuned to hold
+   * `--ink` at 4.5:1, not to be *distinguishable from `--surface`* — different
+   * jobs, and it measured 1.10:1 against an unselected card in light and
+   * **1.00:1 in dark**, where the two have identical relative luminance and the
+   * only difference left is hue. A list of four identical rows for anyone who
+   * cannot separate warm from cool at the same lightness (WCAG 1.4.1, 1.4.11).
+   *
+   * The leading edge is `--accent` itself: 5.02:1 on `--surface` in light,
+   * 8.65:1 in dark. It is also the shape a selected row has in every mail and
+   * notes app, which is the frame this borrows from.
+   */
+  .card.link[aria-current='page'] {
+    background: var(--accent-wash); border-color: var(--accent-line);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+  .card.link[aria-current='page'] .status { background: var(--surface); }
+
+  /* Nothing floats: the header has room for the action. */
+  .fab { display: none; }
+  /* The pushed-screen bar is a phone idiom — on a desktop the list pane is the
+     way back and it never left. */
+  .app.wide .screen-bar { display: none; }
+}
+
+/* The empty detail pane, before a trip is chosen. */
+.pane-empty {
+  color: var(--ink-soft); text-align: center;
+  padding: var(--space-10) var(--space-5);
+  border: 1px dashed var(--rule); border-radius: var(--radius);
+}
+
+/* Room for the last card to clear the floating button. Only ever rendered
+   where the button is, which is a phone. */
+.fab-clearance { height: 64px; }
+
+/*
+ * A chevron says "this pushes to another screen", and at desktop width opening
+ * a trip no longer does — the trip arrives in the pane already on screen. The
+ * row that is open is marked by being open, not by an arrow to somewhere.
+ */
+@media (min-width: 72rem) {
+  .app.wide .list-pane .card.link { padding-right: var(--space-4); }
+  .app.wide .list-pane .card.link::after { content: none; }
+}
+
+/* The hint gives way before the chevron does: it is the part that can be
+   truncated without losing the control's meaning. */
+.optional-fields > summary .hint { min-width: 0; margin-left: auto; }
+
+/*
+ * `aria-disabled`, not `disabled`, so the control keeps its place in the tab
+ * order while a save is in flight — but it must still *look* unavailable, which
+ * `:disabled` styling alone no longer covers.
+ */
+button[aria-disabled='true'] {
+  background: var(--surface-sunk); color: var(--ink-soft);
+  border-color: var(--rule); cursor: not-allowed;
+}
+button[aria-disabled='true']:active { transform: none; filter: none; }
+
+/*
+ * Room to scroll a focused card clear of the two things that float over the
+ * bottom of a phone. Without it the browser stops as soon as the card's *link*
+ * is visible, which leaves the focus ring — drawn across the whole card — up to
+ * 62px underneath the tab bar (WCAG 2.4.12).
+ */
+@media (max-width: 47.999rem) {
+  li.event-item { scroll-margin-bottom: calc(72px + 64px + var(--space-4)); }
+}

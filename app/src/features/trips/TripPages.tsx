@@ -1,14 +1,26 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { formatCalendarDate, type TimelineItem, type TripSummary } from '@travel/shared';
+import { Link, NavLink, useLocation, useNavigate, useParams } from 'react-router-dom';
+import {
+  formatCalendarDate,
+  formatTimeOfDay,
+  type TimelineItem,
+  type TripSummary,
+} from '@travel/shared';
 import { api, ApiError } from '@/api/client';
 import { useAuth } from '@/auth/useAuth';
-import { ErrorText, Field, Sheet, Skeleton, StaleBanner } from '@/components/Bits';
-import { BackIcon, KindChip, ManageIcon, PlusIcon } from '@/components/Icons';
+import { ErrorText, Field, ScreenBar, Sheet, Skeleton, StaleBanner } from '@/components/Bits';
+import { KindChip, ManageIcon, PlusIcon } from '@/components/Icons';
 import { countedKindLabel } from '@/components/kinds';
 import { hasEnded, tripStatus } from '@/features/trips/status';
 import { useHour12 } from '@/prefs/useHour12';
-import { loadTimeline, loadTrip, loadTrips, type Loaded } from '@/data/repository';
+import { useWide } from '@/components/useWide';
+import {
+  cachedNextEvent,
+  loadTimeline,
+  loadTrip,
+  loadTrips,
+  type Loaded,
+} from '@/data/repository';
 import { Timeline } from '@/features/timeline/Timeline';
 import { Issues } from '@/features/timeline/Issues';
 import { NotificationSettings } from '@/features/notify/NotificationSettings';
@@ -143,11 +155,70 @@ export function TripListPage() {
   );
 }
 
-function TripCard({ trip }: { trip: TripSummary }) {
-  const status = tripStatus(trip);
+/**
+ * What is next on this trip, from the cache alone.
+ *
+ * Absent rather than wrong when the trip has never been opened online: there is
+ * nothing cached to read, and inventing a request per card would make the one
+ * screen that must open instantly the slowest one in the app.
+ */
+function useNextUp(tripId: string): TimelineItem | null {
+  const { user } = useAuth();
+  const { pathname } = useLocation();
+  const [next, setNext] = useState<TimelineItem | null>(null);
+
+  /*
+   * Re-read on every navigation, not only on mount.
+   *
+   * At desktop width this list never unmounts — so without the pathname here,
+   * opening a trip for the first time caches its timeline and the card beside
+   * it goes on saying nothing until the page is reloaded. An IndexedDB read per
+   * card per navigation is a rounding error against the request the navigation
+   * itself just made.
+   */
+  useEffect(() => {
+    if (!user) return undefined;
+    let live = true;
+    void cachedNextEvent(tripId, user.id, Date.now()).then((item) => {
+      if (live) setNext(item);
+    });
+    return () => {
+      live = false;
+    };
+  }, [tripId, user, pathname]);
+
+  return next;
+}
+
+function NextUp({ item, hour12 }: { item: TimelineItem; hour12: boolean }) {
+  const day = formatCalendarDate(item.startLocal.slice(0, 10), { weekday: 'long' });
 
   return (
-    <Link className="card link" to={`/trips/${trip.id}`}>
+    <p className="next-up">
+      <KindChip kind={item.kind} mode={item.mode} size="sm" />
+      {/* One line, ellipsised: this is a glance, and a card that grows to three
+          lines for a long restaurant name stops being scannable. */}
+      <span className="what">
+        Next: {item.title} · {formatTimeOfDay(item.startLocal, hour12)} {day}
+      </span>
+    </p>
+  );
+}
+
+function TripCard({ trip }: { trip: TripSummary }) {
+  const status = tripStatus(trip);
+  const hour12 = useHour12();
+  const next = useNextUp(trip.id);
+
+  return (
+    /*
+     * A NavLink rather than a Link, for `aria-current="page"` alone: at desktop
+     * width this list stands permanently beside the trip it opens, and a list
+     * that does not say which of its rows the pane is showing is a list of
+     * links to nowhere in particular. It costs nothing on a phone, where the
+     * list is never on screen at the same time as the trip.
+     */
+    <NavLink className="card link" to={`/trips/${trip.id}`}>
       <div className="row">
         <div className="grow">
           <div className="title">{trip.name}</div>
@@ -155,11 +226,27 @@ function TripCard({ trip }: { trip: TripSummary }) {
             {trip.destination !== null && trip.destination !== '' ? `${trip.destination} · ` : ''}
             {formatRange(trip.startDate, trip.endDate)}
           </div>
+          {next !== null && <NextUp item={next} hour12={hour12} />}
           <span className={`status ${status.tone}`}>{status.text}</span>
         </div>
         {trip.memberCount > 1 && <span className="muted tiny">{trip.memberCount} people</span>}
       </div>
-    </Link>
+    </NavLink>
+  );
+}
+
+/**
+ * What the detail pane shows before a trip has been chosen.
+ *
+ * Only reachable at desktop width: on a phone `/` is the list itself, and there
+ * is no second pane to be empty.
+ */
+export function ChooseTripPane() {
+  return (
+    <div className="pane-empty">
+      <p>No trip open.</p>
+      <p className="muted">Choose one from the list, or start a new one.</p>
+    </div>
   );
 }
 
@@ -179,6 +266,8 @@ export function TripFormPage() {
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
+    // Guarded rather than disabled — see the note on the event form's submit.
+    if (busy) return;
     setBusy(true);
     setError('');
     void (async () => {
@@ -197,6 +286,11 @@ export function TripFormPage() {
   };
 
   return (
+    <>
+    {/* The tab bar is not rendered on this screen, so this is the only way
+        back — and the first thing in the tab order, which is where a way out
+        belongs. */}
+    <ScreenBar to="/" label="Back to trips" />
     <form onSubmit={onSubmit}>
       <h2 className="screen-title">New trip</h2>
       <Field label="Name">
@@ -236,8 +330,12 @@ export function TripFormPage() {
         Used to group the trip in your list and to decide when to label an event with its own zone.
       </p>
       <ErrorText>{error}</ErrorText>
-      <div className="actions">
-        <button disabled={busy}>Create trip</button>
+      <p className="visually-hidden saving-live" role="status">
+        {busy ? 'Creating your trip…' : ''}
+      </p>
+
+      <div className="actions pinned">
+        <button aria-disabled={busy}>Create trip</button>
         {/* A button, not a bare link: an action row of one filled control and
             one underlined word reads as a form on a web page (BRAND.md §6). */}
         <Link className="btn secondary" to="/">
@@ -245,6 +343,7 @@ export function TripFormPage() {
         </Link>
       </div>
     </form>
+    </>
   );
 }
 
@@ -288,6 +387,7 @@ export function TripDetailPage() {
   const [adding, setAdding] = useState(false);
   const closeSheet = useCallback(() => setAdding(false), []);
   const hour12 = useHour12();
+  const wide = useWide();
 
   if (error) return <p className="error">{error}</p>;
   if (!detail || !timeline) return <Skeleton rows={4} label="Loading this trip" />;
@@ -313,21 +413,48 @@ export function TripDetailPage() {
             <ManageIcon />
             Manage
           </Link>
+          {/* Where there is a header with room in it, the action lives in the
+              header. The floating button below is the phone's answer to the
+              same problem and they are never both on screen. */}
+          {wide && (
+            <button aria-label="Add to trip" onClick={() => setAdding(true)}>
+              <PlusIcon size={18} />
+              Add
+            </button>
+          )}
         </div>
         <span className={`status ${status.tone}`}>{status.text}</span>
         <Tallies items={timeline.data} />
       </section>
 
-      {/* One primary action. Three side-by-side "+ Flight / + Stay / + Activity"
-          buttons made the user pick a type before deciding to add anything. */}
-      <button className="block" onClick={() => setAdding(true)}>
-        <PlusIcon size={18} />
-        Add to trip
-      </button>
-
       <Issues items={timeline.data} trip={trip} />
 
       <Timeline items={timeline.data} homeTimezone={trip.homeTimezone} hour12={hour12} />
+
+      {/*
+        The phone's Add.
+
+        It used to be a full-width block between the trip header and the
+        timeline, which put the first event of the trip at the fold on a 390px
+        screen — a screen whose whole job is showing the timeline. Adding is
+        frequent enough to stay reachable from anywhere on the page and not
+        important enough to take a screen's width to say so.
+
+        Last in the DOM on purpose: it is the last thing a keyboard user reaches
+        rather than something they pass through on the way to the itinerary.
+      */}
+      {!wide && (
+        <>
+          <button className="fab" aria-label="Add to trip" onClick={() => setAdding(true)}>
+            <PlusIcon size={20} />
+            Add
+          </button>
+          {/* Something for the last card to scroll past. A floating button that
+              permanently covers the final event of a trip has taken away the
+              one row a person scrolled to the bottom to read. */}
+          <div className="fab-clearance" aria-hidden="true" />
+        </>
+      )}
 
       {adding && (
         <Sheet title="Add to trip" onClose={closeSheet}>
@@ -375,10 +502,10 @@ export function TripSettingsPage() {
 
   return (
     <>
-      <Link className="btn secondary backlink" to={`/trips/${tripId}`}>
-        <BackIcon />
-        {trip.name}
-      </Link>
+      {/* The same bar as every other pushed screen. This was the one screen
+          that had a way back before the bar existed, and so ended up the only
+          one without it (BRAND.md §6b). */}
+      <ScreenBar to={`/trips/${tripId}`} label="Back to trip" title={trip.name} />
 
       <h2 className="screen-title">Trip settings</h2>
 

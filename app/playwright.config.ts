@@ -97,12 +97,41 @@ export default defineConfig({
     baseURL: `http://localhost:${WEB_PORT}`,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    /** The app is a phone-first PWA; test it at the size it is used at. */
     ...devices['Desktop Chrome'],
+    /**
+     * Pinned, and deliberately between the two breakpoints.
+     *
+     * `devices['Desktop Chrome']` is 1280×720 — 80rem — which since the
+     * two-pane layout landed is *desktop*: the trips list stands permanently
+     * beside the open trip and opening one is a selection rather than a push.
+     * Every spec here was written against the pushed-screen model, so
+     * inheriting that width would silently change what 49 specs mean rather
+     * than test anything.
+     *
+     * 900px keeps them on the layout they were written for — one screen at a
+     * time, navigation as chips in the header — and says so out loud instead
+     * of depending on what a Playwright device preset happens to be. The
+     * two-pane layout gets its own project below, at a width where it is real.
+     */
+    viewport: { width: 900, height: 1000 },
     ...(useInstalledChrome ? { channel: 'chrome' } : {}),
   },
 
-  projects: [{ name: 'chromium' }],
+  projects: [
+    /** Everything, at the single-column width above. */
+    { name: 'chromium', testIgnore: '**/desktop.spec.ts' },
+    /**
+     * The two-pane layout, which only exists at 72rem and above. A separate
+     * project rather than a `test.use` inside one spec, because the width is a
+     * property of the whole run: the suite's other specs must not be able to
+     * drift into it by accident.
+     */
+    {
+      name: 'desktop',
+      testMatch: '**/desktop.spec.ts',
+      use: { viewport: { width: 1440, height: 900 } },
+    },
+  ],
 
   webServer: [
     {

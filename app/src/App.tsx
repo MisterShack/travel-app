@@ -12,6 +12,7 @@ import {
   VerifyPage,
 } from '@/features/auth/AuthPages';
 import {
+  ChooseTripPane,
   TripDetailPage,
   TripFormPage,
   TripListPage,
@@ -21,6 +22,7 @@ import { ImportsPage } from '@/features/imports/ImportsPage';
 import { AccountPage } from '@/features/account/AccountPage';
 import { PassesPage } from '@/features/passes/PassesPage';
 import { TabBar } from '@/components/TabBar';
+import { useWide } from '@/components/useWide';
 import { EventFormPage } from '@/features/timeline/EventForm';
 
 /**
@@ -39,11 +41,43 @@ function RequireUser({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * A screen that is a task rather than a destination.
+ *
+ * These get the whole phone: the tab bar goes, because leaving mid-form by
+ * tapping another destination is not something to make easy, and the form's own
+ * actions take the bottom edge instead. The way out is the bar at the top,
+ * which is why that and this arrived together — one without the other would be
+ * a screen with no exit.
+ */
+const TASK_ROUTE = /^\/trips\/(new$|[^/]+\/(segment|lodging|activity)\/[^/]+$)/;
+
 export function App() {
   const { user, offline } = useAuth();
   const { pending } = useInbox();
   const location = useLocation();
   const main = useRef<HTMLElement>(null);
+  const wide = useWide();
+
+  /**
+   * Above 72rem the trips list is a permanent pane beside the open trip, so
+   * opening a trip is a selection rather than a push (BRAND.md §6c). Only the
+   * trip routes have a list to show beside them; Inbox, Passes and Account are
+   * one column next to the rail.
+   */
+  const signedIn = user !== null;
+  const onTripsRoute = location.pathname === '/' || location.pathname.startsWith('/trips');
+  const showListPane = wide && signedIn && onTripsRoute;
+  const task = TASK_ROUTE.test(location.pathname) && !wide;
+
+  const shell = [
+    'app',
+    wide && signedIn ? 'wide' : '',
+    showListPane ? 'with-list' : '',
+    task ? 'no-tabs has-pinned-actions' : '',
+  ]
+    .filter((c) => c !== '')
+    .join(' ');
 
   /**
    * Move focus to the main region on every route change.
@@ -59,15 +93,21 @@ export function App() {
   }, [location.pathname]);
 
   return (
-    <div className="app">
+    <div className={shell}>
       <a className="skip" href="#main">
         Skip to content
       </a>
       {/* Signed out, the wordmark belongs above the sign-in card rather than in
           a title bar over an empty page — so the header only exists once there
-          is an app behind it. */}
+          is an app behind it.
+
+          Signed in, this is a title bar on a phone and the rail on a desktop.
+          Same element and the same children either way — what changes is where
+          it sits, because a strip of chrome across the top of a 1440px window
+          is a phone's header borrowed into a place that has room for a
+          column. */}
       {user !== null && (
-        <header className="bar">
+        <header className={wide ? 'rail' : 'bar'}>
           <h1>
             <Link className="wordmark" to="/">
               Waypoint
@@ -89,8 +129,21 @@ export function App() {
             wordmark, then the status, then the destinations — and the skip link
             is there for anyone who wants none of it.
           */}
-          <TabBar pending={pending} />
+          {/* Not rendered on a task screen rather than hidden: a `display: none`
+              tab bar is still four stops in the keyboard's tab order, leading
+              somewhere the screen is deliberately not offering. */}
+          {!task && <TabBar pending={pending} />}
         </header>
+      )}
+
+      {/* The list, permanently, beside whatever is open. It is a `nav` because
+          that is what it is — a list of links to the app's own content — and it
+          carries its own name so a keyboard user can reach it as a landmark
+          rather than tabbing the rail every time. */}
+      {showListPane && (
+        <nav className="list-pane" aria-label="Trips">
+          <TripListPage />
+        </nav>
       )}
 
       <main id="main" ref={main} tabIndex={-1}>
@@ -106,7 +159,9 @@ export function App() {
             path="/"
             element={
               <RequireUser>
-                <TripListPage />
+                {/* With the list already standing in its own pane, rendering it
+                    again here would be the same screen twice. */}
+                {showListPane ? <ChooseTripPane /> : <TripListPage />}
               </RequireUser>
             }
           />

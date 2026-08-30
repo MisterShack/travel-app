@@ -169,8 +169,27 @@ ever sequenced. The next actually-open item is 3.
    and Phase 12 were both held to. `GEMINI_API_KEY` is set in production, so this is a matter of
    opening a stay with an address and tapping a chip.
 
-7. **A reflow patch: the date fields force horizontal scrolling.** Small, known, and deliberately
-   not done on 2026-08-25 so it did not ride along inside a feature commit.
+7. ~~**A reflow patch: the date fields force horizontal scrolling.**~~ **FIXED 2026-08-28**, and it
+   was bigger than this entry said. The accessibility audit re-measured it at 200% text and found
+   the overflow at *every* viewport width, not only on a phone: 1526px of scroll in a 1440px window
+   on the lodging and activity forms. The flight form was always clean, and that turned out to be
+   the whole diagnosis — its two datetime fields are not inside a `.grid2`.
+
+   **The cause was the grid track, not the input.** A grid item's automatic minimum size is its
+   min-content width, so `1fr` could not shrink below the ~437px an `input[type=datetime-local]`
+   demands at 32px root, and the `width: 100%` on the input never got a chance. The fix is
+   `.grid2 > * { min-width: 0 }` — one line, and *safer* than the `width: 100%; min-width: 0` on the
+   input proposed below, because it does not touch how the control renders. The iOS-Safari worry
+   that made this look risky does not apply: the control was never narrower than its content, the
+   track was wider than the screen. Verified at 320, 390 and 1440 at 200% text — no horizontal
+   scroll at any of them.
+
+   Also worth keeping: the `@media (max-width: 30rem)` single-column fallback never covered this,
+   because media-query `rem` is relative to the *initial* 16px font and is therefore 480px at every
+   text size. One 439px column still overflows a 320px screen.
+
+   The original entry follows, because the reasoning it recorded is why the fix was checked in a
+   browser rather than trusted:
 
    `input[type=datetime-local]` sizes itself from its content, so at 200% text the **Starts** and
    **Ends** fields on every event form demand 473px and drag the whole page sideways —
@@ -188,6 +207,73 @@ ever sequenced. The next actually-open item is 3.
    Found by the `web-accessibility-reviewer` agent while auditing Phase 10 — a defect on the screen
    the feature ships on rather than in the feature, which is the second audit in a row to turn one
    up that way (`631bc0e` found the trip name hidden behind Manage at 200%).
+
+8. **Phase 13 — the frame. SHIPPED 2026-08-28.** BRAND.md §6c now owns the rules; this is the
+   order and the reasoning.
+
+   It came out of a UI review driven at 390, 834 and 1440 (18 screens, including offline). The
+   review's own sequence was *feel first, then frame* — press states and motion before layout,
+   because they cost least. **David reordered it, and was right**: the strongest motion item was a
+   shared-element transition between a trip card and the trip screen, and that transition only
+   exists because opening a trip is a *push*. At desktop width it is now a selection into a pane
+   that is already on screen, so building the motion first would have meant tuning it against a
+   navigation model about to be replaced on half the frames.
+
+   **The one carve-out, taken from the feel phase and shipped here:** press states. `:active`
+   attaches to a card, a button, a tab — a card is a card in every layout, so nothing about the
+   frame could invalidate them, and they were the single clearest "this is a web page" tell on a
+   phone (BRAND.md §6).
+
+   What landed: the rail-and-two-panes layout above 72rem, the phone's screen bar and floating
+   Add, task screens that hide the tab bar, pinned form actions with the optional fields folded
+   away, sticky day headers, and the next event on each trip card — read from the IndexedDB cache,
+   so it costs no request and is absent rather than wrong when there is nothing cached.
+
+   **What this cost the test suite, which is worth knowing before the next width change.** The
+   e2e suite inherited `devices['Desktop Chrome']` — 1280×720, which is 80rem, and therefore
+   *desktop* under the new breakpoint. Left alone, every one of the suite's specs would have
+   silently started running against the two-pane layout they were not written for: not a failure,
+   which is the problem. The viewport is now pinned at 900px and stated, and the two-pane layout has
+   its own project at 1440 (`desktop.spec.ts`). **69 specs, green.**
+
+9. **Phase 14 — the feel.** Next, and now unblocked because the frame under it is settled. View
+   transitions on the card-to-trip move (React Router 7 ships `viewTransition`; no dependency), the
+   skeleton cross-fade and a short entrance stagger, and a live "now" node on the spine. All of it
+   behind `prefers-reduced-motion`, which the sheet already had to learn the hard way.
+
+   Item 7 above is done, ahead of this phase rather than in it — the accessibility audit measured it
+   and the fix was one line. The new furniture it worried about (the pinned row, the floating button,
+   the sticky headers) was measured at 320px, 195px and 400% zoom and introduces no reflow of its
+   own.
+
+10. **Phase 15 — the native shells.** Capacitor for iOS and Android, one codebase, desktop staying
+    an installable PWA. Sequenced last deliberately: a shell inherits whatever the layout is on the
+    day it is built.
+
+    **Four blockers, in the order they bite**, and the first is not a guess — it was reproduced by
+    accident while driving the review:
+
+    - **The session is a cookie and the shell is a different origin.** `sameSite: 'Lax'`,
+      `credentials: 'include'`, and `originGuard` rejecting any write whose `Origin` is not in
+      `APP_ORIGIN`. From `capacitor://localhost` every write is third-party: the cookie is not sent
+      and the guard answers **403 `forbidden_origin`**, rendered as *"This request came from an
+      unrecognised origin."* Running the dev client on an unlisted port produced exactly that on
+      2026-08-28. A bearer token for native clients held in secure storage, cookies untouched on the
+      web.
+    - **Push and the service worker swap places.** Inside the shell the bundle is local, so the
+      worker is no longer what opens the app offline — the IndexedDB cache still is. `sw.ts` becomes
+      the web-only path; the subscription flow needs a platform branch. This is also what finally
+      makes `VAPID_*` optional rather than outstanding on iOS.
+    - **Emailed links have to open the app.** Verification, invite and reset links all point at
+      `waypoint.myze.ca`; without Universal Links and App Links association files they open the
+      browser, and a new user's first act after installing is to leave.
+    - **Apple requires in-app account deletion** wherever there is account creation (Guideline
+      5.1.1(v)). There is no delete-account route in the server and no control in the client —
+      checked 2026-08-28. It is also half of §5's "Data export and account deletion", so the two
+      should land together.
+
+    What the shell buys beyond a listing: APNs, and `.pkpass` straight into Apple Wallet, which is
+    where a boarding pass belongs at a gate.
 
 ## 3. Standing risks
 
@@ -252,6 +338,12 @@ instead of being bolted onto it, which is what conflict detection and segments b
   offline, and it puts the itinerary where family already look.
 - **A "next up" view.** The timeline answers *what is the plan*; nothing answers *what do I do now*.
   One screen, the next event, its countdown, in that event's own zone.
+
+  **Partly delivered 2026-08-28, and the cheap half first:** each trip card now carries its next
+  event, read from the cached timeline. That answers the question on the screen the app opens on,
+  for no request. What is still unbuilt is the *countdown* and a screen of its own — and the honest
+  argument for a whole screen is now weaker than it was, because the answer arrived on a card. The
+  live "now" node in Phase 14 covers more of the same ground.
 - **`source` is a column with one value.** `segments`, `lodging` and `activities` each declare
   `source: 'manual' | 'import'`, and `TimelineItem` carries it through to the client — but the
   create helpers hardcode `'manual'`, nothing ever writes `'import'`, and nothing reads it. So an

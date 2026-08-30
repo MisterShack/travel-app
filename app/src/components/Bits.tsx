@@ -9,6 +9,8 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react';
+import { Link } from 'react-router-dom';
+import { BackIcon } from '@/components/Icons';
 
 /**
  * The banner shown when a view is rendering a cached copy because the network
@@ -314,6 +316,50 @@ export function Skeleton({ rows = 3, label = 'Loading' }: { rows?: number; label
           </span>
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * The bar at the top of a pushed screen: a way back, and the screen's name.
+ *
+ * Every screen reached from another one gets this, which was previously true of
+ * exactly one of them — Add flight, Add stay and Add activity opened with a
+ * heading and no way out but a Cancel button most of a screen further down.
+ *
+ * The back control is a `<Link>` to a known place rather than `history.back()`.
+ * A form is reachable directly by URL (a deep link, a reload, a notification),
+ * and on those the browser's own history has somewhere else entirely behind it;
+ * naming the destination is the only version that is always right.
+ *
+ * Hidden at desktop width by CSS, where the list pane never left the screen and
+ * there is nothing to go back to.
+ */
+export function ScreenBar({
+  to,
+  label,
+  title,
+  actions,
+}: {
+  to: string;
+  label: string;
+  title?: string;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="screen-bar">
+      {/* The word "back" is in the visible label rather than an `aria-label`.
+          Sighted readers get the direction from the chevron; without it the
+          computed name was just "Trip", a link named after a place sitting
+          above a heading called "Add flight", leaving a screen-reader user to
+          infer which way it goes. Putting it in the text satisfies 2.5.3
+          without an attribute that can drift from what is on screen. */}
+      <Link className="back" to={to}>
+        <BackIcon />
+        {label}
+      </Link>
+      {title !== undefined && <p className="bar-title">{title}</p>}
+      {actions !== undefined && <div className="bar-actions">{actions}</div>}
     </div>
   );
 }

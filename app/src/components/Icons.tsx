@@ -202,3 +202,18 @@ export function KindChip({
     </span>
   );
 }
+
+/**
+ * A chevron pointing down. Rotated by CSS when what it opens is open.
+ *
+ * Takes a `className` because that rotation is a stylesheet rule looking for
+ * `.caret`, and `stroked` carries no class — so the rule, and its
+ * `prefers-reduced-motion` companion, were both dead until this existed.
+ */
+export function ChevronIcon({ size = 16, className }: { size?: number; className?: string }) {
+  return (
+    <svg {...stroked} width={size} height={size} className={className}>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}

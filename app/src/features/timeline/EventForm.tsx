@@ -2,7 +2,8 @@ import { useEffect, useId, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { segmentModes, type Passenger, type SegmentMode } from '@travel/shared';
 import { api, ApiError } from '@/api/client';
-import { ErrorText, Field, Warnings } from '@/components/Bits';
+import { ErrorText, Field, ScreenBar, Warnings } from '@/components/Bits';
+import { ChevronIcon } from '@/components/Icons';
 import { AirportField, TimezoneField } from './AirportField';
 import { ACTIVITY_KINDS, applyDraft, type ActivityKind } from './draft';
 import { describeRejection } from './fieldErrors';
@@ -264,6 +265,18 @@ export function EventFormPage() {
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
+    /*
+     * The guard, not a disabled button.
+     *
+     * Disabling a control in response to activating it drops focus to `<body>`:
+     * the reader loses their place, the next Tab starts again at "Skip to
+     * content", and nothing is announced for the length of the request — which
+     * on an airport connection is the only time any of this is visible. This
+     * app has now had that bug three times (BRAND.md §6, and the two in
+     * CLAUDE.md), so the button stays enabled and a second press is refused
+     * here instead.
+     */
+    if (busy) return;
     setBusy(true);
     setError('');
     setWarnings([]);
@@ -342,6 +355,9 @@ export function EventFormPage() {
 
   return (
     <>
+    {/* The way out. Outside the form, above the heading, so it is the first
+        thing in the tab order on a screen that no longer shows the tab bar. */}
+    <ScreenBar to={`/trips/${tripId}`} label="Back to trip" />
     <form onSubmit={onSubmit}>
       <h2>
         {isNew ? 'Add' : 'Edit'}{' '}
@@ -534,12 +550,34 @@ export function EventFormPage() {
         </>
       )}
 
-      <Field label="Confirmation code">
-        <input value={f.confirmationCode} onChange={(e) => set({ confirmationCode: e.target.value })} placeholder="Optional" />
-      </Field>
-      <Field label="Notes">
-        <textarea value={f.notes} onChange={(e) => set({ notes: e.target.value })} />
-      </Field>
+      {/*
+        Everything a booking does not need, folded away.
+
+        These two stood between the last field a flight actually requires and
+        the button that saves it, on a form already 1.7 phone screens tall. A
+        `<details>` rather than component state: it is keyboard operable and
+        announced as expandable without being told to be, and the browser opens
+        it by itself when someone uses find-in-page on a word inside it.
+      */}
+      <details className="optional-fields">
+        {/* The chevron is a sibling of the hint, not inside it: `.hint` clips
+            its own overflow, so at 200% text "Confirmation code, notes" no
+            longer fits and the arrow was pushed out and clipped along with the
+            rest of the sentence. */}
+        <summary>
+          More details
+          <span className="hint">Confirmation code, notes</span>
+          <ChevronIcon className="caret" />
+        </summary>
+        <div className="inner">
+          <Field label="Confirmation code">
+            <input value={f.confirmationCode} onChange={(e) => set({ confirmationCode: e.target.value })} placeholder="Optional" />
+          </Field>
+          <Field label="Notes">
+            <textarea value={f.notes} onChange={(e) => set({ notes: e.target.value })} />
+          </Field>
+        </div>
+      </details>
 
       <Warnings items={warnings} />
       {warnings.length > 0 && (
@@ -549,16 +587,44 @@ export function EventFormPage() {
       )}
       <ErrorText>{error}</ErrorText>
 
-      <div className="actions">
-        <button disabled={busy}>{savedId !== null || !isNew ? 'Save' : 'Add'}</button>
-        <Link className="btn secondary" to={`/trips/${tripId}`}>
-          {warnings.length > 0 ? 'Back to trip' : 'Cancel'}
-        </Link>
-        {(!isNew || savedId !== null) && (
+      {/*
+        Deleting is not one of the two things this row is for.
+
+        It sits above rather than beside them: the pinned row is within a
+        thumb's reach at all times by design, and putting an irreversible action
+        in a bar built to be easy to hit by feel is how someone loses a flight.
+      */}
+      {(!isNew || savedId !== null) && (
+        <div className="actions">
           <button type="button" className="danger" onClick={remove}>
             Delete
           </button>
-        )}
+        </div>
+      )}
+
+      {/*
+        Pinned to the bottom of a phone, in flow on anything wider. Add sat
+        under two optional fields at the end of a form most of two screens
+        tall; a person who has typed everything the flight needs should not
+        have to scroll past what it does not.
+      */}
+      {/*
+        Mounted empty from the first render, always.
+
+        A live region that only exists once it has something to say enters the
+        accessibility tree in the same commit as its first message, which is the
+        one case a live region does not survive — Phase 10 lost a day to exactly
+        this. Empty here, and it announces the moment `busy` flips.
+      */}
+      <p className="visually-hidden saving-live" role="status">
+        {busy ? 'Saving…' : ''}
+      </p>
+
+      <div className="actions pinned">
+        <button aria-disabled={busy}>{savedId !== null || !isNew ? 'Save' : 'Add'}</button>
+        <Link className="btn secondary" to={`/trips/${tripId}`}>
+          {warnings.length > 0 ? 'Back to trip' : 'Cancel'}
+        </Link>
       </div>
     </form>
 

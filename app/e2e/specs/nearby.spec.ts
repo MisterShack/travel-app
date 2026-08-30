@@ -183,7 +183,17 @@ test.describe('asking what is nearby', () => {
     await page.route('**/api/activities/*/nearby', (route) => route.fulfill({ json: ANSWER }));
     await openActivity(page, request);
 
-    const live = page.locator('[role="status"]');
+    /*
+     * Scoped to the panel, not the document.
+     *
+     * A bare `[role="status"]` was matching whatever else the screen happened
+     * to carry — and an event form now also announces "Saving…" from a region
+     * of its own, for the same reason this one exists. What these two tests are
+     * about is *this* panel's region, so they say so; asserting that the whole
+     * page holds exactly one live region was never the point and was never
+     * true of anything in particular.
+     */
+    const live = page.locator('.nearby [role="status"]');
     await expect(live).toHaveCount(1);
     await expect(live).toHaveText('');
     // Present in the tree, not merely in the DOM.
@@ -207,7 +217,7 @@ test.describe('asking what is nearby', () => {
     await openActivity(page, request);
     await page.getByRole('button', { name: 'Eat nearby' }).click();
 
-    const live = page.locator('[role="status"]');
+    const live = page.locator('.nearby [role="status"]');
     await expect(live).toContainText(ANSWER.answer.text);
     await expect(live.getByRole('link')).toHaveCount(0);
     await expect(live).not.toContainText('Google Maps');
@@ -218,7 +228,7 @@ test.describe('asking what is nearby', () => {
     await expect(list.getByRole('link')).toHaveCount(2);
     expect(
       await page.evaluate(
-        () => document.querySelector('[role="status"]')?.nextElementSibling?.className,
+        () => document.querySelector('.nearby [role="status"]')?.nextElementSibling?.className,
       ),
     ).toContain('nearby-places');
   });
