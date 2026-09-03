@@ -27,7 +27,8 @@
 |---|---|---|---|
 | 1 | **Concierge test before code** | Run it. ~$1,200, no code, answers the existential question before the product could. With no deadline there is no argument left against it | Committing the hardest engineering in the plan before knowing anyone buys |
 | 2 | **Does ingestion move ahead of the album?** | Yes. Phase 5's criterion is the only test that proves §2c, and the album should be built once against final clusters | Building edit-preservation twice, or finding the re-cluster conflict late |
-| 3 | **Does `hello@wayleaf.app` exist?** | Create it before the page is announced, via Cloudflare Email Routing | It is printed on the page twice and is the only route a person has to ask for their address to be deleted |
+| 3 | ~~**Does `hello@wayleaf.app` exist?**~~ **Done 2026-09-03** — Cloudflare Email Routing, forwarding verified. Follow-up: forwarded mail fails SPF alignment and lands in junk, so **move to a real mailbox on the apex before launch** | — |
+| 4 | **Does the waitlist confirm by email (double opt-in)?** | Probably yes, and it is the first real use of Resend | Single opt-in means no proof of consent and no way for someone signed up maliciously to find out. The privacy page promises deletion on request — which the person who never signed up cannot ask for, because they do not know |
 | ~~4~~ | ~~**Grab `wayleaf.com`?**~~ **Closed 2026-09-03: it is taken.** A `dig` with no NS/A records was read as "available"; it only means "unconfigured". BUSINESS-PLAN §11's original assessment was correct, and its broker-with-a-walk-away-number advice stands if it is ever wanted | — |
 | 4 | Household tier pricing, given the corrected arithmetic | Rebuild §8 with the credit book as a cost line first | The only recurring revenue line is ~8× overstated |
 | 5 | Face scoring: detection or cross-image matching | Specify explicitly before Phase 2 is scoped | BIPA carries statutory damages and a private right of action |

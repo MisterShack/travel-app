@@ -62,6 +62,19 @@ on the live site twice as the only route a person has to ask for their data to b
 6. Verify by sending from an account that is not the destination. A message from the destination to
    itself can loop or be filtered and proves nothing.
 
+**Forwarded mail lands in junk, and that is not a misconfiguration.** A forward re-sends the message
+from Cloudflare's servers, which the original sender's SPF record does not authorise, so alignment
+fails at the destination and receivers downrank it. Cloudflare implements SRS, which helps; it does
+not make the problem go away. Marking the sender trusted fixes it **for that one mailbox** and does
+nothing for anyone else.
+
+**Why that matters more than it looks.** At launch `hello@wayleaf.app` is the address the privacy
+page names as the route to ask for your data to be deleted. A deletion request silently sitting in
+junk is a promise not kept, and it is the kind of promise a regulator reads literally. Two
+consequences: check junk deliberately until there is a real mailbox, and treat this as the argument
+for moving to **Fastmail on the apex before launch** rather than after — a real mailbox receives
+directly and has no forwarding hop to lose alignment on.
+
 **It only receives.** Replying from your own inbox shows your personal address, not `hello@`.
 Options, in order of how much they cost:
 
