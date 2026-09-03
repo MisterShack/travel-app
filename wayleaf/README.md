@@ -20,6 +20,37 @@ that makes the book assemble itself.
 | **PORTING.md** | What comes across from Waypoint, what comes across changed, and what must not come across. |
 | **BRAND.md** | Identity and design system. Measured colour, the mark, voice, accessibility rules. |
 | **CLAUDE.md** | The project guide — layout, non-negotiables in short, quality workflow. |
+| **.claude/team/CHARTER.md** | The team: roster, model assignment, how agents communicate, the amendment protocol. |
+| **.claude/team/DECISIONS.md** | What David has actually decided, and what is still owed. |
+
+## The team
+
+Wayleaf is built by an orchestrated team of specialist agents, defined in `.claude/`. The roster,
+the model assignment and the rules of engagement are in **`.claude/team/CHARTER.md`**; how work is
+routed is in **`.claude/skills/team/SKILL.md`**.
+
+| Seat | Agent | Model |
+|---|---|---|
+| Project manager | the orchestrator (`/team` skill) | Opus 5 |
+| CFO | `finance-officer` | Opus 5 |
+| Marketing | `market-strategist` | Sonnet 5 |
+| Lead engineer | `lead-engineer` | Opus 5 |
+| Platform / DevOps | `platform-engineer` | Sonnet 5 |
+| Database | `database-reviewer` | Opus 5 |
+| QA and documentation | `qa-documenter` | Sonnet 5 |
+| Privacy | `privacy-counsel` | Opus 5 |
+| Application security | `security-reviewer` | Opus 5 |
+
+Three things worth knowing before using it:
+
+- **Agents report; the orchestrator routes; David decides.** No agent decides anything, and no agent
+  edits its own specification — a stale spec is amended through the protocol in CHARTER §5, with
+  David's approval and a logged reason.
+- **The roster is a directory, not a workflow.** Most work happens inline. Every subagent starts
+  cold and re-derives context, so delegation is for a distinct instrument or for genuine
+  independence — never for the appearance of thoroughness.
+- **`privacy-counsel` and `security-reviewer` were not in the original roster.** They were added
+  because the independent reviews found a class of failure with no seat accountable for it.
 
 ## Relationship to Waypoint
 
