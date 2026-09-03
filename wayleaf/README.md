@@ -73,5 +73,11 @@ as inversions rather than quietly dropped:
 
 ## Stack
 
-Postgres on Railway (Drizzle), Cloudflare R2 for all media with zero egress, Hono API, a React SPA
-as the companion surface, and React Native (Expo) as the capture surface — iOS first.
+**Mobile-first.** React Native (Expo), iOS first — photos originate on the phone, camera-roll
+permission is the whole product, and push exists nowhere else. Postgres on Railway (Drizzle),
+Cloudflare R2 for all media with zero egress, and a Hono API behind it.
+
+The web is second, and it is two things at two times: a **static public page** carrying who we are,
+what we do, where to get the app and the policies — which ships first and gates the iOS submission,
+because App Store Connect will not accept a binary without a privacy policy URL — and, later, a
+**signed-in album editor**, which is the one job a large screen does better than a phone.

@@ -279,6 +279,24 @@ trip-end-to-order lag, and report that lag as its own metric in the meantime.
 This matters more than a metrics quibble usually does: BUSINESS-PLAN §12 makes "book attach rate
 lands below 5%" an *existential* trigger to change pricing models. A number that is wrong in a known
 direction, wired to that decision, is worse than one nobody trusts.
+### 2k. Mobile is the product; the web explains it
+
+Photos originate on the phone. In-trip use is on the phone. Camera-roll permission is the entire
+product, and push notifications exist nowhere else. **So the phone is not a client of this system,
+it is the system**, and anything that treats it as one of several equal surfaces will get the
+sequencing wrong.
+
+The web does two jobs, and neither is capture:
+
+1. **Explain the product and host the policies.** Who we are, what we do, where to get the app,
+   privacy policy, terms. This ships first and is not an app.
+2. **Later: signed-in album editing on a large screen.** Genuinely better than a phone for laying
+   out a book — the one job where the web wins outright rather than imitating the app.
+
+**The trap this rule exists to prevent:** building a web upload path "just for the beta". It would
+be thrown away, it would measure the funnel through a surface the strategy says cannot work, and it
+would take the time that should have gone into the background-upload path that is the actual
+product. Read any beta plan that runs on a browser as a plan that has not accepted this rule.
 
 ---
 
@@ -357,11 +375,20 @@ lands in R2 as an object the API never touched. Then the database is destroyed a
 last night's dump, **and that photo still resolves** — §1c's both-halves drill, run for the first
 time on the smallest possible dataset, which is the only comfortable time to run it.
 
-### Phase 1 — Trips and photos, Path B
+### Phase 1 — Capture: the phone, trips and photos (Path B)
+
+**This phase is the Expo app, not a browser upload form.** Mobile is first (see §2k), so the
+capture surface ships here rather than in a later phase — a web uploader built to carry a beta
+would be thrown away, and it would measure the funnel through a surface the strategy says cannot
+work.
 
 Trip creation from a date range and a destination. Household invite and shared trips (ported).
-Bulk photo upload. EXIF extraction, zone resolution per §2c with its provenance recorded, and
-clustering by time and location into a day-by-day skeleton.
+Camera roll access **without demanding full-library permission** — BUSINESS-PLAN §12 is right that
+refusal is a Medium risk and that manual selection must be genuinely pleasant rather than a
+punishment. Bulk background upload that survives the app being backgrounded, which is the specific
+thing §6 says Capacitor cannot do and is the entire reason for the stack choice. EXIF extraction,
+zone resolution per §2c with its provenance recorded, and clustering by time and location into a
+day-by-day skeleton.
 
 **HEIC is a real problem the business plan does not mention.** iPhones shoot HEIC by default. No
 browser displays it, and `sharp` needs libheif to read it. Every display derivative therefore
@@ -376,7 +403,12 @@ cannot contain the screenshots, the messaging-app copies with their metadata str
 taken at 01:30 that belongs to the previous evening, or the second camera whose clock was never
 changed.
 
-**And it is judged by someone other than the author, on a camera roll that is not David's.** David
+**Upload is a separate criterion and it is pass/fail:** four hundred photos upload over
+hotel-grade wifi with the app backgrounded and the screen locked, and **none are lost**. Then the
+same run with airplane mode toggled twice in the middle, and still none are lost.
+
+**And the clustering is judged by someone other than the author, on a camera roll that is not
+David's.** David
 grading his own trip is not a blind test — he knows where he was, so a near-miss reads as correct
 and the failure the criterion exists to catch is the one he is least able to see. Run it twice:
 once on David's roll to debug against known ground truth, once on someone else's as the actual
@@ -405,16 +437,37 @@ integrated. Stripe checkout — 0% Apple commission, physical goods (§7). The o
 **Acceptance:** a real printed book, of a real trip, in David's hands, ordered through the app.
 Not a PDF that opens. Not a sandbox order. The object.
 
-### Phase 4 — Mobile (Expo, iOS)
+### Phase 4 — The web surface
 
-Camera roll access without demanding full-library permission — §12 is right that refusal is a
-Medium risk and that manual selection must be genuinely pleasant rather than a punishment. Bulk
-background upload that survives the app being backgrounded, which is the specific thing §6 says
-Capacitor cannot do and is the reason for the whole stack choice. Push notifications.
+Two different things wearing one word, shipping at two different times. Neither is the product.
 
-**Acceptance:** four hundred photos upload over hotel-grade wifi with the app backgrounded and the
-screen locked, and **none are lost**. Then the same run with airplane mode toggled twice in the
-middle, and still none are lost.
+**4a — `site/`, the public page. Ships during Phase 0–1, not here.** It is listed under Phase 4 so
+it has an owner and a specification; its *first pass* is needed far earlier than its number
+suggests, because BUSINESS-PLAN §10's launch motion begins "waitlist → 50 hand-held beta
+households" and there is nowhere to collect a waitlist without it.
+
+Pass one — who we are, what we do, where to get the app, and a waitlist. Static, fast, no
+framework needed, no session, no cookie the app relies on.
+
+Pass two — **the policies, and this one is a hard gate on the iOS submission.** App Store Connect
+will not accept a binary without a privacy policy URL, and it rejects on inaccurate privacy labels.
+So the sequence is: `privacy-counsel` briefs real counsel → counsel produces the privacy policy and
+terms → they go on `site/` → the binary can be submitted → the beta can start. **A lawyer's
+turnaround sits inside the critical path**, which is the argument for Gate 0 being a gate rather
+than a task.
+
+Also here: App Store nutrition labels declaring every data type and every third party, and the
+`NSPhotoLibraryUsageDescription` purpose strings, which are marketing copy read at the worst
+possible moment and should be written like it.
+
+**4b — `web/`, signed-in album editing. Later, and genuinely wanted.** A large screen is honestly
+better for laying out a book than a phone is, and this is the one job where the web beats the app
+rather than imitating it. It needs the bearer/cookie session split of Phase 0 to already be right.
+Do not start it until a book has been printed.
+
+**Acceptance for 4a pass one:** a stranger reads the page and can say what the product does and who
+it is for. **For pass two:** the iOS binary is accepted by App Store Connect, which is the only
+test of it that means anything.
 
 ### Phase 5 — Ingestion, Path A
 

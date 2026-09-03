@@ -149,9 +149,14 @@ keeps arriving with nobody accountable for it (that is the shape of a missing se
 
 **Known tensions, recorded rather than resolved:**
 
-- **`lead-engineer` covers web, iOS and Android.** That is a lot. Keep it as *one architect* rather
-  than splitting by platform — three cold starts is worse than one broad brief — but if mobile work
-  begins to starve web work, `mobile-engineer` is the split, at Phase 4.
+- **`lead-engineer` covers mobile, web and the API.** That is a lot, and mobile-first makes it
+  lopsided: Phase 1 is almost entirely Expo. Keep it as *one architect* rather than splitting by
+  platform — three cold starts is worse than one broad brief — but watch Phase 1. If the phone work
+  starves the API work, `mobile-engineer` is the split.
+- **Nobody owns `site/` outright.** The public page is `market-strategist`'s copy, `privacy-counsel`'s
+  policies and `lead-engineer`'s build, which is a seam rather than a seat. Left deliberately: it is
+  two passes of a static page, and a seat for it would be idle nine months of the year. Revisit if
+  the marketing surface grows past a page and its policies.
 - **`qa-documenter` pairs testing with documentation.** They are different cadences: tests are
   written with a change, docs drift after one. Paired deliberately, because both are "keep the
   record true", and Waypoint's `doc-drift-auditor` shows the audit half works read-only. Split if

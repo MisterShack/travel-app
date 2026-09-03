@@ -26,8 +26,25 @@ else is instrumented (BUSINESS-PLAN §14.7). Everything else is vanity.
 |---|---|
 | `shared/` | `@wayleaf/shared` — Zod schemas, the timezone triple, clustering rules. Imported **verbatim** by every client and the server. Platform-neutral: no `node:`, no DOM, no React Native. |
 | `server/` | `@wayleaf/server` — Hono API on Railway, Postgres via Drizzle, R2 for all media. |
-| `web/` | `@wayleaf/web` — React SPA. Companion surface: book layout editing and desk planning. Never the primary capture surface. |
-| `mobile/` | `@wayleaf/mobile` — React Native (Expo), iOS first. The capture surface. Camera roll and background upload are the whole game. |
+| `mobile/` | `@wayleaf/mobile` — React Native (Expo), iOS first. **The product.** Camera roll and background upload are the whole game. |
+| `site/` | `@wayleaf/site` — the public web surface. Static marketing page and the policies. Ships first of the two web things, and it is not an app. |
+| `web/` | `@wayleaf/web` — React SPA, **later**. Signed-in album editing on a large screen. Does not exist in v1. |
+
+**Mobile is first and web is second, and the split inside web matters.** Photos originate on the
+phone, in-trip use is on the phone, camera-roll permission is the entire product, and push exists
+nowhere else. What the web does at launch is *explain the product and host the policies* — who we
+are, what we do, where to get the app. Signed-in album editing on a large screen is a real and
+wanted thing, and it is a later addition, not a v1 surface.
+
+**Two consequences that are easy to miss and expensive to discover late:**
+
+- **There is no web app to run a beta on.** Any plan that plots the beta on a web client is void —
+  the capture surface has to ship before the first household does anything. This is why Phase 1 is
+  the phone rather than a browser upload form that would be thrown away.
+- **The policies are a build dependency, not just a compliance one.** App Store Connect will not
+  accept a binary without a privacy policy URL and accurate privacy labels. So `site/` gates the iOS
+  submission, which gates the beta, which gates everything — and it is the one gate that a lawyer's
+  turnaround time sits inside.
 
 `shared/` being platform-neutral is load-bearing in a way it was not in Waypoint: it is now imported
 by a React Native bundle as well as a browser and Node. A stray `node:crypto` import breaks Metro,

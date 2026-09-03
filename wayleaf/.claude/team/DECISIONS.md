@@ -14,6 +14,7 @@
 | 2026-09-03 | **Wayleaf is a new repository; Waypoint is frozen** | A clean slate on Postgres/R2 without legacy deploy state; the port is deliberate and ledgered in `PORTING.md` | Reusing Waypoint's live deployment, database or domain |
 | 2026-09-03 | **Plan documents before code** | The repo's own convention; a spec reviewed before it is built is the cheapest defect to fix | Nothing — code follows |
 | 2026-09-03 | **Independent review over self-review** | The self-review passed a plan three cold reviewers rejected, and cost ~$3 to disprove | Trusting a single reviewer that shares the author's priors |
+| 2026-09-03 | **Mobile-first; web is a landing page first and an album editor later** | Photos originate on the phone, camera-roll permission is the product, push exists nowhere else. The web's launch job is to explain the product and host the policies | A web-carried beta — that option is gone, so mobile moves into Phase 1. Adds an App Store review cycle upstream of the beta, and puts counsel's turnaround on the critical path via the privacy policy URL |
 
 ## Owed — see ROADMAP §6 for the full statements and recommendations
 
@@ -22,6 +23,7 @@
 | 1 | **The October deadline** | Kill it. §13 puts public launch in Q1 2027, so there is no 2026 season to catch, and the date is the origin of most of the compression | Four phases in four weeks, and the first printed book through an unvalidated colour pipeline |
 | 2 | **Concierge test before code** | Run it. ~$1,200, no code, answers the existential question months before the product could | Committing the hardest engineering in the plan before knowing anyone buys |
 | 3 | Path B only for the beta | Tied to #1; decide together | — |
+| 3a | **Where `site/` is hosted** | Cloudflare Pages, separate from the API | Serving marketing from the API origin means a copy tweak triggers an API deploy against live data, and it forfeits a free static host on infrastructure we already pay for |
 | 4 | Household tier pricing, given the corrected arithmetic | Rebuild §8 with the credit book as a cost line first | The only recurring revenue line is ~8× overstated |
 | 5 | Face scoring: detection or cross-image matching | Specify explicitly before Phase 2 is scoped | BIPA carries statutory damages and a private right of action |
 | 6 | Gate 0 (legal) before the first beta upload | Add it | 50 real families' photographs in a system with no lawful basis |

@@ -45,6 +45,13 @@ actually ship, not as the strategy describes it.**
   arrives.
 - **Consumer legibility.** Whether a 38-year-old parent understands the offer in one screen. Jargon
   from the plan — "cluster", "oracle", "cohort", "Path B" — must never reach a customer.
+- **The public page (`site/`).** You own its copy — who we are, what we do, where to get the app —
+  and the App Store listing text and screenshots. Two hard constraints: the page's job at launch is
+  comprehension and a waitlist, not conversion, because there is no product to convert to yet; and
+  the `NSPhotoLibraryUsageDescription` purpose strings are marketing copy read at the single worst
+  moment, when a stranger is deciding whether to hand over their camera roll. Write them like it.
+  The policies on the same page are **not yours** — they are `privacy-counsel`'s brief and real
+  counsel's words, and marketing must never soften them.
 - **Acquisition and the growth model.** The collaborator loop is the cheapest channel and is
   currently three unmeasured numbers chained together: collaborators per trip × fraction who create
   their own trip × attach rate. Chain three guesses and the growth rate is unknowable.

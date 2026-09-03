@@ -75,22 +75,50 @@ sequence.
 2. **Phase 0 — Foundation.** Postgres, R2, auth ported, the events table, the backup pipeline. The
    restore drill runs here, on the smallest dataset there will ever be, which is the only
    comfortable time to run it.
-3. **Phase 1 — Trips and photos (Path B).** EXIF, zone resolution, clustering. The hardest genuinely
-   novel work in the product, and it is deliberately early because a wrong answer here invalidates
-   Phases 2 and 3 rather than delaying them.
+3. **Phase 1 — Capture: the phone, trips and photos (Path B).** The Expo app, camera roll,
+   background upload, EXIF, zone resolution, clustering. The hardest genuinely novel work in the
+   product, and it is deliberately early because a wrong answer here invalidates Phases 2 and 3
+   rather than delaying them. **Mobile is here rather than after the book** — decided 2026-09-03,
+   see §4a below.
 4. **Phase 2 — The digital album.** Dedupe, best-of-cluster, itinerary-grounded captions, chapters,
    editing.
 5. **Phase 3 — The book and fulfilment. ⟵ the October gate.** PDF to spec, DPI floor, Stripe, the
    order state machine, Prodigi behind an interface.
-6. **Phase 4 — Mobile (Expo, iOS).** After the book, because the book is what is date-constrained
-   and the web client can carry a 50-household beta. **This is a real cost, stated:** the web upload
-   path is a worse experience than the native one for the exact interaction the product is about,
-   so the beta measures the funnel through a handicapped version of it. Read Phase 4's numbers as a
-   floor, not a baseline.
+6. **Phase 4 — The web surface.** Two things at two times, neither of them the product: `site/`
+   (the public page and the policies) and, later, `web/` (signed-in album editing). **`site/` ships
+   during Phases 0–1 despite its number** — see §4a.
 7. **Phase 5 — Ingestion (Path A).** Ported from Waypoint, and its acceptance criterion re-proves
    the zone oracle rather than only the import.
 8. **Phase 6 — Household tier and storage tiering.**
 9. **Phase 7 — v1.5.** Suggestions, preference memory, calendar write-out, extra print SKUs.
+
+### 4a. Mobile moved earlier, and what that reverses
+
+**Decided 2026-09-03: the product is mobile-first, the web is second, and the first web thing is a
+landing page rather than an app.**
+
+This reverses what this document said a day earlier. The previous sequence put mobile at Phase 4,
+*after* the book, on the reasoning that "the web client can carry a 50-household beta" — with the
+cost stated honestly as a handicapped funnel. **That option no longer exists**, because there is no
+web app in v1 to carry anything. So mobile moves into Phase 1, which is also where it always
+belonged: a browser upload path built to carry a beta would have been thrown away, and it would have
+spent the time that should go into the background-upload path that *is* the product.
+
+**Two consequences that change this table rather than merely annotating it:**
+
+- **`site/` runs as a parallel track from Phase 0, not as Phase 4.** BUSINESS-PLAN §10's launch
+  motion opens "waitlist → 50 hand-held beta households", and there is nowhere to collect a waitlist
+  without a page. Pass one is static and cheap and can be built any time after the brand is settled.
+- **The policies are now on the critical path, and a lawyer's turnaround is inside it.** App Store
+  Connect refuses a binary with no privacy policy URL and rejects on inaccurate privacy labels. So:
+  counsel → policy on `site/` → binary accepted → beta starts. **This is the argument for Gate 0
+  being a gate.** Until 2026-09-03 the legal work read as a compliance obligation that could be
+  chased in parallel; it is a build dependency, and it is the one dependency that no amount of
+  engineering effort can shorten.
+
+**What has not changed:** the book is still the date-constrained thing, and Phase 3 is still the
+gate. Mobile moving earlier does not buy schedule — it removes a throwaway surface and adds an App
+Store review cycle, which is a different shape of risk and should be estimated as one.
 
 ## 5. Standing risks
 
@@ -117,6 +145,10 @@ Beyond BUSINESS-PLAN §12, which stands as written. These are the ones the build
   work that cannot start anyway, and the lever pulled was the wrong one. **This is the cheapest
   unknown on the list to close and the most expensive to discover in week three.** One email,
   today, before any code is written.
+- **App Store review is a queue we do not control, and it is now upstream of the beta.** A
+  rejection on privacy labels or on photo-library purpose strings costs a review cycle, and the
+  first submission is the one most likely to be rejected. Submit a skeleton build early, before the
+  app is finished, purely to learn what the review process says about this product.
 - **A shipped book is not revertible.** Every other bug in this product can be fixed with a deploy.
   A print run cannot, which is what puts the DPI floor and order idempotency in the
   non-negotiables rather than in a hardening pass.
@@ -125,7 +157,9 @@ Beyond BUSINESS-PLAN §12, which stands as written. These are the ones the build
 
 1. **Path B only for the closed beta?** PLAN §1a. Tied to the October date; decide both at once.
 2. **HEIC transcode on device or server?** Recommended on device. Needs a real measurement.
-3. **Web-first beta, or wait for mobile?** The sequence above assumes web-first. The cost is in §4.6.
+3. ~~**Web-first beta, or wait for mobile?**~~ **Decided 2026-09-03: mobile-first.** The web's first
+   job is a landing page and the policies; signed-in album editing is a later addition. §4a records
+   what that reversed and what it puts on the critical path.
 4. **How long may a grounded Google Maps result be cached?** Inherited unanswered from Waypoint; the
    API docs carry no retention statement at all, so the silence is confirmed rather than assumed.
    Gates Phase 7 only.
