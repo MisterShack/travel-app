@@ -101,29 +101,58 @@ Never store a local datetime alone. A flight departs in one zone and lands in an
 crosses zones mid-way; and DST rules change between booking and travel, which is why the local time
 is the source of truth and the instant is derived rather than the other way round.
 
-### 2c. The itinerary is the timezone oracle for photos
+### 2c. The itinerary is the timezone oracle — and the camera's clock is a separate unknown
 
 This is the technical statement of the business plan's unfair advantage, and it is the single most
-important paragraph in this document.
+important section in this document. It is also the one most easily got wrong, because it contains
+**two questions that look like one**.
 
 **EXIF `DateTimeOriginal` is a naive local datetime.** It carries no zone. `OffsetTimeOriginal`
 exists in the spec and is written by recent iPhones, but is absent on a great many files — older
 cameras, most Android devices historically, anything that has been through a messaging app, and
 every screenshot. So the common case is: a photo says `2026-07-14 14:03:22` and nothing else.
 
-To place that photo on a timeline you must know what zone the camera was in. Three sources, in
-order of trust:
+The trap is to answer "where was the traveller?" and think you have answered "what time was it?"
+**You have not.** `DateTimeOriginal` is written from the *device's clock*, which is set to whatever
+zone that device believed it was in — and that is not necessarily the zone it was standing in.
 
-1. **`OffsetTimeOriginal`**, where present. Believe it.
-2. **The itinerary.** If the trip says the traveller was in `Europe/Rome` from Sunday 18:40 to
-   Friday 09:15, then a naive `14:03` on Tuesday is `Europe/Rome` at 14:03. This is the oracle, and
-   it is exactly what a photo-book company without a trip planner cannot do.
-3. **The geotag**, where present, resolved to a zone by coordinates. Reliable, but a minority of
-   photos have one.
+> A DSLR still set to `America/Toronto`, photographing the Colosseum at 14:00 Rome time, stamps
+> `08:00`. Resolve that against the itinerary's `Europe/Rome` and you get an instant **six hours**
+> from the truth: wrong day boundary, wrong activity, wrong caption. The photo lands in the
+> previous evening.
 
-Where none of the three answers, **ask, and remember the answer for the trip** — do not guess. A
-silently wrong zone reorders a day and captions the wrong meal, which looks like the product being
-stupid rather than the data being thin.
+Phones auto-update on landing, but not instantly and not always — so the arrivals-hall photos, the
+first of every trip, are exactly the ambiguous ones. And BUSINESS-PLAN §3 says photos are
+"scattered across 3–5 phones," which means **a trip is a set of devices with independent, unknown
+clock offsets**. The mixed-device case is the normal case, not an edge case.
+
+So resolution is two steps, in this order.
+
+**Step one — what was this device's clock set to?** Per device, per trip:
+
+1. **`OffsetTimeOriginal`**, where present. Believe it; the device wrote its own offset.
+2. **Anchor on that device's geotagged photos.** A geotag gives the true zone at that moment via
+   coordinates, and therefore the true offset; the difference against what the device stamped *is*
+   the device's error. Propagate it to that device's ungeotagged photos.
+3. **Ask, once per device per trip**, where a device has no geotags and no offset at all — "was
+   this camera set to local time?" is a question a human answers in one tap and a heuristic
+   answers wrongly.
+
+**Step two — where was the traveller?** Now the itinerary earns its keep. If the trip says the
+traveller was in `Europe/Rome` from Sunday 18:40 to Friday 09:15, a corrected `14:03` on Tuesday is
+`Europe/Rome` at 14:03. **This is the oracle, and it is exactly what a photo-book company without a
+trip planner cannot do.**
+
+Note what step two actually requires, because the plan should not pretend it is a lookup: the
+itinerary holds *events*, not continuous presence. A flight arriving Sunday 18:40 and another
+departing Friday 09:15 imply Rome in between by **interpolation**, not by record. Building that
+interval set — zone spans derived from ordered events, with the gaps filled and the boundaries at
+the segments that cross them — is a real function to write and test, and it belongs in `shared/`
+beside the clustering.
+
+Where neither step answers, **ask, and remember the answer** — do not guess. A silently wrong zone
+reorders a day and captions the wrong meal, which looks like the product being stupid rather than
+the data being thin.
 
 **Path B has no oracle.** A retroactive trip has no itinerary until we have inferred one, and the
 inference depends on the zone. The loop is broken by starting from geotagged photos: resolve zones
@@ -148,7 +177,7 @@ unviable one.
 Two things carry from the passes work regardless:
 
 - **Sniff the bytes; never believe the uploader's `Content-Type`.** An image must prove it is an
-  image.
+  image. **But see below — this rule does not survive direct-to-R2 upload in its original form.**
 - **The danger is serving a file back, not accepting one.** Anything rendered from our own origin
   is script holding the reader's session. Derivatives are served from R2 through presigned,
   short-lived, single-purpose URLs on a domain that holds no session cookie — never proxied through
@@ -159,6 +188,26 @@ Two things carry from the passes work regardless:
 photos through the API process is four hundred chances to fall over on a Railway container, and it
 is also the "route media through Railway" mistake that §8 identifies as the difference between a
 $40 bill and a $600 one.
+
+**Which breaks the sniff rule as Waypoint wrote it, and the break has to be repaired explicitly.**
+There, the API received the bytes and could refuse before anything was written. Here the API never
+sees them, so by the time anything can be sniffed the object already exists and has already been
+billed. Two consequences, both non-negotiable in their own right:
+
+- **A presigned PUT is minted with conditions, never bare.** A size ceiling, a content-type
+  prefix, and a short expiry, pinned into the signature. An unconditioned URL is an unbounded
+  write capability handed to a client — four hundred of them is four hundred chances to put 5GB of
+  anything into our bucket at our cost, and by §2e a *collaborator* holds them too, deliberately
+  unchecked against any plan.
+- **A photo is `pending_scan` until something has read its bytes.** Sniffing becomes an
+  asynchronous step after the PUT completes: fetch the head of the object, verify it is genuinely
+  the image type it claims, record dimensions and EXIF, then promote to `ready`. **Nothing serves,
+  clusters or prints a photo that has not been promoted**, and an object that fails the check is
+  deleted rather than merely flagged — an unreferenced object in a bucket still costs money and
+  still has a URL.
+
+The conditions are the cheap half and the state is the load-bearing half. A `pending_scan` state
+that everything downstream forgets to filter on is the same as not having one.
 
 ### 2e. Collaborators never hit a paywall
 
@@ -212,7 +261,24 @@ about the launch.
 
 Minimum event set from the start: trip created (with path A/B), collaborator invited, invite
 accepted, photos uploaded (count), album generated, album edited, book previewed, order started,
-order paid. Attach rate is `order paid / trip with photos`, and every denominator is in that list.
+order paid. Every denominator anyone will want is in that list.
+
+**Attach rate is a cohort measure, not a running ratio, and getting this wrong is worse than not
+measuring it.** Books are ordered after the trip, sometimes months after. Computed naively as
+`orders paid / trips with photos`, the denominator includes trips that have not yet had time to
+convert — so the number is depressed by exactly the rate at which new trips arrive. **It falls
+fastest when acquisition is working**, and it will be at its most misleading during the beta and
+immediately after any marketing push, which are the two moments it will actually be read.
+
+So: **attach rate is measured over trips whose end date is at least 60 days past**, and it is
+always reported with its cohort window named. Sixty days is a starting value chosen to sit beyond
+the post-trip emotional peak the business plan builds the whole conversion story on (§7); replace
+it with a measured value as soon as there are enough real orders to see the distribution of
+trip-end-to-order lag, and report that lag as its own metric in the meantime.
+
+This matters more than a metrics quibble usually does: BUSINESS-PLAN §12 makes "book attach rate
+lands below 5%" an *existential* trigger to change pricing models. A number that is wrong in a known
+direction, wired to that decision, is worse than one nobody trusts.
 
 ---
 
@@ -229,11 +295,18 @@ they are also the zone oracle of §2c, which is a second job they did not have b
 
 - **`photos`** — one row per uploaded file. Holds the R2 keys (original, display, thumb), the
   sniffed content type, byte size, a perceptual hash for dedupe, the *naive* EXIF local datetime
-  as written by the camera, the resolved zone **and how it was resolved** (offset / itinerary /
-  geotag / user / destination-default), the derived instant, lat/lng where present, pixel
-  dimensions, and the uploader. **Storing how the zone was resolved is not bookkeeping** — it is
-  what lets the UI say "we think this was Rome" with the right amount of confidence, and what lets
-  a later itinerary correct an earlier guess.
+  as written by the camera, the resolved zone **and how it was resolved** (offset / device-anchor /
+  itinerary / geotag / user / destination-default), the derived instant, lat/lng where present,
+  pixel dimensions, the uploader, and the **scan state** of §2d — nothing serves, clusters or
+  prints a row that is still `pending_scan`. **Storing how the zone was resolved is not
+  bookkeeping** — it is what lets the UI say "we think this was Rome" with the right amount of
+  confidence, and what lets a later itinerary correct an earlier guess.
+- **`devices`** — the camera a photo came off, identified from EXIF `Make` / `Model` /
+  `BodySerialNumber`, scoped per trip, carrying the **clock offset** derived in §2c step one and
+  how *that* was derived (own-offset / geotag-anchored / asked). Without this table there is
+  nowhere to put the answer to "was this camera set to local time", and the correction has to be
+  re-derived per photo from evidence that most photos do not carry. It is a small table and it is
+  the difference between a six-hour error and none.
 - **`photo_clusters`** — a group of photos the system believes belong together: a moment, an
   activity, a day. Carries its own time bounds and centroid, an optional link to the itinerary
   entity it matched, and a `selected_photo_id` for the best-of-cluster pick. Rebuildable from
@@ -297,10 +370,19 @@ on the device before upload (cheap for us, slower for the user, and the client a
 decoder) or server-side (predictable, and the cost lands on us). **Recommendation: on device.** The
 phone decodes HEIC natively and for free; a Railway container does not.
 
-**Acceptance:** four hundred real photos from a real past trip — David's, with the itinerary
-withheld — cluster into a day-by-day skeleton that David agrees with on inspection. Synthetic EXIF
-fixtures do not count for this; they cannot contain the screenshots, the messaging-app copies with
-their metadata stripped, and the photo taken at 01:30 that belongs to the previous day.
+**Acceptance:** four hundred real photos from a real past trip cluster into a day-by-day skeleton
+that the person who took them agrees with. Synthetic EXIF fixtures do not count for this; they
+cannot contain the screenshots, the messaging-app copies with their metadata stripped, the photo
+taken at 01:30 that belongs to the previous evening, or the second camera whose clock was never
+changed.
+
+**And it is judged by someone other than the author, on a camera roll that is not David's.** David
+grading his own trip is not a blind test — he knows where he was, so a near-miss reads as correct
+and the failure the criterion exists to catch is the one he is least able to see. Run it twice:
+once on David's roll to debug against known ground truth, once on someone else's as the actual
+gate, scored as a **countable error rate** (photos placed on the wrong day, clusters split or
+merged wrongly) rather than an impression. Write the number down; it is the baseline every later
+change to clustering is measured against.
 
 ### Phase 2 — The digital album
 
@@ -369,7 +451,10 @@ per §9 Phase 2: magnets, postcards, the $25 softcover mini book.
 
 ## 5. Open questions
 
-Things this plan cannot settle, listed so they are not mistaken for oversights.
+Things this plan cannot settle, listed so they are not mistaken for oversights. **These are
+questions nobody can answer yet because the information does not exist.** Decisions that are
+David's to make — including the ones the plan review surfaced — live in ROADMAP §6, and are not
+restated here; a decision written down twice drifts.
 
 1. **Every number in BUSINESS-PLAN §8 is a guess until a Prodigi account exists.** Print cost,
    shipping and the 46% contribution margin all move together. This blocks pricing, not building.
@@ -380,7 +465,36 @@ Things this plan cannot settle, listed so they are not mistaken for oversights.
 4. **How long may a grounded Maps result be cached** — inherited unanswered from Waypoint, and it
    gates Phase 7's suggestions the same way it gated Waypoint's. The API docs carry no retention
    statement at all; the silence is confirmed rather than assumed.
-5. **Whether the closed beta is Path B only** — §1a's recommendation, David's call.
+5. **Whether the closed beta is Path B only** — §1a makes the recommendation; the decision is
+   ROADMAP §6.1, and it is the same decision as the October date.
 6. **Railway's current PITR offering** — verify before relying on it. §6 flags Supabase as
    historically stronger here, and the answer changes only how much our own pipeline has to carry,
    never whether it exists.
+
+---
+
+## 6. Review record
+
+**Reviewed 2026-09-03 under `/plan-review`. Verdict: REVISE.** Eight findings; all eight are
+resolved in this document or recorded as decisions in ROADMAP §6. Nothing was found that changed
+the approach — Path B first, R2 for media, the itinerary as the zone source, backups as a hard
+requirement, fulfilment behind an interface all stand.
+
+**The review was run by the same model that wrote the plan**, which the skill itself warns against:
+a reviewer sharing the author's priors shares its blind spots. Treat a clean area as unexamined
+rather than sound, and re-run this against the plan with a different reviewer before Phase 1 —
+Phase 0 is foundation work that is wrong in obvious ways if it is wrong at all, but the clustering
+in Phase 1 is where a shared blind spot would be expensive.
+
+What the review changed:
+
+| # | Finding | Where it went |
+|---|---|---|
+| 1 | The oracle answers *where the traveller was*; EXIF records *what the camera's clock said*. Conflating them puts a DSLR's photos six hours out | §2c rewritten as two steps; `devices` added to §3 |
+| 2 | "Sniff the bytes" and "upload direct to R2" contradict each other operationally — the API never sees the bytes | §2d: presigned conditions, and a `pending_scan` state nothing downstream may skip |
+| 5 | `order paid / trip with photos` falls fastest when acquisition works | §2j: a 60-day cohort measure, always reported with its window |
+| 8 | Phase 1's acceptance criterion was not blind, and its stated condition was a no-op | §4 Phase 1: someone else's camera roll, a countable error rate, written down |
+| 3 | Whose retention clock governs a collaborator's uploaded photo | ROADMAP §6.5, with a recommendation |
+| 4 | A re-cluster can destroy album edits; the plan asserts both properties and reconciles neither | ROADMAP §6.6, with a recommendation |
+| 6 | §2e builds a commitment against the business plan's own stated pricing fallback | ROADMAP §6.7, with a recommendation |
+| 7 | The October date depends on Gate 2, which runs on Prodigi's clock and has never been timed | ROADMAP §5 and Gate 2 |

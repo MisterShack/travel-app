@@ -50,13 +50,19 @@ Full rationale in PLAN.md §2. In short, and in the order they will bite:
   changes. Ported verbatim from Waypoint's `shared/src/time.ts`, including its DST gap/ambiguity
   handling, because it is correct and it was expensive.
 
-- **The itinerary is the timezone oracle for photos.** This is the whole product, expressed as a
-  schema constraint. EXIF `DateTimeOriginal` is a *naive local datetime* — no zone, and
-  `OffsetTimeOriginal` is frequently absent. A photo taken at 14:00 is 14:00 in a place the file
-  does not name. The itinerary knows what zone the traveller was in at that instant, so clustering
-  a photo to "Tuesday, the Colosseum" is a cross-zone comparison that only works because every
-  event already carries the triple above. **A photo book company cannot copy this without building
-  a trip planner first** (BUSINESS-PLAN §2), and this is the line in the code where that is true.
+- **The itinerary is the timezone oracle for photos — and the camera's clock is a separate
+  unknown.** This is the whole product, expressed as a schema constraint, and it is two questions
+  that look like one. EXIF `DateTimeOriginal` is a *naive local datetime* — no zone, and
+  `OffsetTimeOriginal` is frequently absent. The itinerary knows what zone the *traveller* was in,
+  so clustering a photo to "Tuesday, the Colosseum" is a cross-zone comparison that only works
+  because every event carries the triple above. **A photo book company cannot copy this without
+  building a trip planner first** (BUSINESS-PLAN §2).
+
+  But `DateTimeOriginal` is written from the *device's* clock, not the place's. A DSLR still set to
+  `America/Toronto` at the Colosseum stamps 08:00 for 14:00 — six hours out, wrong day, wrong
+  caption. A household shoots on 3–5 devices with independent offsets, so this is the normal case.
+  **Resolve the device's clock first (PLAN §2c step one), the traveller's location second.** Never
+  apply the oracle to a raw EXIF timestamp.
 
 - **Media bytes live in R2. Never in the database.** This *inverts* Waypoint's passes decision, and
   the inversion is the point: passes went into SQLite because Litestream replicates the database
@@ -68,7 +74,10 @@ Full rationale in PLAN.md §2. In short, and in the order they will bite:
 
 - **The server never trusts the client** — every write re-validated against `shared/` schemas. And
   every uploaded byte is sniffed: the uploader's `Content-Type` is never believed, an image has to
-  prove it is an image. Ported from Waypoint's passes work, which was written for exactly this.
+  prove it is an image. Ported from Waypoint's passes work — **but not in its original form**,
+  because uploads go client-to-R2 and the API never sees the bytes. Presigned PUTs carry pinned
+  size, type and expiry conditions, and a photo stays `pending_scan` until something has actually
+  read it. Nothing serves, clusters or prints an unpromoted row (PLAN §2d).
 
 - **A collaborator never hits a paywall.** This is an authorisation rule, enforced in the
   membership module, not a billing rule bolted on later (BUSINESS-PLAN §3). Everyone else on the
@@ -122,6 +131,11 @@ throws on boot, `.dockerignore` is load-bearing, and the native-binary `optional
 ## Status
 
 **Nothing is built.** This repository holds the plan and the port ledger. Phase 0 has not started.
+
+The plan was reviewed under `/plan-review` on 2026-09-03 — verdict REVISE, eight findings, all
+resolved in PLAN.md or recorded as decisions in ROADMAP §6. **The review was run by the model that
+wrote the plan**, so a clean area is unexamined rather than sound; PLAN §6 says to re-run it with a
+different reviewer before Phase 1.
 
 ## Quality workflow
 

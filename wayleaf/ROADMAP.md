@@ -30,7 +30,7 @@ These are not a backlog. Each one blocks something specific, and the "blocks" co
 | # | Gate | Blocks | Status |
 |---|---|---|---|
 | 1 | **Prodigi account open, real rate cards pulled** | Every number in BUSINESS-PLAN §8 — print cost, shipping, the 46% margin, the $59 price. Pricing, not building | Not started |
-| 2 | **Prodigi's print specification in hand** — page sizes, bleed, colour profile, DPI minimum, spine calculation | Phase 3. The PDF generator cannot be written against a guess | Not started |
+| 2 | **Prodigi's print specification in hand** — page sizes, bleed, colour profile, DPI minimum, spine calculation | Phase 3 — **and therefore the October date.** The PDF generator cannot be written against a guess | Not started, **and this is the schedule's real dependency** — see §5 |
 | 3 | **Sample books ordered from three vendors and judged side by side** | Vendor choice. §12 rates print-quality complaints High and says print quality *is* the product | Not started |
 | 4 | **The restore drill run — database and bucket together** | Beta. See §3 | Blocked on Phase 0 |
 | 5 | **Book attach rate instrumented** | Everything downstream of launch. It is the one metric §8 says the business lives or dies on, and it cannot be measured retroactively | Phase 0 deliverable |
@@ -111,6 +111,12 @@ Beyond BUSINESS-PLAN §12, which stands as written. These are the ones the build
 - **Path B has no timezone oracle**, which is the asymmetry the business plan glosses when it says
   Path B "reuses the same clustering machinery." The clustering is the same; the zone resolution is
   not. PLAN §2c.
+- **The October date depends on a gate we do not control, and nobody has timed it.** Gate 2 blocks
+  Phase 3, and Phase 3 *is* the deadline. If Prodigi takes three weeks to open an account and
+  release a specification to a pre-revenue applicant, then PLAN §1a's de-scope buys four weeks for
+  work that cannot start anyway, and the lever pulled was the wrong one. **This is the cheapest
+  unknown on the list to close and the most expensive to discover in week three.** One email,
+  today, before any code is written.
 - **A shipped book is not revertible.** Every other bug in this product can be fixed with a deploy.
   A print run cannot, which is what puts the DPI floor and order idempotency in the
   non-negotiables rather than in a hardening pass.
@@ -123,9 +129,37 @@ Beyond BUSINESS-PLAN §12, which stands as written. These are the ones the build
 4. **How long may a grounded Google Maps result be cached?** Inherited unanswered from Waypoint; the
    API docs carry no retention statement at all, so the silence is confirmed rather than assumed.
    Gates Phase 7 only.
-5. **Registration open, or invite-only for the beta?** Waypoint judged open registration an
+5. **Whose retention clock governs a photo a collaborator uploaded?** (plan-review finding 3.) A
+   Household member uploads 200 photos to a free-tier owner's trip; at 12 months the expiry job
+   comes for the originals. The uploader's tier or the owner's? Deleting a paying member's
+   originals breaks what they bought; keeping them because *one* member pays makes the tier
+   bypassable by inviting yourself. **Recommendation: the trip owner's tier governs the trip's
+   originals, and an uploader whose own tier is higher keeps a personal full-resolution copy of
+   their own uploads.** That preserves both promises without making the trip the loophole — but it
+   is a product and possibly a legal call, and PLAN §2e's "never consult a collaborator's plan" is
+   deliberately silent here, because retention is the one place where it must be consulted.
+6. **What happens to an album edit whose cluster no longer exists after a re-cluster?**
+   (plan-review finding 4.) PLAN §3 requires clusters be rebuilt whenever the itinerary changes,
+   and requires a user's layout edits to survive regeneration. Phase 5 forces the collision: a
+   Path B album, edited, then corrected by a late import. **Recommendation: album edits pin to
+   photo ids, never to cluster ids, and a re-cluster that would move an edited page is *offered*
+   rather than applied** — "your itinerary changed; 3 pages can be improved" with a preview. The
+   alternative, silently reflowing an album someone spent an hour on, is the same class of harm as
+   losing the photos.
+7. **Is the pricing fallback still reachable after §2e is built?** (plan-review finding 6.)
+   BUSINESS-PLAN §12 names "flip to Model B faster" as the response if attach rate disappoints.
+   Model B is a paywall before value — and PLAN §2e instructs that the membership module be
+   written so a plan check has *nowhere to go* on participation paths, which is precisely what
+   Model B needs. The plan builds a commitment against its own stated fallback and does not say so.
+   **Recommendation: accept the commitment and write the cost down rather than hedging it.** A seam
+   kept open "in case" is a seam nobody tests and a paywall nobody notices creeping back in; the
+   collaborator loop is the cheapest acquisition channel in the business and half-committing to it
+   gets its downside without its upside. But the cost is real — reversing means reopening the
+   membership module and every participation path — and it should be a decision rather than a
+   discovery.
+8. **Registration open, or invite-only for the beta?** Waypoint judged open registration an
    acceptable risk for a personal app. A beta that is 50 hand-held households and is accumulating
    irreplaceable data is a different calculation, and the answer is probably invite-only until
    public launch — but it should be decided rather than inherited.
-6. **Does the Household tier's book credit expire?** BUSINESS-PLAN §7 assumes breakage as a revenue
+9. **Does the Household tier's book credit expire?** BUSINESS-PLAN §7 assumes breakage as a revenue
    line without saying so. It changes the liability and it changes how the tier is described.
