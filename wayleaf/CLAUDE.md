@@ -151,10 +151,16 @@ throws on boot, `.dockerignore` is load-bearing, and the native-binary `optional
 
 **Nothing is built.** This repository holds the plan and the port ledger. Phase 0 has not started.
 
-The plan was reviewed under `/plan-review` on 2026-09-03 — verdict REVISE, eight findings, all
-resolved in PLAN.md or recorded as decisions in ROADMAP §6. **The review was run by the model that
-wrote the plan**, so a clean area is unexamined rather than sound; PLAN §6 says to re-run it with a
-different reviewer before Phase 1.
+**The plan has been reviewed twice and the two rounds disagree.** A self-review under
+`/plan-review` returned REVISE — eight findings, all resolved in PLAN.md or recorded as decisions in
+ROADMAP §6. Three independent cold reviewers then returned **RETHINK** (business), **DO NOT BUILD AS
+SPECIFIED** (safety) and **PROCEED WITH FIXES** (security) against the founding documents as a
+whole. The team in `.claude/` is what came out of round 2; this plan was not revised for it.
+
+**Until the decisions in ROADMAP §6 are made, this is not a build-ready spec.** PLAN §6 carries both
+rounds and the one gap in the record: round 2's findings were never written down, which leaves the
+release bar's condition 3 — every CRITICAL and HIGH closed — unverifiable against a list that does
+not exist.
 
 ## Quality workflow
 

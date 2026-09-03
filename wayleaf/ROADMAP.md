@@ -56,7 +56,7 @@ deliberate trade, made once, recorded here so nobody re-discovers it as a surpri
 travel` book (BUSINESS-PLAN §9 Phase 3) remains the natural December hook whenever we are ready for
 one.
 
-## 2. Gates## 2. Gates
+## 2. Gates
 
 These are not a backlog. Each one blocks something specific, and the "blocks" column is the point.
 

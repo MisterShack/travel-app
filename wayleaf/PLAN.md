@@ -533,18 +533,67 @@ restated here; a decision written down twice drifts.
 
 ## 6. Review record
 
-**Reviewed 2026-09-03 under `/plan-review`. Verdict: REVISE.** Eight findings; all eight are
-resolved in this document or recorded as decisions in ROADMAP §6. Nothing was found that changed
-the approach — Path B first, R2 for media, the itinerary as the zone source, backups as a hard
-requirement, fulfilment behind an interface all stand.
+**This plan has been reviewed twice, by reviewers of different independence, and the two rounds
+reached different verdicts.** Read both. Round 2 is the one that governs, and it is the one this
+section used to omit.
 
-**The review was run by the same model that wrote the plan**, which the skill itself warns against:
-a reviewer sharing the author's priors shares its blind spots. Treat a clean area as unexamined
-rather than sound, and re-run this against the plan with a different reviewer before Phase 1 —
-Phase 0 is foundation work that is wrong in obvious ways if it is wrong at all, but the clustering
-in Phase 1 is where a shared blind spot would be expensive.
+### Round 1 — self-review, 2026-09-03. Verdict: REVISE
 
-What the review changed:
+Run under `/plan-review`. Eight findings; all eight are resolved in this document or recorded as
+decisions in ROADMAP §6 (the table below). Nothing was found that changed the approach — Path B
+first, R2 for media, the itinerary as the zone source, backups as a hard requirement, fulfilment
+behind an interface all stand.
+
+**It was run by the same model that wrote the plan**, which the skill itself warns against: a
+reviewer sharing the author's priors shares its blind spots. This section used to end by asking for
+a re-run with a different reviewer before Phase 1. That re-run has happened. It is round 2, and the
+plan did not survive it in the shape round 1 left it.
+
+### Round 2 — three independent cold reviewers, 2026-09-03
+
+Against the founding documents as a whole, not this file alone:
+
+| Review | Verdict |
+|---|---|
+| Business | **RETHINK** |
+| Safety | **DO NOT BUILD AS SPECIFIED** |
+| Security | **PROCEED WITH FIXES** |
+
+All three converged on the same shape, independently:
+
+> "The documents are strongest exactly where Waypoint had already been hurt, and thinnest where
+> Wayleaf is new. Money, object storage and session transport — the three genuinely new surfaces —
+> each get one confident paragraph and no adversary."
+
+> "It reviewed the plan against itself rather than against the world."
+
+**What came out of round 2 was the team, not a revision of this document.**
+`.claude/team/CHARTER.md` §1 records the reasoning: every seat exists because a dimension of the
+work had nobody accountable for it. `privacy-counsel` exists because the safety review found that
+*consent*, *GDPR*, *PIPEDA*, *COPPA*, *BIPA*, *biometric*, *privacy policy*, *terms of service*,
+*erasure*, *moderation* and *age gate* appear **zero times** across seven documents.
+`security-reviewer` exists because three of the four security criticals — webhook authenticity,
+presigned upload capability, the cookie/bearer CSRF split — are app-layer, and a database or infra
+seat would have missed all three.
+
+**So this is not a build-ready spec.** The `/team` skill states that as a standing fact; it is
+restated here, in the document it is about, because this is where someone about to build from it
+will look. Until the decisions in ROADMAP §6 are made, treating this plan as buildable is the
+mistake the reviews exist to prevent.
+
+### The gap in this record
+
+**Round 2's findings were never written down.** They survive only as the summary above, reassembled
+from `CHARTER.md` §1 and two agent files. There is no findings list, no severity table, and the
+*fourth* security critical is not named anywhere in this repository.
+
+That has a concrete consequence rather than a tidiness one: **ROADMAP §1's release bar, condition 3,
+cannot currently be checked.** It requires that every CRITICAL and HIGH from the security review be
+closed, against a list that does not exist. Either round 2 is re-run and its findings recorded here,
+or condition 3 is unverifiable and the bar has a hole in exactly the place — money, uploads,
+sessions — that all three reviewers independently called the thinnest. Recorded 2026-09-03.
+
+What round 1 changed:
 
 | # | Finding | Where it went |
 |---|---|---|
