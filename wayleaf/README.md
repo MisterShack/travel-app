@@ -1,0 +1,84 @@
+# Wayleaf
+
+**Every trip should end with a book.**
+
+A travel memory platform: plan the trip, live it, and keep it. We are not an AI trip planner — we
+are a memory company that plans your trip, because planning it is how we get the structured data
+that makes the book assemble itself.
+
+> **Status: planning. Nothing is built.** This directory holds the founding documents for a new
+> repository. It currently lives inside `mistershack/travel-app` on a branch for review; it is
+> intended to be seeded into `mistershack/wayleaf` once the plan is agreed.
+
+## The documents, in reading order
+
+| Document | Owns |
+|---|---|
+| **BUSINESS-PLAN.md** | Strategy, positioning, pricing, unit economics, go-to-market. David's, v0.3. |
+| **ROADMAP.md** | The gates, the order of the work, standing risks, decisions owed. **Start here.** |
+| **PLAN.md** | The build: non-negotiables with reasons, the data model, phases with acceptance criteria. |
+| **PORTING.md** | What comes across from Waypoint, what comes across changed, and what must not come across. |
+| **BRAND.md** | Identity and design system. Measured colour, the mark, voice, accessibility rules. |
+| **CLAUDE.md** | The project guide — layout, non-negotiables in short, quality workflow. |
+| **DNS.md** | Domains and every DNS record, the `.ca` redirect, and the MX conflict to avoid. |
+| **.claude/team/CHARTER.md** | The team: roster, model assignment, how agents communicate, the amendment protocol. |
+| **.claude/team/DECISIONS.md** | What David has actually decided, and what is still owed. |
+
+## The team
+
+Wayleaf is built by an orchestrated team of specialist agents, defined in `.claude/`. The roster,
+the model assignment and the rules of engagement are in **`.claude/team/CHARTER.md`**; how work is
+routed is in **`.claude/skills/team/SKILL.md`**.
+
+| Seat | Agent | Model |
+|---|---|---|
+| Project manager | the orchestrator (`/team` skill) | Opus 5 |
+| CFO | `finance-officer` | Opus 5 |
+| Marketing | `market-strategist` | Sonnet 5 |
+| Lead engineer | `lead-engineer` | Opus 5 |
+| Platform / DevOps | `platform-engineer` | Sonnet 5 |
+| Database | `database-reviewer` | Opus 5 |
+| QA and documentation | `qa-documenter` | Sonnet 5 |
+| Privacy | `privacy-counsel` | Opus 5 |
+| Application security | `security-reviewer` | Opus 5 |
+
+Three things worth knowing before using it:
+
+- **Agents report; the orchestrator routes; David decides.** No agent decides anything, and no agent
+  edits its own specification — a stale spec is amended through the protocol in CHARTER §5, with
+  David's approval and a logged reason.
+- **The roster is a directory, not a workflow.** Most work happens inline. Every subagent starts
+  cold and re-derives context, so delegation is for a distinct instrument or for genuine
+  independence — never for the appearance of thoroughness.
+- **`privacy-counsel` and `security-reviewer` were not in the original roster.** They were added
+  because the independent reviews found a class of failure with no seat accountable for it.
+
+## Relationship to Waypoint
+
+Wayleaf is a **new repository**. Waypoint (`mistershack/travel-app`) is frozen and stays live at
+`waypoint.myze.ca` as a personal itinerary app.
+
+Wayleaf borrows its proven parts deliberately — the timezone triple, the auth stack, the email
+ingestion pipeline, the trip and membership model — and PORTING.md is the ledger. Nothing is
+inherited by accident, and several of Waypoint's best decisions are wrong here. Those are recorded
+as inversions rather than quietly dropped:
+
+- **Backups.** Waypoint deferred them by an explicit decision. Here they are a hard requirement from
+  the first row, because the worst case stops being "re-enter my own trips" and becomes "lose
+  someone's honeymoon".
+- **Media storage.** Waypoint put pass bytes inside SQLite, correctly, because Litestream replicates
+  the database and nothing else on the disk. With Postgres and R2 that reasoning is void and the
+  opposite one applies.
+- **Session transport.** Waypoint's cookie sessions and origin guard assume a browser. A React
+  Native client is permanently the non-browser case.
+
+## Stack
+
+**Mobile-first.** React Native (Expo), iOS first — photos originate on the phone, camera-roll
+permission is the whole product, and push exists nowhere else. Postgres on Railway (Drizzle),
+Cloudflare R2 for all media with zero egress, and a Hono API behind it.
+
+The web is second, and it is two things at two times: a **static public page** carrying who we are,
+what we do, where to get the app and the policies — which ships first and gates the iOS submission,
+because App Store Connect will not accept a binary without a privacy policy URL — and, later, a
+**signed-in album editor**, which is the one job a large screen does better than a phone.

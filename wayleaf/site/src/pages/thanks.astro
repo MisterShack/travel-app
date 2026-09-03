@@ -1,0 +1,22 @@
+---
+import Base from '../layouts/Base.astro';
+import Mark from '../components/Mark.astro';
+---
+<Base title="You’re on the list — Wayleaf" description="Thanks — we’ll email you when Wayleaf opens." noindex={true}>
+  <main class="mid">
+    <p class="wordmark"><Mark size={28} title="Wayleaf" />Wayleaf</p>
+    <h1>You’re on the list.</h1>
+    <p>
+      We’ll email you when Wayleaf opens, and we won’t use your address for
+      anything else. If you change your mind,{' '}
+      <a href="mailto:hello@wayleaf.app">say so</a> and we’ll remove you.
+    </p>
+    <p><a href="/">Back to the start</a></p>
+  </main>
+</Base>
+<style>
+  .mid { max-width: 34rem; margin: 0 auto; padding: clamp(3rem, 12vh, 7rem) var(--gutter); display: grid; gap: 1rem; }
+  .wordmark { display: inline-flex; align-items: center; gap: 0.5rem; font-family: var(--display); font-weight: 500; font-size: 1.3rem; color: var(--accent); font-variation-settings: 'SOFT' 40, 'WONK' 1; }
+  h1 { font-size: clamp(2rem, 6vw, 2.75rem); }
+  p { color: var(--ink-muted); }
+</style>

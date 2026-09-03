@@ -1,0 +1,35 @@
+---
+/**
+ * The Wayleaf mark: a leaf that also reads as a turning page.
+ *
+ * BRAND.md §5's constraints, all load-bearing:
+ *   - flat vector, single colour, `currentColor` so it inherits
+ *   - interior detail as NEGATIVE SPACE, never a drawn line. A stroked midrib
+ *     closes up at 20px; a gap survives
+ *   - legible at 20px — tested there first, not last
+ *   - no glow, no gradient, no bevel
+ *
+ * Chosen from four candidates rendered at 16/20/28/56/120px in both themes,
+ * because BRAND.md §5 says test at 20px first and not last. The rejected ones
+ * are instructive: an offset fold grew a spike at the base that read as an
+ * arrowhead, and a thinner crescent lost the leaf entirely below 28px.
+ *
+ * At small sizes this reads as a leaf with a midrib. At large sizes the lens
+ * reads as the gutter between two open pages. That is the pun arriving on its
+ * own rather than being forced — which is the only way a mark ever earns one.
+ */
+interface Props { size?: number | string; class?: string; title?: string | null; }
+const { size = 24, class: className, title = null } = Astro.props;
+const labelled = title !== null;
+---
+<svg
+  width={size} height={size} viewBox="0 0 24 24"
+  fill="currentColor" fill-rule="evenodd"
+  class={className}
+  role={labelled ? 'img' : undefined}
+  aria-label={labelled ? title : undefined}
+  aria-hidden={labelled ? undefined : 'true'}
+  focusable="false"
+>
+  <path d="M3 21C3 11 11 3 21 3C21 13 13 21 3 21ZM5.9 19.1C8.5 13.7 13.7 8.5 19.1 5.9C16.5 11.3 11.3 16.5 5.9 19.1Z" />
+</svg>

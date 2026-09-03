@@ -1,0 +1,109 @@
+---
+import Base from '../layouts/Base.astro';
+import Mark from '../components/Mark.astro';
+
+const title = 'Privacy — Wayleaf';
+const description =
+  'What Wayleaf does with the email address you give the waitlist. A short, honest notice covering the only data we currently hold.';
+---
+<Base title={title} description={description}>
+  <header class="bar">
+    <a class="wordmark" href="/"><Mark size={24} title="Wayleaf" />Wayleaf</a>
+  </header>
+
+  <main class="doc">
+    <h1>Privacy</h1>
+
+    <div class="callout">
+      <p>
+        <strong>This is not our full privacy policy.</strong> Wayleaf is in
+        development and the only personal data we hold is the email address you
+        give the waitlist, so this notice covers exactly that and nothing more.
+        A complete policy — covering photos, trips, the people in your
+        photographs, and everyone we work with to print a book — will be
+        published before the app opens, and before any photograph is ever
+        uploaded.
+      </p>
+    </div>
+
+    <h2>What we collect</h2>
+    <p>
+      Your email address, if you typed it into the waitlist form. That is the
+      entire list.
+    </p>
+    <p>
+      Our host records ordinary web-server logs — IP address, page requested,
+      browser — as almost every website does. We do not run analytics, we do not
+      run advertising, and there are no third-party trackers on this site.
+    </p>
+
+    <h2>What we do with it</h2>
+    <p>
+      Send you an email when Wayleaf opens, and possibly one or two before then
+      if something changes that you would want to know. Then we stop.
+    </p>
+    <p>We do not sell it, rent it, or share it with anyone for their own purposes.</p>
+
+    <h2>How long we keep it</h2>
+    <p>
+      Until Wayleaf opens and we have written to you, or until you ask us to
+      delete it — whichever comes first. If the project is abandoned we will
+      delete the list and tell you we have.
+    </p>
+
+    <h2>Removing yourself</h2>
+    <p>
+      Email <a href="mailto:hello@wayleaf.app">hello@wayleaf.app</a> and say so.
+      No account needed, no form to find, no reason required. We will confirm
+      when it is done.
+    </p>
+
+    <h2>Where it is stored</h2>
+    <p>
+      With Cloudflare, our hosting provider, which may store and process it
+      outside Canada. If you are in the UK or the EU you have rights over this
+      data — access, correction, erasure, and to complain to your data
+      protection authority. The email address above reaches a person.
+    </p>
+
+    <h2>Changes</h2>
+    <p>
+      When the full policy is published this page will be replaced by it, and
+      anyone on the waitlist will be told before that happens.
+    </p>
+
+    <p class="updated"><small>Last updated 3 September 2026.</small></p>
+  </main>
+
+  <footer class="foot">
+    <nav aria-label="Footer"><a href="/">Home</a><a href="mailto:hello@wayleaf.app">hello@wayleaf.app</a></nav>
+  </footer>
+</Base>
+
+<style>
+  .bar { max-width: 46rem; margin: 0 auto; padding: 1.4rem var(--gutter); }
+  .wordmark {
+    display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none;
+    font-family: var(--display); font-weight: 500; font-size: 1.3rem;
+    font-variation-settings: 'SOFT' 40, 'WONK' 1; color: var(--accent);
+  }
+  .doc { max-width: 46rem; margin: 0 auto; padding: 1rem var(--gutter) 3rem; }
+  .doc h1 { font-size: clamp(2rem, 5vw, 2.75rem); margin-bottom: 1.5rem; }
+  .doc h2 { font-size: 1.25rem; margin: 2.25rem 0 0.6rem; }
+  .doc p { max-width: var(--measure); color: var(--ink-muted); }
+  .doc p + p { margin-top: 0.85rem; }
+  .callout {
+    background: var(--surface-sunk);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    padding: 1.1rem 1.25rem; margin-bottom: 1rem;
+  }
+  .callout p { color: var(--ink); max-width: none; }
+  .callout strong { font-weight: 500; }
+  .updated { margin-top: 2.5rem; }
+  .foot {
+    max-width: 46rem; margin: 0 auto; padding: 1.5rem var(--gutter) 3rem;
+    border-top: 1px solid var(--hairline);
+  }
+  .foot nav { display: flex; gap: 1.25rem; flex-wrap: wrap; }
+</style>
