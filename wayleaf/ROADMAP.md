@@ -68,7 +68,7 @@ These are not a backlog. Each one blocks something specific, and the "blocks" co
 | 4 | **The restore drill run — database and bucket together** | Beta. See §3 | Blocked on Phase 0 |
 | 5 | **Book attach rate instrumented** | Everything downstream of launch. It is the one metric §8 says the business lives or dies on, and it cannot be measured retroactively | Phase 0 deliverable |
 | 6 | **CIPO trademark filed** | The **first production print run**, not launch. §11 is explicit that a rename after a run costs an order of magnitude more | Not started |
-| 7 | **`wayleaf.ca` secured** and redirected | Nothing, but it is cheap and gets more expensive the moment the name appears anywhere public | Not started |
+| 7 | **`wayleaf.ca` secured** and redirected | Nothing, but it is cheap and gets more expensive the moment the name appears anywhere public | **Secured 2026-09-03**, along with `wayleaf.app`. Redirect not yet configured — DNS.md §3 |
 | 8 | **Railway's current PITR offering verified** | How much of the backup pipeline we carry ourselves — never *whether* | Not started |
 | 9 | **A second fulfilment vendor integrated** | Public launch. Not the beta | Blocked on 3 |
 

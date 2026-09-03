@@ -29,9 +29,14 @@ configure and nothing to remember to renew.
    - Output directory: `dist`
    - Root directory: `site`
 2. **Custom domain.** Pages project → Custom domains → add `wayleaf.app` and `www.wayleaf.app`.
-   If the domain's nameservers are already Cloudflare's, the DNS records and the certificate are
-   created for you. Set a redirect so exactly one of the two is canonical — the `<link rel=canonical>`
-   in `src/layouts/Base.astro` says the apex, so redirect `www` → apex.
+   The DNS records and the certificate are created for you. Redirect `www` → apex, because the
+   `<link rel=canonical>` in `src/layouts/Base.astro` says the apex.
+
+   **`wayleaf.app` is the primary domain and that is settled** — it is what `astro.config.mjs`
+   declares, so it is already in the canonical link, the sitemap and every Open Graph URL. Changing
+   it later invalidates all three plus every link anyone has shared. `wayleaf.ca` 301s here; see
+   **`../DNS.md`** for that redirect and for the full record layout, including the MX conflict
+   between human mail and the import pipeline.
 3. **Waitlist storage.** Workers & Pages → KV → create a namespace named `wayleaf-waitlist`, then in
    the Pages project → Settings → Functions → KV namespace bindings, bind it as **`WAITLIST`**.
    Do this **before** announcing the page anywhere.

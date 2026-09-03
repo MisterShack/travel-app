@@ -136,8 +136,10 @@ hashed single-use tokens), same `Mailer` interface, same "a booking import is ne
 applied" rule. **Different database engine, different media store, different client stack, and a
 different attitude to backups.**
 
-It does not share a login, a database, a Railway service or a domain with Waypoint. Wayleaf lives
-at `wayleaf.app`.
+It does not share a login, a database, a Railway service or a domain with Waypoint. **Wayleaf lives
+at `wayleaf.app`** (registered 2026-09-03; `wayleaf.ca` redirects to it). The domain layout, every
+DNS record, and the MX conflict between human mail and the import pipeline are in **DNS.md** — read
+it before touching mail or adding a subdomain.
 
 When porting, carry over the deploy gotchas documented in Waypoint's `CLAUDE.md` and `DEPLOY.md`
 rather than re-discovering them: `STATIC_DIR` must be absolute, the API must be mounted under

@@ -20,6 +20,7 @@ that makes the book assemble itself.
 | **PORTING.md** | What comes across from Waypoint, what comes across changed, and what must not come across. |
 | **BRAND.md** | Identity and design system. Measured colour, the mark, voice, accessibility rules. |
 | **CLAUDE.md** | The project guide — layout, non-negotiables in short, quality workflow. |
+| **DNS.md** | Domains and every DNS record, the `.ca` redirect, and the MX conflict to avoid. |
 | **.claude/team/CHARTER.md** | The team: roster, model assignment, how agents communicate, the amendment protocol. |
 | **.claude/team/DECISIONS.md** | What David has actually decided, and what is still owed. |
 
