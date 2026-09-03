@@ -28,7 +28,7 @@
 | 1 | **Concierge test before code** | Run it. ~$1,200, no code, answers the existential question before the product could. With no deadline there is no argument left against it | Committing the hardest engineering in the plan before knowing anyone buys |
 | 2 | **Does ingestion move ahead of the album?** | Yes. Phase 5's criterion is the only test that proves §2c, and the album should be built once against final clusters | Building edit-preservation twice, or finding the re-cluster conflict late |
 | 3 | **Does `hello@wayleaf.app` exist?** | Create it before the page is announced, via Cloudflare Email Routing | It is printed on the page twice and is the only route a person has to ask for their address to be deleted |
-| 4 | **Grab `wayleaf.com`?** | Yes if still free at retail. Redirect it the same way as `.ca` | The customer is 30–50 buying a physical object; `.com` carries trust with that person. BUSINESS-PLAN §11 assumed it was taken and it appears not to be |
+| ~~4~~ | ~~**Grab `wayleaf.com`?**~~ **Closed 2026-09-03: it is taken.** A `dig` with no NS/A records was read as "available"; it only means "unconfigured". BUSINESS-PLAN §11's original assessment was correct, and its broker-with-a-walk-away-number advice stands if it is ever wanted | — |
 | 4 | Household tier pricing, given the corrected arithmetic | Rebuild §8 with the credit book as a cost line first | The only recurring revenue line is ~8× overstated |
 | 5 | Face scoring: detection or cross-image matching | Specify explicitly before Phase 2 is scoped | BIPA carries statutory damages and a private right of action |
 | 6 | Gate 0 (legal) before the first beta upload | Add it | 50 real families' photographs in a system with no lawful basis |

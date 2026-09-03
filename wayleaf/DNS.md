@@ -13,7 +13,7 @@
 |---|---|---|
 | **`wayleaf.app`** | **Primary. Everything lives here.** The site, the app's API, the email pipeline, every canonical URL | Registered 2026-09-03 |
 | `wayleaf.ca` | Defensive. **301 redirects to `wayleaf.app`**, path and query preserved | Registered 2026-09-03; redirect not yet configured |
-| `wayleaf.com` | Not held. Appeared unregistered on 2026-09-03 — worth grabbing at retail if still free, and redirecting the same way | Open |
+| `wayleaf.com` | **Taken.** Confirmed 2026-09-03 | Not available. BUSINESS-PLAN §11's original read was right |
 
 **`.app` is primary — decided 2026-09-03.** It is already what `site/astro.config.mjs` declares, so
 the canonical link, the sitemap and every Open Graph URL point there. **Changing the primary later
@@ -61,6 +61,12 @@ never inherits the link equity, which is the entire reason for owning the domain
 1. Add `wayleaf.ca` to Cloudflare as a zone and point its nameservers there. (`.ca` is CIRA-run with
    Canadian presence requirements and is often registered elsewhere — that is fine. The registrar
    and the DNS host do not have to be the same.)
+1b. **Create a proxied placeholder record, or the rule will never fire.** A Redirect Rule runs on
+   traffic Cloudflare actually receives, and Cloudflare only receives traffic for a hostname that
+   resolves through it. With no record there is nothing to intercept and the domain simply fails to
+   resolve. Add `A @ → 192.0.2.1` and `A www → 192.0.2.1`, both **proxied** (orange cloud).
+   `192.0.2.1` is RFC 5737 documentation space — it is unroutable on purpose, and nothing ever
+   reaches it because the redirect fires at the edge first.
 2. Wait for Universal SSL to issue. **The redirect cannot serve over HTTPS before the certificate
    exists**, and a browser reaching a `.ca` with no cert sees a warning, not a redirect.
 3. Turn on **Always Use HTTPS** for the zone.
