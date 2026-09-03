@@ -106,19 +106,52 @@ Never tint, overlay, duotone or brand-filter a user's photograph. Not on a card,
 preview, not on a share image. A gradient scrim behind text laid over a photo is allowed and should
 be neutral black at low alpha — never accent-coloured.
 
-## 4. Type
+## 4. Type — settled 2026-09-03
+
+**Display: Fraunces. Text: Inter.** Both variable, both open-licensed, both with real fallback
+stacks so the page is correct before they load and correct if they never do.
+
+Fraunces earns the display role: its `SOFT` and `WONK` axes give it the slightly hand-cut warmth of
+letterpress without tipping into pastiche, which is exactly the "good stationery and archival
+paper" register §3 asks for. It is set at `SOFT 40, WONK 1` — enough character to be recognisable,
+not enough to perform.
+
+**The split is by surface, and it matters:** Fraunces is for *marketing* display — the public page,
+the wordmark, the book's own chapter openers. **The app chrome is Inter throughout**, because §3's
+first principle is that the UI is neutral and photographs supply everything else. A characterful
+face is an asset on a landing page and a distraction beside someone's holiday photographs.
 
 Set the wordmark in a real typeface. **Never let an image generator produce lettering** — it
 produces shapes that resemble letters, which is a different thing, and it is obvious at 200%.
 
-The interface wants a text face that does not perform. A photo book's own pages may want a
-different, more bookish face than the app chrome; that is a decision for Phase 2, when there are
-real pages to look at, and it should be made by printing them rather than by looking at a screen.
+A photo book's own body pages may still want a third face; that is a decision for Phase 2, when
+there are real pages, and it should be made by printing them rather than by looking at a screen.
 
-## 5. The mark
+## 5. The mark — settled 2026-09-03
 
 **A leaf that also reads as a turning page.** The name hands this over directly: both are flat,
-organic, single-shape forms, and the fold line does all the work.
+organic, single-shape forms, and the fold does all the work.
+
+The mark lives at `site/src/components/Mark.astro`. One path, `fill-rule="evenodd"`, `currentColor`,
+no stroke:
+
+```
+M3 21C3 11 11 3 21 3C21 13 13 21 3 21Z
+M5.9 19.1C8.5 13.7 13.7 8.5 19.1 5.9C16.5 11.3 11.3 16.5 5.9 19.1Z
+```
+
+At small sizes it reads as a leaf with a midrib. At large sizes the lens reads as the gutter between
+two open pages. **The pun arrives on its own rather than being forced**, which is the only way a
+mark ever earns one.
+
+**Chosen from four candidates rendered at 16/20/28/56/120px in both themes**, because this section
+says test at 20px first and not last. The rejected ones are the useful part: an offset fold grew a
+spike at the base that read as an *arrowhead* — the same failure as Waypoint's hazard triangle,
+found the same way, by looking rather than by reasoning — and a thinner crescent lost the leaf
+entirely below 28px.
+
+Still outstanding: put it on a real home screen among real icons and show it to someone who has not
+been told what it means. That test has not been run.
 
 Requirements, whichever direction wins:
 

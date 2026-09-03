@@ -164,7 +164,8 @@ because the suites cannot see those.
 | Trigger | Run |
 |---|---|
 | Any change at all | `npm run typecheck`, `npm run lint`, `npm test` from the root |
-| Any change to a client, the API, or a user-facing flow | `npm run test:e2e --workspace @wayleaf/web` |
+| Any change to a client, the API, or a user-facing flow | The workspace's own e2e suite (`mobile/` via Maestro or Detox; `web/` via Playwright when it exists) |
+| Any change to `site/` | `npm run build --workspace @wayleaf/site`, then look at it in a real browser at 390px and in both themes |
 | Any UI change, and before showing the app to anyone | `web-accessibility-reviewer` agent |
 | Any migration that touches existing rows | `migration-rehearser` agent |
 | Any change to upload, storage retention or deletion | Restore drill. Not the backup — the restore |
