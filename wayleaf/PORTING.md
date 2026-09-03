@@ -174,9 +174,14 @@ reintroduce it by copying from an older commit.
 
 ## `app/` — the least portable third
 
-Waypoint's client is a Vite/React PWA built for a phone-shaped itinerary. Wayleaf's web app is a
-companion for book editing and desk planning (BUSINESS-PLAN §6), and the capture surface is a
-separate Expo app. **Most of this workspace is a different product.**
+Waypoint's client is a Vite/React PWA built for a phone-shaped itinerary. Wayleaf's capture surface
+is an Expo app, its first web surface is a static page that is not an app at all, and signed-in
+album editing on the web comes later (PLAN §2k). **Most of this workspace is a different product**,
+and the parts that do carry over are mostly heading to `mobile/` rather than to `web/`.
+
+Note the direction of travel: a phone-shaped React PWA is closer to the Expo app than to anything
+`site/` needs, so read the table below as "what `mobile/` can borrow", not "what the web inherits".
+`site/` inherits nothing from here — it is a static page with no session.
 
 | Area | Verdict |
 |---|---|

@@ -36,11 +36,18 @@ hypothesis until you have opened the code.
 |---|---|---|
 | `shared/` | Zod schemas, the timezone triple, clustering | Platform-neutral — now also imported by **Metro**, so a `node:` import breaks the mobile bundle, not the typecheck |
 | `server/` | Hono, Postgres via Drizzle (`node-postgres`), R2 | |
-| `web/` | React SPA | Companion: book layout editing, desk planning. Never the capture surface |
-| `mobile/` | React Native (Expo), iOS first | The capture surface. Camera roll and background upload are the product |
+| `mobile/` | React Native (Expo), iOS first | **The product.** Ships in Phase 1, not after the book |
+| `site/` | Static public page | Who we are, what we do, where to get the app, and the policies. Not an app. Its policy pass **gates App Store submission** |
+| `web/` | React SPA, later | Signed-in album editing on a large screen. Does not exist in v1 |
 
 Capacitor and native Swift+Kotlin are both ruled out with reasons in BUSINESS-PLAN §6. Do not
 reopen without new evidence.
+
+**Mobile-first is a sequencing rule, not a preference** (PLAN §2k, decided 2026-09-03). Never plan a
+browser upload path to carry a beta: it gets thrown away, and it spends the time that belongs to the
+background-upload path that is the actual product. And note what the split puts upstream of you —
+App Store Connect refuses a binary with no privacy policy URL, so `site/`'s policy pass and a
+lawyer's turnaround both sit ahead of the first beta build.
 
 ## Standing technical knowledge
 
