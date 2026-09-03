@@ -7,30 +7,63 @@
 >
 > Written 2026-09-03. Nothing is built yet.
 
-## 1. The date that drives everything
+## 1. There is no date. There is a bar.
 
-**BUSINESS-PLAN §9: the ordering flow must ship no later than early October, or a full gifting
-season is lost.** Photo book demand spikes hard in November–December, and a product that misses it
-waits a year for the next one.
+**Decided 2026-09-03: the October deadline is dead.** BUSINESS-PLAN §9 argued the ordering flow had
+to ship by early October or lose a gifting season. David's call: people take trips all year, the
+retroactive angle works all year, and Christmas is not worth the compression. **The priority is
+stable, not early.**
 
-Today is **2026-09-03**. That is roughly four weeks to Phase 3, for two people.
+That was the right call and the evidence was already in this document. §13 of the business plan puts
+public launch in **Q1 2027**, so the only thing that would have shipped into the 2026 season was
+≤20 beta books — roughly $540 of contribution margin, with no marketing and no public signup
+running. The deadline was buying a season the plan does not sell into, and paying for it with four
+phases compressed into four weeks and a first printed book rushed through an unvalidated colour
+pipeline.
 
-This is the constraint the phase ordering is built around, and it is why PLAN §1a recommends the
-closed beta ship **Path B only** — retroactive trips, no email ingestion. Ingestion is proven code
-sitting in Waypoint and it will port confidently; it is simply not on the critical path to a
-printed object, and the four weeks do not have room for anything that is not.
+### What replaces it
 
-**If that recommendation is rejected, the October date goes with it.** Those are the same decision
-and should be made once, together, rather than discovered in five weeks.
+A deadline is a forcing function, and removing one without replacing it is how a project drifts for
+a year. **The replacement is a release bar: a set of conditions that are either met or not.** Not a
+date, and not a feeling that it seems ready.
 
-## 2. Gates
+Wayleaf is ready for its first outside household when **all** of these are true:
+
+| # | Condition | Why it is on the list |
+|---|---|---|
+| 1 | The restore drill has passed **twice, on different dates** — Postgres *and* R2 together, every row resolving to an object, no orphan surviving that should have been deleted | One passing drill proves the script ran. Two prove the process exists |
+| 2 | **Deletion is designed, built and proven in that drill** — including that a restore does not resurrect erased data | Currently structurally impossible; §3 |
+| 3 | Every **CRITICAL and HIGH** from the security review is closed, and a re-review confirms it | Webhook forgery ships free physical objects; presigned uploads are an unbounded write |
+| 4 | **Gate 0 is complete** — entity, policies live on `site/`, privacy labels accurate, iOS binary accepted | It gates the binary, so it gates everything |
+| 5 | A **real printed book** of a real trip is in a hand, and it is good | The one artefact a deploy cannot fix |
+| 6 | **30 consecutive days** of the founders using it on their own real trips with no data incident | Time-in-use, which is the honest replacement for a date-on-a-calendar |
+| 7 | Each phase's own acceptance criterion in PLAN §4 is met — **exercised, not stubbed** | Waypoint's suites were green while the app was wrong |
+
+**Condition 6 is the one doing the work a deadline used to do.** It cannot be shortened by effort,
+it cannot be argued with, and it converts "stable" from an adjective into something with a date
+attached that nobody chose.
+
+### What this changes, and what it does not
+
+**Changes:** the phase compression is gone; Path A returns to v1 (PLAN §1a); print round trips are
+affordable, so the first book can be corrected rather than shipped as-is; Prodigi's response time
+stops being a schedule risk; and the beta can run calmly, which is what a 50-household hand-held
+beta needs to be worth anything.
+
+**Does not change:** seasonality is still real. Photo book demand does spike in November–December,
+and a launch that lands in, say, February is trading a demand peak for stability. That is a
+deliberate trade, made once, recorded here so nobody re-discovers it as a surprise. The `year in
+travel` book (BUSINESS-PLAN §9 Phase 3) remains the natural December hook whenever we are ready for
+one.
+
+## 2. Gates## 2. Gates
 
 These are not a backlog. Each one blocks something specific, and the "blocks" column is the point.
 
 | # | Gate | Blocks | Status |
 |---|---|---|---|
 | 1 | **Prodigi account open, real rate cards pulled** | Every number in BUSINESS-PLAN §8 — print cost, shipping, the 46% margin, the $59 price. Pricing, not building | Not started |
-| 2 | **Prodigi's print specification in hand** — page sizes, bleed, colour profile, DPI minimum, spine calculation | Phase 3 — **and therefore the October date.** The PDF generator cannot be written against a guess | Not started, **and this is the schedule's real dependency** — see §5 |
+| 2 | **Prodigi's print specification in hand** — page sizes, bleed, colour profile, DPI minimum, spine calculation | Phase 3. The PDF generator cannot be written against a guess | Not started. No longer a schedule risk, but still a hard block on the book |
 | 3 | **Sample books ordered from three vendors and judged side by side** | Vendor choice. §12 rates print-quality complaints High and says print quality *is* the product | Not started |
 | 4 | **The restore drill run — database and bucket together** | Beta. See §3 | Blocked on Phase 0 |
 | 5 | **Book attach rate instrumented** | Everything downstream of launch. It is the one metric §8 says the business lives or dies on, and it cannot be measured retroactively | Phase 0 deliverable |
@@ -82,7 +115,7 @@ sequence.
    see §4a below.
 4. **Phase 2 — The digital album.** Dedupe, best-of-cluster, itinerary-grounded captions, chapters,
    editing.
-5. **Phase 3 — The book and fulfilment. ⟵ the October gate.** PDF to spec, DPI floor, Stripe, the
+5. **Phase 3 — The book and fulfilment.** PDF to spec, DPI floor, Stripe, the
    order state machine, Prodigi behind an interface.
 6. **Phase 4 — The web surface.** Two things at two times, neither of them the product: `site/`
    (the public page and the policies) and, later, `web/` (signed-in album editing). **`site/` ships
@@ -124,10 +157,11 @@ Store review cycle, which is a different shape of risk and should be estimated a
 
 Beyond BUSINESS-PLAN §12, which stands as written. These are the ones the build surfaces.
 
-- **The October date is very tight.** Four weeks to a printed book, through three phases, two of
-  which contain genuinely unsolved work. The de-scope lever is Path B only (PLAN §1a); the next
-  lever after that is a single fixed book format with no layout editing, ordered from one vendor.
-  **Decide the levers now, in advance, rather than in week three.**
+- **With no deadline, the risk inverts: drift.** A project with no date and two part-time founders
+  can stay 80% done indefinitely, and "stable" is exactly the kind of goal that recedes as you
+  approach it. §1's release bar is the mitigation, and condition 6 — thirty consecutive days of real
+  use — is the part that cannot be argued with. **Re-read the bar at every phase boundary and say
+  which conditions moved.** A bar nobody checks is a deadline nobody set.
 - **Clustering quality is the product and cannot be unit-tested into existence.** Synthetic EXIF
   fixtures contain none of the things that break it: screenshots, messaging-app copies with metadata
   stripped, the photo at 01:30 that belongs to the previous evening, the camera whose clock is
@@ -139,12 +173,11 @@ Beyond BUSINESS-PLAN §12, which stands as written. These are the ones the build
 - **Path B has no timezone oracle**, which is the asymmetry the business plan glosses when it says
   Path B "reuses the same clustering machinery." The clustering is the same; the zone resolution is
   not. PLAN §2c.
-- **The October date depends on a gate we do not control, and nobody has timed it.** Gate 2 blocks
-  Phase 3, and Phase 3 *is* the deadline. If Prodigi takes three weeks to open an account and
-  release a specification to a pre-revenue applicant, then PLAN §1a's de-scope buys four weeks for
-  work that cannot start anyway, and the lever pulled was the wrong one. **This is the cheapest
-  unknown on the list to close and the most expensive to discover in week three.** One email,
-  today, before any code is written.
+- **Gates 1–3 still run on Prodigi's clock, and nothing starts them but us.** They no longer
+  threaten a date, which removes the urgency and therefore the prompt — that is the new failure
+  mode. Every per-book number in BUSINESS-PLAN §8 is a guess until the rate card lands, and Phase 3
+  cannot be written against a guessed print spec. **Send the email anyway.** It costs nothing and it
+  is the longest-lead item on the list.
 - **App Store review is a queue we do not control, and it is now upstream of the beta.** A
   rejection on privacy labels or on photo-library purpose strings costs a review cycle, and the
   first submission is the one most likely to be rejected. Submit a skeleton build early, before the
@@ -155,15 +188,23 @@ Beyond BUSINESS-PLAN §12, which stands as written. These are the ones the build
 
 ## 6. Decisions owed
 
-1. **Path B only for the closed beta?** PLAN §1a. Tied to the October date; decide both at once.
+1. ~~**The October deadline**~~ **Decided 2026-09-03: killed.** Stable beats early; §1 replaces it
+   with a release bar. This resolved most of what was downstream of it.
 2. **HEIC transcode on device or server?** Recommended on device. Needs a real measurement.
-3. ~~**Web-first beta, or wait for mobile?**~~ **Decided 2026-09-03: mobile-first.** The web's first
+3. **The concierge test** — 20 households, hand-made books, ~$1,200, no code. **Recommendation: run it.** With no deadline there is no argument left against answering the existential question before building for it.
+4. **Does ingestion (Path A) move ahead of the album?** Both paths are in v1 either way — that was
+   settled when the deadline died (PLAN §1a). This is only about order. **Recommendation: yes, move
+   it.** Phase 5's acceptance criterion is the only test that actually proves §2c, the product's
+   central technical claim; and building the album against clusters a later import will re-derive
+   means either building the edit-preservation machinery twice or finding the conflict late. The
+   cost is that the album — the thing that makes the product feel real — arrives later.
+5. ~~**Web-first beta, or wait for mobile?**~~ **Decided 2026-09-03: mobile-first.** The web's first
    job is a landing page and the policies; signed-in album editing is a later addition. §4a records
    what that reversed and what it puts on the critical path.
-4. **How long may a grounded Google Maps result be cached?** Inherited unanswered from Waypoint; the
+6. **How long may a grounded Google Maps result be cached?** Inherited unanswered from Waypoint; the
    API docs carry no retention statement at all, so the silence is confirmed rather than assumed.
    Gates Phase 7 only.
-5. **Whose retention clock governs a photo a collaborator uploaded?** (plan-review finding 3.) A
+7. **Whose retention clock governs a photo a collaborator uploaded?** (plan-review finding 3.) A
    Household member uploads 200 photos to a free-tier owner's trip; at 12 months the expiry job
    comes for the originals. The uploader's tier or the owner's? Deleting a paying member's
    originals breaks what they bought; keeping them because *one* member pays makes the tier
@@ -172,7 +213,7 @@ Beyond BUSINESS-PLAN §12, which stands as written. These are the ones the build
    their own uploads.** That preserves both promises without making the trip the loophole — but it
    is a product and possibly a legal call, and PLAN §2e's "never consult a collaborator's plan" is
    deliberately silent here, because retention is the one place where it must be consulted.
-6. **What happens to an album edit whose cluster no longer exists after a re-cluster?**
+8. **What happens to an album edit whose cluster no longer exists after a re-cluster?**
    (plan-review finding 4.) PLAN §3 requires clusters be rebuilt whenever the itinerary changes,
    and requires a user's layout edits to survive regeneration. Phase 5 forces the collision: a
    Path B album, edited, then corrected by a late import. **Recommendation: album edits pin to
@@ -180,7 +221,7 @@ Beyond BUSINESS-PLAN §12, which stands as written. These are the ones the build
    rather than applied** — "your itinerary changed; 3 pages can be improved" with a preview. The
    alternative, silently reflowing an album someone spent an hour on, is the same class of harm as
    losing the photos.
-7. **Is the pricing fallback still reachable after §2e is built?** (plan-review finding 6.)
+9. **Is the pricing fallback still reachable after §2e is built?** (plan-review finding 6.)
    BUSINESS-PLAN §12 names "flip to Model B faster" as the response if attach rate disappoints.
    Model B is a paywall before value — and PLAN §2e instructs that the membership module be
    written so a plan check has *nowhere to go* on participation paths, which is precisely what
@@ -191,9 +232,9 @@ Beyond BUSINESS-PLAN §12, which stands as written. These are the ones the build
    gets its downside without its upside. But the cost is real — reversing means reopening the
    membership module and every participation path — and it should be a decision rather than a
    discovery.
-8. **Registration open, or invite-only for the beta?** Waypoint judged open registration an
+10. **Registration open, or invite-only for the beta?** Waypoint judged open registration an
    acceptable risk for a personal app. A beta that is 50 hand-held households and is accumulating
    irreplaceable data is a different calculation, and the answer is probably invite-only until
    public launch — but it should be decided rather than inherited.
-9. **Does the Household tier's book credit expire?** BUSINESS-PLAN §7 assumes breakage as a revenue
+11. **Does the Household tier's book credit expire?** BUSINESS-PLAN §7 assumes breakage as a revenue
    line without saying so. It changes the liability and it changes how the tier is described.

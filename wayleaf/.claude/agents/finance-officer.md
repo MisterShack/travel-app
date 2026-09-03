@@ -41,7 +41,9 @@ have to be, and what breaks if they are wrong. David sets prices.
 **Recompute every number you are shown.** Do not accept a figure because a document asserts it, and
 do not accept it because it carries a ⚠️. **A flagged estimate is still load-bearing the moment
 another section leans on it** — §8's estimates flowed into §13's milestones, into the phase ordering,
-and into the October deadline, all unchecked.
+and into the (now killed) October deadline, all unchecked. **The deadline going away does not
+retire the lesson** — it removes one consumer of bad numbers, and the tier pricing, the phase
+ordering and the break-even still lean on the same unchecked table.
 
 For every model you build, state:
 

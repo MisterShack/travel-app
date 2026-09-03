@@ -13,37 +13,41 @@
 Three places where the build should not follow the business plan literally. Each is a
 recommendation for David, not a decision already taken.
 
-### 1a. Both entry paths in v1 is the wrong first month
+### 1a. Both entry paths belong in v1 — the question is only which comes first
 
-BUSINESS-PLAN §4 says build Path A (planned trip) and Path B (retroactive trip) in v1. Agreed, for
-v1. **Not agreed for the first release**, because of the date.
+**This section previously argued the opposite, on schedule grounds, and the schedule is gone.**
+BUSINESS-PLAN §9 said the ordering flow had to ship by early October or lose a gifting season; on
+2026-09-03 David killed that deadline. People travel year-round, the retroactive angle works
+year-round, and the priority is a product that is stable rather than one that is early.
 
-§9 says the ordering flow must ship **no later than early October** or a full gifting season is
-lost. Today is 2026-09-03. That is roughly four weeks, for two people, and the critical path to a
-printed book is:
+So the argument that produced "Path B only" no longer holds, and it is worth being precise about
+*why* it was weak even before the date went, because the reasoning generalises.
 
-```
-photos in → EXIF out → cluster → select and dedupe → lay out → PDF to a printer's spec → order → ship
-```
+**The de-scope cut the cheap work and kept the expensive work.** This document claimed the email
+ingestion port was "nearly free" because Waypoint proved it end to end, and eleven lines later
+claimed that cutting it bought back four weeks. Both cannot be true. `server/src/import/` is 1,044
+lines with its tests already written — two or three days. Meanwhile Path B keeps the hardest
+unsolved problem in the product, which §2c names itself: a retroactive trip has no timezone oracle.
+**As a schedule lever it was close to worthless; it was a product decision wearing a schedule
+argument.**
 
-**Email ingestion is not on that path.** It is the thing that makes Path A work, it is genuinely
-the highest-ROI use of AI (§5.1), and Wayleaf gets it nearly free because Waypoint already proved
-it end to end against a real airline confirmation and a real Via Rail one. All of which is an
-argument for porting it *confidently*, and none of which is an argument for porting it *first*.
+It was also quietly refuting the positioning. BUSINESS-PLAN §2 rests on "a photo book company
+cannot copy this without building a trip planner first" — and Path B *is* that company. Shipping
+only Path B would have meant the beta measured a product the strategy says has no moat, while the
+half that supplies the moat sat unbuilt.
 
-Path B needs no ingestion at all. A user picks a date range and a destination, dumps a camera roll
-in, and we infer the skeleton from EXIF. §4 already says Path B is "faster to value and likely
-converts better, because the user arrives already wanting the book," and §10.6 says the retroactive
-angle "works year-round rather than only in season."
+**So: build both. Sequence Path B first, for product reasons that stand on their own** — it is
+faster to value, the user arrives already wanting the book (§4), and "turn last summer's photos
+into a book" acquires people who have never wanted a trip planner (§10.6). Path A follows closely
+rather than being deferred behind the book.
 
-**Recommendation: the closed beta ships Path B only.** Path A lands in Phase 5, after the book
-works. This is not a reduction in scope, it is a reordering of it, and it buys back the four weeks
-that the October deadline does not have.
-
-**What it costs, stated because it should be decided with this on the table:** the beta then proves
-nothing about ingestion accuracy, which §5 calls "the single most damaging bug in the product." The
-mitigation is that Waypoint's ingestion is already proven against real mail, and Phase 5's
-acceptance criterion re-proves it here rather than assuming the port was clean.
+**And there is an ordering argument for pulling ingestion earlier than Phase 5**, which §5 records
+as an open decision rather than settling here: Phase 5's acceptance criterion — photos re-clustering
+against an itinerary's zones instead of their guessed ones — is the only test that actually proves
+§2c, the central technical claim of the product. Building the album on clusters that a later import
+will re-derive means either building the edit-preservation machinery twice or discovering the
+conflict late. Doing ingestion before the album means the album is built once, against final
+clusters.
 
 ### 1b. "Migrate SQLite → Postgres while it's still cheap" is already free
 
@@ -427,7 +431,7 @@ make all of it editable, with generated and edited state distinguishable per §3
 that bar itself ("four hours of layout work to ten minutes of approval"), and it is measurable.
 Time it with a stopwatch on someone who is not the author.
 
-### Phase 3 — The book, and fulfilment — **the October gate**
+### Phase 3 — The book, and fulfilment
 
 PDF generation to Prodigi's real specification: page size, bleed, colour profile, spine. The DPI
 gate of §2i. The `FulfilmentProvider` interface with Prodigi behind it and a second vendor
@@ -518,8 +522,9 @@ restated here; a decision written down twice drifts.
 4. **How long may a grounded Maps result be cached** — inherited unanswered from Waypoint, and it
    gates Phase 7's suggestions the same way it gated Waypoint's. The API docs carry no retention
    statement at all; the silence is confirmed rather than assumed.
-5. **Whether the closed beta is Path B only** — §1a makes the recommendation; the decision is
-   ROADMAP §6.1, and it is the same decision as the October date.
+5. **Whether ingestion (Path A) moves ahead of the album** — §1a makes the argument; the decision
+   is ROADMAP §6.4. Both paths are in v1 either way; this is only about order, and it turns on
+   whether the album should be built against clusters an import will later re-derive.
 6. **Railway's current PITR offering** — verify before relying on it. §6 flags Supabase as
    historically stronger here, and the answer changes only how much our own pipeline has to carry,
    never whether it exists.
@@ -550,4 +555,4 @@ What the review changed:
 | 3 | Whose retention clock governs a collaborator's uploaded photo | ROADMAP §6.5, with a recommendation |
 | 4 | A re-cluster can destroy album edits; the plan asserts both properties and reconciles neither | ROADMAP §6.6, with a recommendation |
 | 6 | §2e builds a commitment against the business plan's own stated pricing fallback | ROADMAP §6.7, with a recommendation |
-| 7 | The October date depends on Gate 2, which runs on Prodigi's clock and has never been timed | ROADMAP §5 and Gate 2 |
+| 7 | The October date depends on Gate 2, which runs on Prodigi's clock and has never been timed | **Moot 2026-09-03** — the deadline was killed. Gate 2 still blocks Phase 3, but nothing now depends on how fast Prodigi answers |
