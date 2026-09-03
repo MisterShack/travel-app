@@ -46,6 +46,43 @@ Waypoint brushed this and wrote it down: one of its import gates exists because 
 sending domain delivers replies to our own `no-reply` too". The fix is the split above — humans on
 the apex, the pipeline on `in.`, and nothing on `send.` but text records.
 
+### Setting up `hello@wayleaf.app` — Cloudflare Email Routing
+
+Free, inbound-only, five minutes. It is enough for a coming-soon page and it is the address printed
+on the live site twice as the only route a person has to ask for their data to be deleted.
+
+1. Zone `wayleaf.app` → **Email** → **Email Routing** → enable.
+2. Add a **destination address** (a personal inbox) and click the link Cloudflare emails you.
+   Forwarding does not start until that is verified.
+3. Create the custom address `hello@wayleaf.app` → forward to the destination.
+4. **Accept the MX and SPF records it offers.** This is Email Routing taking the apex MX, which is
+   correct and intended — the apex is for humans.
+5. Add a **catch-all** to the same destination. Typos, and anything sent to an address we have not
+   thought of yet, otherwise bounce silently.
+6. Verify by sending from an account that is not the destination. A message from the destination to
+   itself can loop or be filtered and proves nothing.
+
+**It only receives.** Replying from your own inbox shows your personal address, not `hello@`.
+Options, in order of how much they cost:
+
+- **Do nothing.** For a coming-soon page, replying from a personal address is fine and honest.
+- **Fastmail on the apex when two-way matters.** It replaces Email Routing, sends and receives
+  properly, and brings its own SPF/DKIM.
+- **Do not wire Resend into human mail.** It is the transactional sender, it belongs on `send.`, and
+  putting its DKIM on the apex muddies the separation this section exists to keep.
+
+### Two ways this breaks later, both silent
+
+**Resend inbound must never be given the apex MX.** When Phase 5 arrives, its MX goes on
+`in.wayleaf.app`. Pointed at the apex it replaces Email Routing's records and `hello@` stops
+receiving — no error, no bounce we would see, just silence on the one address the privacy page
+promises a reply from.
+
+**A hostname may have exactly one SPF record.** Two `v=spf1` TXT records on the same name is a
+permanent error, and receivers treat it as a fail rather than ignoring the extra. Email Routing adds
+one to the apex. If anything else ever sends as `@wayleaf.app`, the two mechanisms have to be merged
+into a single record — never added alongside.
+
 **And keep transactional sending off the apex.** If bulk mail and human mail share a domain, a
 deliverability problem in one poisons the other, and the domain a customer emails you at is the
 worse half to lose.
